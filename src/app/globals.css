@@ -1,23 +1,24 @@
-/* src/app/globals.css */
+/* Tailwind v4 import */
 @import "tailwindcss";
 
+/* ---------- Base ---------- */
 @layer base {
   :root { color-scheme: dark; }
   html, body { @apply min-h-screen text-white; background-color: #0b0f17; }
 }
 
-/* Reusable UI helpers */
+/* ---------- Reusable helpers ---------- */
 @layer components {
   .glass { @apply bg-white/5 border border-white/10 backdrop-blur-md; }
   .thin-border { @apply border border-white/10; }
   .gradient-text { @apply bg-clip-text text-transparent; }
 }
 .gradient-text {
-  /* plain CSS for gradient text */
+  /* keep gradient as plain CSS (avoids Tailwind 'background-image' parsing) */
   background-image: linear-gradient(90deg, #22d3ee, #60a5fa, #a78bfa);
 }
 
-/* Futuristic background layers (pure CSS, no Tailwind parsing issues) */
+/* ---------- Futuristic background layers ---------- */
 .aurora {
   position: absolute; inset: -20%;
   background:
@@ -65,4 +66,79 @@
 
 @media (prefers-reduced-motion: reduce) {
   .aurora, .scanlines { animation: none !important; }
+}
+
+/* ---------- Big, clickable tabs ---------- */
+.tab-card {
+  position: relative; aspect-ratio: 1 / 1;
+  border-radius: 1.5rem; padding: 1.25rem; text-align: left;
+  border: 1px solid rgba(255,255,255,0.12); overflow: hidden;
+  transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+}
+.tab-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.25); box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.tab-inner { position: relative; z-index: 2; }
+.tab-title { font-weight: 700; font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
+.tab-sub { color: rgba(255,255,255,.7); margin-top: .35rem; font-size: .95rem; }
+
+/* Purple/blue starry tab (Futurecasting) */
+.tab-future {
+  background:
+    radial-gradient(120% 90% at 10% 10%, rgba(34,211,238,.15), transparent 60%),
+    radial-gradient(110% 90% at 90% 15%, rgba(168,85,247,.18), transparent 60%),
+    rgba(11,15,23,1);
+}
+.tab-future .tab-dots::before, .tab-future .tab-dots::after {
+  content:""; position:absolute; inset:0; background-image:
+    radial-gradient(2px 2px at 15% 25%, rgba(255,255,255,.6), transparent),
+    radial-gradient(1.5px 1.5px at 60% 40%, rgba(255,255,255,.5), transparent),
+    radial-gradient(1.2px 1.2px at 80% 70%, rgba(255,255,255,.35), transparent);
+  opacity:.7; filter: drop-shadow(0 0 6px rgba(180,200,255,.25));
+}
+
+/* Bright “Wonderland” tab (Hoops) */
+.wonder-card {
+  position: relative;
+  background:
+    radial-gradient(100% 120% at 10% 10%, rgba(255,182,193,.18), transparent 60%),
+    radial-gradient(120% 120% at 90% 10%, rgba(255,255,153,.18), transparent 60%),
+    radial-gradient(120% 120% at 50% 90%, rgba(186,230,253,.18), transparent 60%),
+    rgba(255,255,255,.06);
+}
+.tab-wonder {
+  position: relative;
+  background:
+    radial-gradient(100% 120% at 10% 10%, rgba(255,182,193,.22), transparent 60%),
+    radial-gradient(120% 120% at 90% 10%, rgba(255,255,153,.22), transparent 60%),
+    radial-gradient(120% 120% at 50% 90%, rgba(186,230,253,.22), transparent 60%),
+    rgba(255,255,255,.06);
+}
+
+/* Sparkles + sheen for Wonderland vibe */
+.sparkles::before {
+  content:""; position:absolute; inset: -10%;
+  background:
+    radial-gradient(3px 3px at 20% 30%, rgba(255,255,255,.9), transparent 30%),
+    radial-gradient(2px 2px at 60% 40%, rgba(255,255,255,.8), transparent 30%),
+    radial-gradient(2px 2px at 80% 70%, rgba(255,255,255,.7), transparent 30%),
+    radial-gradient(1.5px 1.5px at 35% 80%, rgba(255,255,255,.6), transparent 30%);
+  filter: drop-shadow(0 0 10px rgba(255,255,255,.35));
+  animation: sparkleShift 12s linear infinite;
+  pointer-events: none;
+}
+@keyframes sparkleShift {
+  0% { transform: translate3d(0,0,0) }
+  50% { transform: translate3d(2%, -2%, 0) }
+  100% { transform: translate3d(0,0,0) }
+}
+.shine::after {
+  content:""; position:absolute; inset:-20%;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.25) 50%, transparent 70%);
+  transform: rotate(5deg);
+  animation: sheen 6s linear infinite;
+  pointer-events: none;
+}
+@keyframes sheen {
+  0% { transform: translateX(-60%) rotate(5deg); }
+  100% { transform: translateX(60%) rotate(5deg); }
 }

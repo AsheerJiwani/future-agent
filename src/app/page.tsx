@@ -1,19 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Load the Three.js starfield only on the client (no SSR)
-const Starfield = dynamic(() => import("../components/Starfield"), { ssr: false });
+/* 3D background (client-only) */
+const Starfield = dynamic(() => import("../components/Starfield").then(m => m.default), { ssr: false });
 
-type Scenario = {
-  name: string;
-  summary: string;
-  decade_timeline?: { year: number; milestones: string[] }[];
-};
+/* ---------------- Types ---------------- */
+type Timeline = { year: number; milestones: string[] };
+type Scenario = { name: string; summary: string; decade_timeline?: Timeline[] };
 
-type Payload = {
+type FuturePayload = {
   title: string;
   domains: string[];
   horizon_years: number;
@@ -23,10 +21,14 @@ type Payload = {
   suggested_actions: string[];
 };
 
-export default function Page() {
+type ChatMsg = { role: "user" | "assistant"; content: string };
+type HoopsResp = { answer: string; follow_up: string; sources: { title: string; url: string }[] };
+
+/* ---------------- Futurecasting Panel ---------------- */
+function FuturecastingPanel() {
   const [topic, setTopic] = useState("");
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<Payload | null>(null);
+  const [data, setData] = useState<FuturePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -34,7 +36,6 @@ export default function Page() {
     setError(null);
     setLoading(true);
     setData(null);
-
     try {
       const res = await fetch("/api/predict", {
         method: "POST",
@@ -47,8 +48,9 @@ export default function Page() {
           question: ""
         })
       });
+
       if (!res.ok) throw new Error(await res.text());
-      const json: Payload = await res.json();
+      const json = (await res.json()) as FuturePayload;
       setData(json);
     } catch (err) {
       console.error(err);
@@ -59,193 +61,313 @@ export default function Page() {
   }
 
   return (
+    <div className="glass rounded-3xl p-6 md:p-8">
+      <h2 className="text-xl font-semibold mb-4">Futurecasting AI</h2>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm mb-2 opacity-80">Enter a topic and let the AI predict what will happen to it in 50 years!</label>
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="e.g., Quantum computing in medicine"
+            className="w-full rounded-xl bg-white/5 thin-border px-3 py-3 outline-none focus:ring-2 focus:ring-cyan-400"
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-xl py-3 font-semibold bg-gradient-to-r from-cyan-500 to-purple-500 hover:opacity-90 transition disabled:opacity-60"
+        >
+          {loading ? "Generating…" : "Generate Scenarios"}
+        </button>
+
+        {error && <div className="text-red-300 text-sm">{error}</div>}
+      </form>
+
+      <div className="mt-6">
+        {!loading && !data && <div className="text-white/60 text-sm">Your scenarios will appear here.</div>}
+        {loading && <div className="text-white/70">Synthesizing long-horizon futures…</div>}
+
+        {data && (
+          <div className="space-y-6">
+            <div className="text-sm text-white/70">
+              <div className="text-base text-white font-semibold">{data.title}</div>
+              <div className="opacity-70">
+                Domains: {data.domains.join(", ")} · Horizon: {data.horizon_years} yrs
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {data.scenarios.map((s, i) => (
+                <div key={i} className="rounded-2xl thin-border p-4 bg-white/5">
+                  <div className="text-sm uppercase tracking-wide opacity-70 mb-1">{s.name}</div>
+                  <div className="font-medium mb-2">{s.summary}</div>
+                  {!!s.decade_timeline?.length && (
+                    <div className="text-xs opacity-80 space-y-1 mt-2">
+                      <div className="opacity-60 mb-1">Milestones</div>
+                      <ul className="space-y-1 list-disc ml-5">
+                        {s.decade_timeline.slice(0, 5).map((t, k) => (
+                          <li key={k}><span className="opacity-60">{t.year}:</span> {t.milestones.join("; ")}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {[
+                { title: "Signals to watch", items: data.signals },
+                { title: "Open questions", items: data.open_questions },
+                { title: "Next-best actions", items: data.suggested_actions }
+              ].map((blk, idx) => (
+                <div key={idx} className="rounded-2xl thin-border p-4 bg-white/5">
+                  <div className="opacity-70 text-sm uppercase tracking-wide mb-1">{blk.title}</div>
+                  {blk.items.length === 0 ? (
+                    <div className="text-white/50 text-sm">—</div>
+                  ) : (
+                    <ul className="list-disc ml-5 space-y-1 text-sm">
+                      {blk.items.map((x, i) => <li key={i}>{x}</li>)}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- HoopsChat with client-side streaming ---------------- */
+function HoopsChat() {
+  const [history, setHistory] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  // boot message
+  useEffect(() => {
+    const saved = localStorage.getItem("hoops_history");
+    if (saved) setHistory(JSON.parse(saved) as ChatMsg[]);
+    else setHistory([{ role: "assistant", content: "Yo! I’m Hoops Tutor 🏀 What do you want to learn—triangle offense, Spain PnR, or an era like the 2010s Warriors?" }]);
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("hoops_history", JSON.stringify(history));
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+
+    const base = [...history, { role: "user", content: text } as ChatMsg];
+    // optimistic assistant placeholder for streaming
+    const placeholderIndex = base.length;
+    base.push({ role: "assistant", content: "" });
+    setHistory(base);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/hoops-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history: base })
+      });
+
+      const ct = res.headers.get("content-type") || "";
+
+      // --- If server streams text (SSE or chunked) ---
+      if (res.body && (ct.includes("text/event-stream") || ct.includes("text/plain"))) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+        let next = [...base] as ChatMsg[];
+
+        while (!done) {
+          const chunk = await reader.read();
+          done = chunk.done;
+          if (chunk.value) {
+            const s = decoder.decode(chunk.value, { stream: true });
+            // If SSE-style lines: "data: ...\n\n"
+            const append = s.replace(/^data:\s*/gm, "");
+            next[placeholderIndex] = {
+              role: "assistant",
+              content: (next[placeholderIndex]?.content || "") + append
+            } as ChatMsg;
+            setHistory(next as ChatMsg[]);
+          }
+        }
+      }
+      // --- JSON response fallback (current API behavior) ---
+      else {
+        if (!res.ok) throw new Error(await res.text());
+        const data = (await res.json()) as HoopsResp | { error: string };
+        if ("error" in data) throw new Error(data.error);
+
+        const sources = data.sources?.length
+          ? "\n\nSources:\n" + data.sources.map(s => `• ${s.title} — ${s.url}`).join("\n")
+          : "";
+
+        const next = [...base];
+        next[placeholderIndex] = { role: "assistant", content: `${data.answer}\n\n${data.follow_up}${sources}` };
+        setHistory(next as ChatMsg[]);
+      }
+    } catch (e) {
+      console.error(e);
+      const next = [...history, { role: "user", content: text }, { role: "assistant", content: "My bad—something glitched. Try again in a sec." }];
+      setHistory(next as ChatMsg[]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  }
+
+  return (
+    <div className="rounded-3xl p-4 md:p-6 wonder-card thin-border relative overflow-hidden">
+      <div className="text-lg font-semibold mb-2">Hoops Tutor</div>
+      <div className="text-white/70 text-sm mb-4">Ask me about eras, sets, rules, or strategy. I’ll quiz you back 😏</div>
+
+      <div className="h-80 overflow-y-auto rounded-2xl p-3 bg-white/5 thin-border">
+        {history.map((m, i) => (
+          <div key={i} className={`mb-3 ${m.role === "user" ? "text-right" : "text-left"}`}>
+            <div className={`inline-block max-w-[85%] rounded-2xl px-3 py-2 whitespace-pre-wrap ${
+              m.role === "user" ? "bg-gradient-to-r from-pink-400/30 to-yellow-300/30 thin-border" : "bg-white/10 thin-border"
+            }`}>
+              {m.content}
+            </div>
+          </div>
+        ))}
+        <div ref={endRef} />
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <input
+          className="flex-1 rounded-xl px-3 py-3 bg-white/5 thin-border outline-none focus:ring-2 focus:ring-fuchsia-400"
+          placeholder="E.g., how did the 24-second clock change the NBA?"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKey}
+        />
+        <button
+          onClick={send}
+          disabled={loading}
+          className="rounded-xl px-4 py-3 font-semibold bg-gradient-to-r from-fuchsia-500 to-amber-400 hover:opacity-90 disabled:opacity-60"
+        >
+          {loading ? "Thinking…" : "Send"}
+        </button>
+      </div>
+
+      {/* Wonderland glisten */}
+      <div className="sparkles" />
+      <div className="shine" />
+    </div>
+  );
+}
+
+/* ---------------- Page (two large tabs) ---------------- */
+export default function Page() {
+  const [open, setOpen] = useState<"future" | "hoops" | null>(null);
+
+  return (
     <div className="relative min-h-screen overflow-hidden">
-      {/* Futuristic background (client-only 3D) */}
+      {/* BACKGROUND */}
       <div className="aurora" />
-      <div className="pointer-events-none absolute inset-0">
+      <div className="pointer-events-none absolute inset-0 -z-10">
         <Starfield />
       </div>
 
-      {/* Header */}
+      {/* HEADER */}
       <header className="relative z-10 max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between">
           <div className="text-sm opacity-80">asheerjiwani.dev</div>
           <nav className="text-sm opacity-80 space-x-5">
-            <a href="#agent" className="hover:opacity-100">Agent</a>
+            <a href="#tabs" className="hover:opacity-100">Home</a>
             <a href="#about" className="hover:opacity-100">About</a>
-            <a href="https://vercel.com" target="_blank" rel="noreferrer" className="hover:opacity-100">
-              Deployed on Vercel
-            </a>
           </nav>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="relative z-10 max-w-6xl mx-auto px-6 pb-24">
-        {/* Hero */}
-        <section className="text-center py-10">
-          <motion.h1
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-4xl md:text-6xl font-semibold leading-tight"
-          >
-            <span className="gradient-text">Futurecasting AI</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.6 }}
-            className="mt-4 text-white/70 max-w-3xl mx-auto"
-          >
-            Enter a topic, and this multi-agent system imagines how it could evolve over the next 50 years—
-            across markets, politics, and technology.
-          </motion.p>
-          <p className="mt-2 text-xs text-white/50">Exploratory scenarios. Not advice.</p>
+      {/* TABS GRID */}
+      <main id="tabs" className="relative z-10 max-w-6xl mx-auto px-6 pb-24">
+        <section className="text-center py-6">
+          <h1 className="text-4xl md:text-5xl font-semibold gradient-text">Interactive Labs</h1>
+          <p className="mt-2 text-white/70">Pick a tile to open a full experience.</p>
         </section>
 
-        {/* Agent */}
-        <section id="agent" className="grid lg:grid-cols-2 gap-6">
-          {/* Left: form */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="glass rounded-3xl p-6 md:p-8 shadow-glow"
-          >
-            <h2 className="text-xl font-semibold mb-4">
-              Enter a topic and let the AI predict what will happen to it in 50 years!
-            </h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* FUTURECAST TAB */}
+          <button onClick={() => setOpen(open === "future" ? null : "future")} className="tab-card tab-future group">
+            <div className="tab-inner">
+              <div className="tab-title">Futurecasting AI</div>
+              <div className="tab-sub">50-year scenarios across markets, politics, tech.</div>
+            </div>
+            <div className="tab-dots" />
+          </button>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm mb-2 opacity-80">Your topic</label>
-                <input
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  placeholder="e.g., Quantum computing in medicine"
-                  className="w-full rounded-xl bg-white/5 thin-border px-3 py-3 outline-none focus:ring-2 focus:ring-cyan-400"
-                  required
-                />
-              </div>
+          {/* HOOPS TAB */}
+          <button onClick={() => setOpen(open === "hoops" ? null : "hoops")} className="tab-card tab-wonder group">
+            <div className="tab-inner">
+              <div className="tab-title">Hoops Tutor</div>
+              <div className="tab-sub">Learn plays, eras, and strategy—get quizzed as you go.</div>
+            </div>
+            <div className="sparkles" />
+            <div className="shine" />
+          </button>
+        </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl py-3 font-semibold bg-gradient-to-r from-cyan-500 to-purple-500 hover:opacity-90 transition disabled:opacity-60"
-              >
-                {loading ? "Generating…" : "Generate Scenarios"}
-              </button>
+        {/* PANELS */}
+        <AnimatePresence>
+          {open === "future" && (
+            <motion.section
+              key="future"
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
+              className="mt-6"
+            >
+              <FuturecastingPanel />
+            </motion.section>
+          )}
 
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="text-red-300 text-sm"
-                  >
-                    {error}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </form>
-          </motion.div>
+          {open === "hoops" && (
+            <motion.section
+              key="hoops"
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
+              className="mt-6"
+            >
+              <HoopsChat />
+            </motion.section>
+          )}
+        </AnimatePresence>
 
-          {/* Right: output */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05, duration: 0.5 }}
-            className="glass rounded-3xl p-6 md:p-8"
-          >
-            <h2 className="text-xl font-semibold mb-4">Output</h2>
-
-            {!loading && !data && (
-              <div className="text-white/60 text-sm">Your scenarios will appear here.</div>
-            )}
-
-            {loading && (
-              <div className="text-white/70">Synthesizing multi-agent futures…</div>
-            )}
-
-            {data && (
-              <div className="space-y-6">
-                <div className="text-sm text-white/70">
-                  <div className="text-base text-white font-semibold">{data.title}</div>
-                  <div className="opacity-70">
-                    Domains: {data.domains.join(", ")} · Horizon: {data.horizon_years} yrs
-                  </div>
-                </div>
-
-                {/* Scenarios */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  {data.scenarios.map((s, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.05 * i }}
-                      className="rounded-2xl thin-border p-4 bg-white/5"
-                    >
-                      <div className="text-sm uppercase tracking-wide opacity-70 mb-1">{s.name}</div>
-                      <div className="font-medium mb-2">{s.summary}</div>
-                      {!!s.decade_timeline?.length && (
-                        <div className="text-xs opacity-80 space-y-1 mt-2">
-                          <div className="opacity-60 mb-1">Milestones</div>
-                          <ul className="space-y-1 list-disc ml-5">
-                            {s.decade_timeline.slice(0, 5).map((t, k) => (
-                              <li key={k}>
-                                <span className="opacity-60">{t.year}:</span> {t.milestones.join("; ")}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-
-                {/* Signals / Questions / Actions */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  {[
-                    { title: "Signals to watch", items: data.signals },
-                    { title: "Open questions", items: data.open_questions },
-                    { title: "Next-best actions", items: data.suggested_actions }
-                  ].map((blk, idx) => (
-                    <div key={idx} className="rounded-2xl thin-border p-4 bg-white/5">
-                      <div className="opacity-70 text-sm uppercase tracking-wide mb-1">{blk.title}</div>
-                      {!blk.items?.length ? (
-                        <div className="text-white/50 text-sm">—</div>
-                      ) : (
-                        <ul className="list-disc ml-5 space-y-1 text-sm">
-                          {blk.items.map((x, i) => <li key={i}>{x}</li>)}
-                        </ul>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </section>
-
-        {/* About */}
+        {/* ABOUT */}
         <section id="about" className="mt-16 glass rounded-3xl p-6 md:p-8">
-          <h3 className="text-lg font-semibold mb-2">About this project</h3>
+          <h3 className="text-lg font-semibold mb-2">About</h3>
           <p className="text-white/70">
-            A custom multi-agent system that synthesizes long-horizon drivers, generates scenarios,
-            and stress-tests assumptions. Built with Next.js, Tailwind, Framer Motion, and a starfield
-            rendered in Three.js. Powered by OpenAI’s gpt-4o-mini.
+            Two interactive tiles: a star-lit Futurecasting AI and a bright, playful Hoops Tutor.
+            Built with Next.js, Tailwind, and OpenAI.
           </p>
         </section>
 
         <footer className="mt-10 text-center text-white/50 text-xs">
-          © {new Date().getFullYear()} Asheer Jiwani · Source available on request
+          © {new Date().getFullYear()} Asheer Jiwani · Exploratory only
         </footer>
       </main>
-      
+
+      {/* FOREGROUND OVERLAYS */}
+      <div className="grid-overlay" />
+      <div className="scanlines" />
     </div>
   );
-  
 }
