@@ -188,7 +188,7 @@ function HoopsChat() {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let done = false;
-        let next = [...base] as ChatMsg[];
+        const next = [...base];
 
         while (!done) {
           const chunk = await reader.read();
