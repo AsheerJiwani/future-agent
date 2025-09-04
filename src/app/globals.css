@@ -144,6 +144,15 @@
   --bubbleUserFrom:#f0abfc66; --bubbleUserTo:#fbbf2466; --bubbleBot: rgba(255,255,255,.14);
 }
 
+/* Theme: Football (distinct from site, Future, Hoops) */
+.theme-football {
+  --accent-from: #34d399; /* emerald */
+  --accent-to:   #22d3ee; /* cyan */
+  --ring: rgba(34,211,238,.45);
+  --surface: rgba(6, 18, 12, 0.75); /* deep greenish glass */
+  --bubbleUserFrom:#34d3994d; --bubbleUserTo:#22d3ee4d; --bubbleBot: rgba(255,255,255,.10);
+}
+
 /* Utility classes used inside panels */
 .btn-accent {
   background-image: linear-gradient(90deg, var(--accent-from), var(--accent-to));
