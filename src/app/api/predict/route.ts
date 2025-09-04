@@ -1,4 +1,6 @@
-export const runtime = "edge"; // fast on Vercel Edge
+// src/app/api/predict/route.ts
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 type ChatRole = "system" | "user" | "assistant";
 type ChatMessage = { role: ChatRole; content: string };
@@ -11,13 +13,8 @@ type RequestPayload = {
   question: string;
 };
 
-type Driver = { name: string; why_it_matters: string; indicative_metrics?: string[] };
-type SynthOut = { drivers: Driver[] };
-
 type Timeline = { year: number; milestones: string[] };
 type Scenario = { name: string; summary: string; decade_timeline: Timeline[] };
-
-type AuditOut = { signals: string[]; open_questions: string[] };
 
 type FinalPayload = {
   title: string;
@@ -29,41 +26,31 @@ type FinalPayload = {
   suggested_actions: string[];
 };
 
-function safeParse<T>(text: string): T | null {
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return null;
-  }
-}
-
 function requireEnv(name: string): string {
   const v = process.env[name];
-  if (!v) {
-    // Clear error you can see in Vercel logs
-    console.error(`[api/predict] Missing env var: ${name}`);
-    throw new Error(`Server misconfigured: ${name} is not set`);
-  }
+  if (!v) throw new Error(`Server misconfigured: ${name} is not set`);
   return v;
 }
 
-async function chat(messages: ChatMessage[], expectJSON = false): Promise<string> {
-  const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY"); // ✅ guard here
+function safeParse<T>(text: string): T | null {
+  try { return JSON.parse(text) as T; } catch { return null; }
+}
 
+async function chat(messages: ChatMessage[], expectJSON = false): Promise<string> {
+  const OPENAI_API_KEY = requireEnv("OPENAI_API_KEY");
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
       temperature: 0.6,
       messages,
-      response_format: expectJSON ? { type: "json_object" } : undefined,
-    }),
+      response_format: expectJSON ? { type: "json_object" } : undefined
+    })
   });
-
   if (!res.ok) {
     const t = await res.text();
     console.error("[api/predict] OpenAI error:", t);
@@ -76,107 +63,57 @@ async function chat(messages: ChatMessage[], expectJSON = false): Promise<string
 export async function POST(req: Request) {
   try {
     const incoming = (await req.json()) as Partial<RequestPayload> | null;
-
-    const topic = incoming?.topic ?? "Global AI progress";
-    const domains = incoming?.domains ?? ["markets", "politics", "technology"];
-    const region = incoming?.region ?? "Global";
-    const horizon = typeof incoming?.horizon === "number" ? incoming!.horizon : 50;
+    const topic    = incoming?.topic    ?? "Global AI progress";
+    const domains  = incoming?.domains  ?? ["markets", "politics", "technology", "society"];
+    const region   = incoming?.region   ?? "Global";
+    const horizon  = typeof incoming?.horizon === "number" ? incoming!.horizon : 50;
     const question = incoming?.question ?? "";
 
-    // 1) Trend Synthesizer
-    const synthMsg = await chat(
-      [
-        {
-          role: "system",
-          content:
-            `You are Trend Synthesizer. Return JSON: ` +
-            `{ "drivers": [{ "name": string, "why_it_matters": string, "indicative_metrics": string[] }] }`
-        },
-        {
-          role: "user",
-          content:
-            `Topic: ${topic}\nDomains: ${domains.join(", ")}\nRegion: ${region}\nHorizon: ${horizon}\n` +
-            `Question: ${question || "(none)"}\nReturn JSON only.`
-        }
-      ],
-      true
-    );
-    const synth = safeParse<SynthOut>(synthMsg) ?? { drivers: [] };
+    const system: ChatMessage = {
+      role: "system",
+      content:
+`You are a single-pass Futurecasting multi-agent in one body.
+Write ONLY strict JSON with keys:
+{
+  "title": string,
+  "domains": string[],
+  "horizon_years": number,
+  "scenarios": [
+    { "name": "Baseline", "summary": string, "decade_timeline": [{"year": number, "milestones": string[]}] },
+    { "name": "Upside",   "summary": string, "decade_timeline": [{"year": number, "milestones": string[]}] },
+    { "name": "Downside", "summary": string, "decade_timeline": [{"year": number, "milestones": string[]}] }
+  ],
+  "signals": string[],
+  "open_questions": string[],
+  "suggested_actions": string[]
+}
+Constraints:
+- horizon spans ~10-year steps up to the given number of years
+- each summary <= 120 words
+- keep signals/actions concise and concrete
+- NO markdown, NO commentary, JSON only`
+    };
 
-    // 2) Scenario Generator
-    const scenMsg = await chat(
-      [
-        {
-          role: "system",
-          content:
-            `You are Scenario Generator. Return JSON: { "scenarios":[{ "name":"Baseline|Upside|Downside", ` +
-            `"summary": string, "decade_timeline":[{"year":number,"milestones":string[]}] }] } spanning ${horizon}y in ~10y steps.`
-        },
-        { role: "user", content: `Drivers JSON:\n${JSON.stringify(synth)}\nReturn JSON only.` }
-      ],
-      true
-    );
-    const scenParsed = safeParse<{ scenarios: Scenario[] }>(scenMsg);
-    const scenarios: Scenario[] = scenParsed?.scenarios ?? [];
+    const user: ChatMessage = {
+      role: "user",
+      content:
+`Topic: ${topic}
+Domains: ${domains.join(", ")}
+Region: ${region}
+Horizon: ${horizon}
+Question: ${question || "(none)"}`
+    };
 
-    // 3) Risk Auditor
-    const auditMsg = await chat(
-      [
-        {
-          role: "system",
-          content: `You are Risk Auditor. Return JSON: { "signals": string[], "open_questions": string[] }`
-        },
-        {
-          role: "user",
-          content:
-            `Topic: ${topic}\nDomains: ${domains.join(", ")}\nRegion: ${region}\n` +
-            `Scenarios: ${JSON.stringify(scenarios)}\nReturn JSON only.`
-        }
-      ],
-      true
-    );
-    const audit = safeParse<AuditOut>(auditMsg) ?? { signals: [], open_questions: [] };
+    const jsonStr = await chat([system, user], true);
+    const parsed = safeParse<FinalPayload>(jsonStr);
+    const fallback: FinalPayload = {
+      title: `${topic} — ${horizon}-Year Outlook`,
+      domains, horizon_years: horizon,
+      scenarios: [],
+      signals: [], open_questions: [], suggested_actions: []
+    };
 
-    // 4) Executive Summary
-    const finalMsg = await chat(
-      [
-        {
-          role: "system",
-          content:
-            `You are Executive Summarizer. Return STRICT JSON:\n` +
-            `{\n  "title": string,\n  "domains": string[],\n  "horizon_years": number,\n` +
-            `  "scenarios": [{ "name": string, "summary": string, "decade_timeline": [{"year": number, "milestones": string[]}] }],\n` +
-            `  "signals": string[],\n  "open_questions": string[],\n  "suggested_actions": string[]\n}`
-        },
-        {
-          role: "user",
-          content:
-            `Inputs:\nTopic: ${topic}\nDomains: ${domains.join(", ")}\nRegion: ${region}\nHorizon: ${horizon}\n` +
-            `Drivers: ${JSON.stringify(synth)}\nScenarios: ${JSON.stringify(scenarios)}\nAudit: ${JSON.stringify(audit)}\n` +
-            `Audience: analysts, founders, policymakers.`
-        }
-      ],
-      true
-    );
-    const parsed = safeParse<FinalPayload>(finalMsg);
-
-    const finalJSON: FinalPayload =
-      parsed ?? {
-        title: `${topic} — ${horizon}-Year Outlook`,
-        domains,
-        horizon_years: horizon,
-        scenarios,
-        signals: audit.signals,
-        open_questions: audit.open_questions,
-        suggested_actions: []
-      };
-
-    finalJSON.title ||= `${topic} — ${horizon}-Year Outlook`;
-    finalJSON.domains ||= domains;
-    finalJSON.horizon_years ||= horizon;
-
-    return new Response(JSON.stringify(finalJSON), {
-      status: 200,
+    return new Response(JSON.stringify(parsed ?? fallback), {
       headers: { "Content-Type": "application/json" }
     });
   } catch (e) {
