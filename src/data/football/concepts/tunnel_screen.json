@@ -1,0 +1,101 @@
+{
+  "id": "TUNNEL_SCREEN",
+  "name": "Tunnel Screen",
+  "family": "Quick",
+  "bestInto": ["C3", "C2", "Pressure"],
+  "weakInto": ["Press man w/ trigger"],
+  "personnel": ["10", "11"],
+  "formations": ["2x2", "3x1", "Trips"],
+  "tags": ["WR screen", "alley block"],
+  "preSnapKeys": [
+    "Off coverage to screen side",
+    "Overhang width",
+    "Pressure tells"
+  ],
+  "postSnapKeys": [
+    "Let rush upfield",
+    "WR retrace, OL release",
+    "Hit alley behind blocks"
+  ],
+  "footwork": "Catch/throw",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Overhang/Nickel", "if": "late trigger (eyes on QB; depth ≥ 6)", "then": "Throw screen now", "coachingPoint": "Ball to screen shoulder; let rush upfield" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "drives early downhill", "then": "Abort throw—eat it or dirt it at feet", "coachingPoint": "Screens die vs early trigger" }
+      ],
+      "notes": ["Invite rush: tackle/guard release timing matters more than QB patience."]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "bails/squats under outside WR", "then": "Good: throw tunnel inside", "coachingPoint": "WR retrace; OL wrap to alley" },
+        { "step": 2, "keyDefender": "Half safety", "if": "fast fill into alley", "then": "Hit quick; WR plant & cut back behind first wrap", "coachingPoint": "Avoid drift—ball fast" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens & runs to pole", "then": "Tunnel is on—LBs vacate middle", "coachingPoint": "Throw with conviction; let OL escort" },
+        { "step": 2, "keyDefender": "Nickel", "if": "fits inside early", "then": "Abort or check backside swing", "coachingPoint": "Don’t throw into squeeze" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps quick out/flat", "then": "Tunnel still good (inside path)", "coachingPoint": "Ball inside; avoid sideline" },
+        { "step": 2, "keyDefender": "Safety", "if": "triggers downhill early", "then": "Kill it—progress to next play", "coachingPoint": "Screens are yes/no—don’t force" }
+      ],
+      "notes": ["Great call into trap look if the screen lane is inside (not out)."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on WR", "if": "off/soft or picked in traffic", "then": "Throw now—let him run", "coachingPoint": "Lead slightly upfield" },
+        { "step": 2, "keyDefender": "Press man", "if": "CB triggers through WR", "then": "Abort; check RB swing or dirt", "coachingPoint": "Never throw into collision" }
+      ],
+      "hotRules": ["Vs pressure → screen is built-in hot if lane is clear; else dirt at feet"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Ball out to tunnel instantly or dirt", "coachingPoint": "Protect—no drift" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Under droppers", "if": "depth ≥ 8 and expand with routes", "then": "Tunnel good—hit fast", "coachingPoint": "Timing over velocity; OL to alley" },
+        { "step": 2, "keyDefender": "Outside quarter", "if": "triggers downhill early", "then": "Abort; alert backside screen tag", "coachingPoint": "Don’t throw into a trigger" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LB/Nickel", "if": "flow with routes, late to rally", "then": "Throw tunnel", "coachingPoint": "Hit chest, no arc" },
+        { "step": 2, "keyDefender": "Safety", "if": "downhill fit early", "then": "Eat it/dirt", "coachingPoint": "Live for 2nd/short, not a pick-6" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "bails/sits squat outside", "then": "Tunnel inside is green", "coachingPoint": "WR retrace tight" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match under", "if": "collision routes, late to trigger", "then": "Throw tunnel", "coachingPoint": "Trust OL release timing" },
+        { "step": 2, "keyDefender": "Match safety", "if": "fits fast", "then": "Abort", "coachingPoint": "Screens are binary—yes or no" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Throwing too early before OL release",
+    "Panicking vs free rusher (trust the screen)"
+  ],
+  "sources": [
+    { "title": "Screen concepts", "url": "https://en.wikipedia.org/wiki/Screen_pass" }
+  ]
+}

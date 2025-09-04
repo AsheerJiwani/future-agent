@@ -1,0 +1,103 @@
+{
+  "id": "Y_CROSS",
+  "name": "Y-Cross",
+  "family": "Dropback",
+  "bestInto": ["C3", "C1", "QUARTERS"],
+  "weakInto": ["C2"],
+  "personnel": ["11", "12"],
+  "formations": ["3x1", "2x2"],
+  "tags": ["cross route + post/dig", "Air Raid staple"],
+  "preSnapKeys": [
+    "Single-high shell (good)",
+    "Cross runner match (LB/Nickel)",
+    "MOF safety tilt"
+  ],
+  "postSnapKeys": [
+    "Cross runner leveraged by hook/curl",
+    "Post/dig window behind",
+    "Back side alert (go/dig)"
+  ],
+  "footwork": "Gun 5–7 (or PA)",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Hook/curl (frontside)", "if": "widens with shallow/flat tag", "then": "Y-cross behind @14–18", "coachingPoint": "Drive it; hit him on stride" },
+        { "step": 2, "keyDefender": "MOF safety", "if": "stays high on post/clear", "then": "Cross window still open—take it", "coachingPoint": "Eyes hold MOF, ball on time" },
+        { "step": 3, "keyDefender": "Hook/curl (backside)", "if": "sits under cross", "then": "Backside dig/sit or checkdown", "coachingPoint": "Progress quickly; don’t force" }
+      ],
+      "notes": ["Air Raid staple: Cross answers single-high by replacing widened hook/curl."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on cross", "if": "in trail through traffic", "then": "Hit cross on the run", "coachingPoint": "Lead away from leverage; YAC throw" },
+        { "step": 2, "keyDefender": "Low hole/robber", "if": "drives cross early", "then": "Backside dig/sit replaces robber", "coachingPoint": "Replace vacated space immediately" },
+        { "step": 3, "keyDefender": "Man on post", "if": "no safety help outside", "then": "Alert post shot", "coachingPoint": "Only if leverage is clean" }
+      ],
+      "hotRules": ["Vs pressure → throw to cross working away from blitz or quick outlet"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to cross/shallow now", "coachingPoint": "Catch/rock/throw—no hitch" },
+        { "step": 2, "keyDefender": "Trail leverage", "if": "protected", "then": "Pick best leverage: cross vs trail, post vs outside leverage", "coachingPoint": "No rainbow balls over middle" }
+      ]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner/flat", "if": "widens with flat", "then": "Cross into vacated hook seam", "coachingPoint": "Throttle if zone walls appear" },
+        { "step": 2, "keyDefender": "Half safety", "if": "drives post/clear late", "then": "Window on cross tightens—progress to under/sit", "coachingPoint": "Don’t lead into contact" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens to cross & runs pole", "then": "Backside dig in MOF void", "coachingPoint": "Drive it at 14–18" },
+        { "step": 2, "keyDefender": "Mike (pole)", "if": "walls dig window", "then": "Settle the cross earlier (12–14)", "coachingPoint": "Receiver friendly to QB—show numbers" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out/flat", "then": "Ignore flat; cross settles then runs", "coachingPoint": "Don’t throw into trap" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Inside quarter", "if": "static on hash", "then": "Cross at 14–18 across face of LBs", "coachingPoint": "Lower trajectory; on-time throw" },
+        { "step": 2, "keyDefender": "Outside quarter", "if": "sits under dig", "then": "Check down or shallow sit", "coachingPoint": "Avoid late middle throws vs C4" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LB", "if": "walls cross inside-out", "then": "Sit briefly then continue—QB hits in first window", "coachingPoint": "WR find grass; QB throw chest" },
+        { "step": 2, "keyDefender": "Safety", "if": "poaches post", "then": "Cross stays alive; avoid post shot", "coachingPoint": "Take profit; don’t test bracket" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Quarter side hook", "if": "widens with flat", "then": "Cross behind into quarter window", "coachingPoint": "Throw early window before close" },
+        { "step": 2, "keyDefender": "Half side corner", "if": "sits squat", "then": "Do not throw out/flat late; work cross/checkdown", "coachingPoint": "Protect the ball" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match under defenders", "if": "collision cross hard", "then": "Backside dig replacing collision", "coachingPoint": "Feet set; drive throw" },
+        { "step": 2, "keyDefender": "Match safety", "if": "squeezes post early", "then": "Stay on cross/under", "coachingPoint": "Avoid throwing into match brackets" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Throwing cross late into squeeze",
+    "Drifting instead of climbing"
+  ],
+  "sources": [
+    { "title": "Air Raid – Y-Cross", "url": "https://en.wikipedia.org/wiki/Air_Raid_offense" }
+  ]
+}

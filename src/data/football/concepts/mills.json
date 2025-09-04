@@ -1,0 +1,101 @@
+{
+  "id": "MILLS",
+  "name": "Mills (Post-Dig)",
+  "family": "Dropback",
+  "bestInto": ["C4", "QUARTERS", "C3"],
+  "weakInto": ["C2"],
+  "personnel": ["10", "11"],
+  "formations": ["2x2", "3x1"],
+  "tags": ["post over dig", "MOF attack"],
+  "preSnapKeys": [
+    "Two-high shells susceptible to post",
+    "Corner technique vs #1",
+    "Safety depth/tilt"
+  ],
+  "postSnapKeys": [
+    "Safety bites dig (or squats)",
+    "Corner midpoint on #1",
+    "Window for post"
+  ],
+  "footwork": "Gun 5–7",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "MOF safety", "if": "tilts away from post (to dig)", "then": "Post over top vs corner leverage", "coachingPoint": "Drive it; no hang time" },
+        { "step": 2, "keyDefender": "MOF safety", "if": "shades post", "then": "Rip dig on time", "coachingPoint": "Firm; avoid undercut" }
+      ],
+      "notes": ["Influence MOF with eyes; choose the opposite lane."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner on post", "if": "outside leverage / no help", "then": "Post shot", "coachingPoint": "Line drive; away from near hip" },
+        { "step": 2, "keyDefender": "Robber", "if": "poaches dig", "then": "Backside outlet/under", "coachingPoint": "Replace the robber" }
+      ],
+      "hotRules": ["Vs pressure → hot to under/sit"]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Half safety", "if": "expands wide with #1", "then": "Dig in curl window", "coachingPoint": "On time—protect WR" },
+        { "step": 2, "keyDefender": "Cloud corner", "if": "sits squat under post", "then": "Do not force post; work dig/check", "coachingPoint": "Live for next down" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens to dig & runs", "then": "Post over pole if MOF safety bites dig", "coachingPoint": "Eyes manipulate pole & MOF" },
+        { "step": 2, "keyDefender": "Mike/MOF", "if": "cap both", "then": "Checkdown/under", "coachingPoint": "Don’t test capped MOF" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out/flat by #2", "then": "Inside throws only: dig if window; avoid outside sail", "coachingPoint": "Confirm trap before outside" }
+      ]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to under/quick sit", "coachingPoint": "Catch/rock/throw" },
+        { "step": 2, "keyDefender": "Trail leverage", "if": "protected", "then": "Post vs clean leverage or dig vs trail", "coachingPoint": "Ball location protects WR" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Inside quarter", "if": "static on hash", "then": "Post if safety jumps dig; else dig on time", "coachingPoint": "Anticipate match; be early" },
+        { "step": 2, "keyDefender": "Outside quarter", "if": "sits under outside", "then": "Stay inside; avoid late outside throws", "coachingPoint": "Checkdown if capped" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety", "if": "poaches dig", "then": "Post behind if MOF free", "coachingPoint": "Eyes to move the safety" },
+        { "step": 2, "keyDefender": "Match safety", "if": "stays high on post", "then": "Dig on rhythm", "coachingPoint": "Drive through window" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "sits squat/outside", "then": "Prefer dig inside", "coachingPoint": "Avoid outside shots vs half help" },
+        { "step": 2, "keyDefender": "Quarter-side safety", "if": "late to overlap post", "then": "Post if clean window", "coachingPoint": "No floaters" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety/corner", "if": "squeezes post early", "then": "Dig now", "coachingPoint": "On time; firm" },
+        { "step": 2, "keyDefender": "Under match", "if": "walls dig", "then": "Checkdown/backside", "coachingPoint": "Avoid bracketed shots" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Hanging the post vs deep safety",
+    "Late to dig (LB undercuts)"
+  ],
+  "sources": [
+    { "title": "Mills concept background", "url": "https://en.wikipedia.org/wiki/West_Coast_offense" }
+  ]
+}

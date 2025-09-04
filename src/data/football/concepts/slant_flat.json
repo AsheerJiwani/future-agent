@@ -1,0 +1,102 @@
+{
+  "id": "SLANT_FLAT",
+  "name": "Slant-Flat",
+  "family": "Quick",
+  "bestInto": ["C1", "C0", "C3"],
+  "weakInto": ["C2", "PALMS"],
+  "personnel": ["10", "11"],
+  "formations": ["2x2", "3x1"],
+  "tags": ["double slant variant", "quick timing"],
+  "preSnapKeys": [
+    "Man indicators (press/trail, apex head-up)",
+    "Flat defender width on #2",
+    "Safety tilt (robber?)"
+  ],
+  "postSnapKeys": [
+    "Flat widens with flat route",
+    "Inside leverage on slant",
+    "Hook defender undercut"
+  ],
+  "footwork": "Gun 1–3 (quick)",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat (apex)", "if": "widens hard with flat/out", "then": "Throw slant now in first window", "coachingPoint": "No drift; ball on chest" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "stays inside under slant", "then": "Hit flat on the move", "coachingPoint": "Lead upfield to grass" }
+      ],
+      "notes": ["Classic apex read: widen→slant, sit→flat."]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits squat under quick out/flat", "then": "Favor slant inside window", "coachingPoint": "Bang it before hook collapses" },
+        { "step": 2, "keyDefender": "Half safety", "if": "drives slant window", "then": "Flat immediately", "coachingPoint": "Throw to upfield shoulder" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Apex/Mike", "if": "expands with flat and Mike opens pole", "then": "Slant now under Mike’s pole", "coachingPoint": "No hitch; protect WR" },
+        { "step": 2, "keyDefender": "Apex", "if": "walls slant window", "then": "Flat fast", "coachingPoint": "Ball out—timing wins" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps flat/out by #2", "then": "Throw slant—do NOT throw flat blindly", "coachingPoint": "Confirm trap before any flat throw" }
+      ],
+      "notes": ["Palms invites flat traps—keep eyes inside first."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on #1", "if": "outside leverage / off", "then": "Slant now (runaway)", "coachingPoint": "Ball on frame; allow run after catch" },
+        { "step": 2, "keyDefender": "Man on #2", "if": "late through traffic", "then": "Flat outlet", "coachingPoint": "Lead away from pursuit" }
+      ],
+      "hotRules": ["Vs pressure → hot to slant/now"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to slant", "coachingPoint": "Catch/rock/throw—no double clutch" },
+        { "step": 2, "keyDefender": "Trail leverage", "if": "protected", "then": "Choose best leverage: slant vs off, flat vs trail", "coachingPoint": "Location beats man" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "sits under out/flat", "then": "Slant in first window", "coachingPoint": "On time, firm" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "robs slant window", "then": "Flat immediately", "coachingPoint": "Throw to grass; avoid collisions" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LB", "if": "expands with flat", "then": "Slant now", "coachingPoint": "Receiver present early; QB stick throw" },
+        { "step": 2, "keyDefender": "Match LB", "if": "walls slant", "then": "Flat", "coachingPoint": "No hesitation" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "triggers on flat", "then": "Slant inside", "coachingPoint": "Hit chest quickly" },
+        { "step": 2, "keyDefender": "Quarter-side hook", "if": "sits inside", "then": "Flat", "coachingPoint": "Lead upfield" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match overhang", "if": "chases flat", "then": "Slant now", "coachingPoint": "No air; protect WR" },
+        { "step": 2, "keyDefender": "Match overhang", "if": "walls slant", "then": "Flat immediately", "coachingPoint": "Ball out on rhythm" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Late to slant (LB undercuts)",
+    "Throwing flat into squat corner"
+  ],
+  "sources": [
+    { "title": "Route tree – Slant", "url": "https://en.wikipedia.org/wiki/Route-running#Slant" }
+  ]
+}

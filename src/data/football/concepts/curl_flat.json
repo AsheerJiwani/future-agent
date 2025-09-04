@@ -1,0 +1,100 @@
+{
+  "id": "CURL_FLAT",
+  "name": "Curl-Flat",
+  "family": "Quick",
+  "bestInto": ["C3", "C1"],
+  "weakInto": ["C2", "PALMS"],
+  "personnel": ["10", "11", "12"],
+  "formations": ["2x2", "3x1", "Bunch"],
+  "tags": ["quick", "curl @10–12 + flat"],
+  "preSnapKeys": [
+    "Curl/flat defender leverage",
+    "Corner off/soft vs #1",
+    "Apex width"
+  ],
+  "postSnapKeys": [
+    "Curl/flat widens with flat",
+    "Hook defender midpoint vs curl",
+    "Corner depth"
+  ],
+  "footwork": "Gun 3",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat (apex)", "if": "widens with flat/swing", "then": "Curl now at 10–12 (settle in hook)", "coachingPoint": "Hit numbers; no drift in pocket" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "stays inside under curl", "then": "Flat immediately", "coachingPoint": "Lead upfield to maximize YAC" }
+      ],
+      "notes": ["Read apex: widen → curl; sit inside → flat."]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits squat under out", "then": "Curl inside (find hook window)", "coachingPoint": "Receiver throttle & show numbers" },
+        { "step": 2, "keyDefender": "Half safety", "if": "drives curl late", "then": "Checkdown/flat", "coachingPoint": "Protect the ball—don’t force late curl" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)/apex", "if": "expands with flat & pole opens", "then": "Curl in seam/hook void", "coachingPoint": "Ball on time into chest" },
+        { "step": 2, "keyDefender": "Mike (pole)", "if": "walls curl window", "then": "Flat now", "coachingPoint": "Process fast—don’t pat the ball" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out/flat", "then": "Curl inside—do NOT throw flat blindly", "coachingPoint": "Confirm corner before flat" }
+      ]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on curl", "if": "off/outside leverage", "then": "Curl break friendly to QB", "coachingPoint": "Work back to ball; protect from undercut" },
+        { "step": 2, "keyDefender": "Man on flat", "if": "late through traffic", "then": "Flat on the move", "coachingPoint": "Throw away from pursuit angle" }
+      ],
+      "hotRules": ["Vs pressure → hot to quick curl/now or flat outlet"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to quick curl/now", "coachingPoint": "Catch/rock/throw—no hitch" },
+        { "step": 2, "keyDefender": "Trail leverage", "if": "protected", "then": "Pick best leverage (curl vs off, flat vs late)", "coachingPoint": "Location wins vs man" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "sits under out & squeezes curl", "then": "Flat/checkdown", "coachingPoint": "Don’t force contested curls" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "static on hash", "then": "Hit curl on time before squeeze", "coachingPoint": "Firm throw; no air" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LB", "if": "expands with flat", "then": "Curl now", "coachingPoint": "Receiver sit; QB stick throw" },
+        { "step": 2, "keyDefender": "Match LB", "if": "walls curl", "then": "Flat immediately", "coachingPoint": "Timing > arm" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "triggers flat", "then": "Curl inside", "coachingPoint": "Hit chest; avoid traps" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match overhang", "if": "chases flat", "then": "Curl now", "coachingPoint": "Throw on rhythm" },
+        { "step": 2, "keyDefender": "Match overhang", "if": "walls curl", "then": "Flat immediately", "coachingPoint": "Throw to grass; no hesitation" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Throwing flat into squat corner",
+    "Late to curl (window closes)"
+  ],
+  "sources": [
+    { "title": "Route tree – Curl", "url": "https://en.wikipedia.org/wiki/Route-running#Curl" }
+  ]
+}

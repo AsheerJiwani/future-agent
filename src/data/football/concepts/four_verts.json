@@ -1,0 +1,104 @@
+{
+  "id": "FOUR_VERTS",
+  "name": "Four Verticals (Seam Read)",
+  "family": "Dropback",
+  "bestInto": ["C3", "C1", "C2"],
+  "weakInto": ["QUARTERS"],
+  "personnel": ["10", "11"],
+  "formations": ["2x2", "3x1", "Empty"],
+  "tags": ["seam read", "bender", "MOF stress"],
+  "preSnapKeys": [
+    "MOF open/closed (single vs two-high)",
+    "Apex width and leverage on #2",
+    "Corner depth"
+  ],
+  "postSnapKeys": [
+    "Middle runner depth",
+    "Seam squeeze by hook/curl",
+    "Safety tilt"
+  ],
+  "footwork": "Gun 5 + hitch",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "MOF safety", "if": "tilts strong to #3/#2", "then": "Work weak seam/bender on hash", "coachingPoint": "Hold MOF with eyes; throw on a line at 18–22" },
+        { "step": 2, "keyDefender": "Hook/curl (weak)", "if": "squeezes seam window late", "then": "Outside vertical vs cushion", "coachingPoint": "Trajectory firm; keep it away from corner overlap" },
+        { "step": 3, "keyDefender": "Corner (weak)", "if": "bails too wide", "then": "Back-shoulder outside vert", "coachingPoint": "If capped, do not force—progress" }
+      ],
+      "notes": ["Classic single-high read: affect MOF safety → throw opposite seam."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "MOF safety", "if": "drives #3 seam/bender", "then": "Opposite seam outside leverage", "coachingPoint": "Win inside on hash; throw before collision" },
+        { "step": 2, "keyDefender": "Trail on outside", "if": "late hip-to-hip", "then": "Outside go (back-shoulder or over top)", "coachingPoint": "Ball location beats coverage" }
+      ],
+      "hotRules": ["Vs pressure → quick seam to #2 (hot) or replace blitz with now"]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Half safety", "if": "too wide on #1", "then": "Hash seam by #2 now", "coachingPoint": "Line-drive seam, not a lob" },
+        { "step": 2, "keyDefender": "Cloud corner", "if": "sits squat", "then": "Avoid outside go unless hole shot is clean early", "coachingPoint": "Confirm safety width before hole shot" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens strong & runs the pole", "then": "Work weak seam behind hook", "coachingPoint": "Aim inside shoulder at 18–20" },
+        { "step": 2, "keyDefender": "Half safety (weak)", "if": "slow to overlap weak seam", "then": "Rip seam before pole arrives", "coachingPoint": "Anticipate window; no hang-time" }
+      ],
+      "notes": ["Pole runner shrinks MOF—seam timing is everything."]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out by #2", "then": "Do not throw outside go late; work inside seam", "coachingPoint": "Confirm corner behavior pre-throw" },
+        { "step": 2, "keyDefender": "Safety", "if": "drives #2 seam aggressively", "then": "Opposite seam on time", "coachingPoint": "Eyes can move the safety" }
+      ]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to #2 seam (quick) or now screen", "coachingPoint": "Catch/rock/throw—no drift" },
+        { "step": 2, "keyDefender": "Trail leverage", "if": "protected", "then": "Pick best leverage (seam vs trail, outside vs cushion)", "coachingPoint": "Back-shoulder beats good trail" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Inside quarter", "if": "static on hash", "then": "Bender through the seam window", "coachingPoint": "Flatten vs safety cap; velocity throw" },
+        { "step": 2, "keyDefender": "Outside quarter", "if": "sits under outside go", "then": "Stick with seams; avoid outside unless hole is early", "coachingPoint": "Don’t float outside vs quarters" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Matching safety", "if": "poaches #2 bender", "then": "Opposite bender or #3 seam", "coachingPoint": "Move him with eyes; throw off his leverage" },
+        { "step": 2, "keyDefender": "Match LB", "if": "walls #3 seam", "then": "Outside one-on-one if clean", "coachingPoint": "Take leverage, not hero shots" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Quarter side safety", "if": "late to overlap hash seam", "then": "Seam on quarter side now", "coachingPoint": "Hash landmark; no air" },
+        { "step": 2, "keyDefender": "Half side corner", "if": "sits squat", "then": "Avoid outside go; work seams", "coachingPoint": "Hole shot only if very early & clean" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety/corner", "if": "squeezes bender early", "then": "Opposite seam off his tilt", "coachingPoint": "Snap eyes; throw off defender movement" },
+        { "step": 2, "keyDefender": "Under match", "if": "walls seam late", "then": "Outside back-shoulder vs leverage", "coachingPoint": "Protect WR from safety overlap" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Throwing seam into safety squeeze",
+    "Hanging the ball on bender"
+  ],
+  "sources": [
+    { "title": "Four Verts (Air Raid)", "url": "https://en.wikipedia.org/wiki/Air_Raid_offense" }
+  ]
+}

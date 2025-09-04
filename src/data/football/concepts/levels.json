@@ -1,0 +1,101 @@
+{
+  "id": "LEVELS",
+  "name": "Levels",
+  "family": "Dropback",
+  "bestInto": ["C3", "C1", "QUARTERS"],
+  "weakInto": ["C2"],
+  "personnel": ["10", "11"],
+  "formations": ["3x1", "2x2"],
+  "tags": ["hi-lo crossers", "drive variant"],
+  "preSnapKeys": [
+    "Single-high shell",
+    "Hook/curl depth",
+    "Nickel leverage on crosser"
+  ],
+  "postSnapKeys": [
+    "Hook/curl squeezes shallow",
+    "Window behind for dig",
+    "MOF safety tilt"
+  ],
+  "footwork": "Gun 5 + hitch",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Hook/curl", "if": "widens with shallow", "then": "Dig @14–18 behind him", "coachingPoint": "Drive it; no float" },
+        { "step": 2, "keyDefender": "Hook/curl", "if": "sits under dig", "then": "Shallow settle/run", "coachingPoint": "Throw on time to chest" }
+      ],
+      "notes": ["Hi-lo the hook/curl; backside glance alert vs tilted MOF."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on shallow", "if": "trail leverage", "then": "Shallow on the run", "coachingPoint": "Lead away from leverage" },
+        { "step": 2, "keyDefender": "Low hole/robber", "if": "drives shallow", "then": "Dig behind", "coachingPoint": "Replace the robber quickly" }
+      ],
+      "hotRules": ["Vs pressure → shallow now"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to shallow", "coachingPoint": "Catch/rock/throw" },
+        { "step": 2, "keyDefender": "Trail on dig", "if": "protected", "then": "Dig vs trail", "coachingPoint": "Firm throw; protect WR" }
+      ]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner/flat", "if": "widens with shallow", "then": "Dig window opens", "coachingPoint": "Hit on rhythm before safety overlap" },
+        { "step": 2, "keyDefender": "Half safety", "if": "squeezes dig", "then": "Checkdown/under", "coachingPoint": "Avoid late into squeeze" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "runs pole", "then": "Shallow settle & run", "coachingPoint": "WR throttle; QB stick throw" },
+        { "step": 2, "keyDefender": "Mike (pole)", "if": "walls shallow window", "then": "Dig if pole opens window", "coachingPoint": "Drive through seam window" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner(2-read)", "if": "traps flat/out tag", "then": "Ignore outside; work shallow→dig", "coachingPoint": "Stay inside vs traps" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Under droppers", "if": "carry shallow", "then": "Dig in window between Qtrs", "coachingPoint": "On time; firm" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "robs dig", "then": "Checkdown", "coachingPoint": "No late middle throws" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LB", "if": "walls shallow inside-out", "then": "Sit/under replaces; QB throw first window", "coachingPoint": "Find grass, show numbers" },
+        { "step": 2, "keyDefender": "Safety", "if": "poaches dig", "then": "Stay on shallow/check", "coachingPoint": "Take profit" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Quarter side hook", "if": "widens with shallow", "then": "Dig behind", "coachingPoint": "Drive before close" },
+        { "step": 2, "keyDefender": "Half side corner", "if": "sits squat", "then": "Avoid outs; take shallow/check", "coachingPoint": "Protect ball vs squat corner" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match under", "if": "collision shallow hard", "then": "Replace with dig/under", "coachingPoint": "Feet set; no air" },
+        { "step": 2, "keyDefender": "Match safety", "if": "squeezes dig early", "then": "Shallow/checkdown", "coachingPoint": "Avoid match brackets" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Floating the dig",
+    "Late to shallow vs pressure"
+  ],
+  "sources": [
+    { "title": "Drive/Levels concept", "url": "https://en.wikipedia.org/wiki/Route-running#In" }
+  ]
+}

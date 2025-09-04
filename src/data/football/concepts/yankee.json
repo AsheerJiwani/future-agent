@@ -1,0 +1,100 @@
+{
+  "id": "YANKEE",
+  "name": "Yankee (Deep PA Cross-Post)",
+  "family": "PlayAction",
+  "bestInto": ["C3", "C1"],
+  "weakInto": ["C2", "QUARTERS"],
+  "personnel": ["12", "21", "11"],
+  "formations": ["Nasty splits", "Tight"],
+  "tags": ["deep shot", "PA cross + post"],
+  "preSnapKeys": [
+    "Single-high shell (MOF closed)",
+    "Corners off/leverage",
+    "Box count to sell run"
+  ],
+  "postSnapKeys": [
+    "MOF safety tilt",
+    "Corner carry on post",
+    "Crosser window behind LBs"
+  ],
+  "footwork": "Under center PA 7+",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "MOF safety", "if": "drives crosser after PA", "then": "Post over top", "coachingPoint": "Reset base after fake; line-drive it" },
+        { "step": 2, "keyDefender": "MOF safety", "if": "stays high center", "then": "Deep crosser window", "coachingPoint": "Hit stride; avoid hang time" }
+      ],
+      "notes": ["Sell run; set your feet before launching."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner on post", "if": "outside leverage/no help", "then": "Post shot", "coachingPoint": "Drive away from leverage" },
+        { "step": 2, "keyDefender": "Man on crosser", "if": "late through traffic", "then": "Crosser on the run", "coachingPoint": "Lead away from leverage" }
+      ],
+      "hotRules": ["Vs pressure → alert quick outlet off fake or kill the fake"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Immediate free", "if": "arrives", "then": "Abort deep; throw outlet/flat", "coachingPoint": "Live for next play" }
+      ]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Half safety", "if": "widens with post", "then": "Crosser in void behind LBs", "coachingPoint": "Throw on rope; avoid LB tips" },
+        { "step": 2, "keyDefender": "Cloud corner", "if": "sits squat", "then": "Do not test outside; keep it inside", "coachingPoint": "Outlet if window shuts" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens strong to crosser", "then": "Post behind if MOF safety steps forward", "coachingPoint": "Eyes manipulate pole+MOF" },
+        { "step": 2, "keyDefender": "Mike/MOF", "if": "cap both", "then": "Checkdown", "coachingPoint": "Shot only if early window" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner(2-read)", "if": "traps out/flat tags", "then": "Stay inside: crosser/post only", "coachingPoint": "Don’t throw trapped outs" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Inside quarter", "if": "static on hash", "then": "Crosser at depth on time", "coachingPoint": "Lower trajectory" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "drives crosser", "then": "Post if opposite safety held", "coachingPoint": "Only if cap is removed" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety", "if": "poaches post", "then": "Crosser on stride", "coachingPoint": "Avoid match brackets" },
+        { "step": 2, "keyDefender": "Match safety", "if": "stays high on crosser", "then": "Post if clean window", "coachingPoint": "No floaters" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Quarter side safety", "if": "late to overlap", "then": "Post toward quarter side", "coachingPoint": "Drive it early" },
+        { "step": 2, "keyDefender": "Half side corner", "if": "squat under outside", "then": "Crosser/checkdown", "coachingPoint": "Protect ball vs squat" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety", "if": "squeezes post early", "then": "Crosser now", "coachingPoint": "Hit on time; avoid hang" },
+        { "step": 2, "keyDefender": "Under match", "if": "walls crosser", "then": "Outlet/backside", "coachingPoint": "Don’t force into match" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Taking the shot into a capped post",
+    "Not resetting feet after PA"
+  ],
+  "sources": [
+    { "title": "Play-action deep concepts", "url": "https://en.wikipedia.org/wiki/Play-action_pass" }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "id": "GLANCE_RPO",
+  "name": "Glance RPO",
+  "family": "RPO",
+  "bestInto": ["C3", "C1", "Box-heavy"],
+  "weakInto": ["Two-high bracket"],
+  "personnel": ["11", "12"],
+  "formations": ["2x2", "3x1", "Tight"],
+  "tags": ["RPO slant/bender", "attach to run"],
+  "preSnapKeys": [
+    "Box count & apex leverage",
+    "MOF safety tilt",
+    "Corner cushion"
+  ],
+  "postSnapKeys": [
+    "Apex crashes fit → throw",
+    "Apex expands → handoff",
+    "MOF safety overlap on glance"
+  ],
+  "footwork": "Mesh footwork (inside zone) + quick throw",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Conflict apex", "if": "fits run (tight downhill into box)", "then": "Pull & throw glance now", "coachingPoint": "One-step rhythm; throw into vacated window" },
+        { "step": 2, "keyDefender": "Conflict apex", "if": "expands under glance path", "then": "Give the run", "coachingPoint": "Trust the read—don’t double clutch" },
+        { "step": 3, "keyDefender": "MOF safety", "if": "drives glance early", "then": "Give or tag now screen away", "coachingPoint": "Never throw into squeeze" }
+      ],
+      "notes": ["Pre-snap: cushion/inside leverage to glance side upgrades pull."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Apex (man on slot)", "if": "fits hard vs run", "then": "Pull & throw glance replacing fit", "coachingPoint": "Ball out now; no hitch" },
+        { "step": 2, "keyDefender": "Man leverage", "if": "inside leverage cap on glance", "then": "Give or throw away from leverage (tag out/now)", "coachingPoint": "Don’t force vs inside cap" }
+      ],
+      "hotRules": ["If pressure closes mesh → abort pull; protect the ball"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Immediate pressure", "if": "mesh disrupted", "then": "Protect: give if possible or eat it", "coachingPoint": "No blind throws" },
+        { "step": 2, "keyDefender": "Man leverage", "if": "clean pull window", "then": "Glance vs trail leverage", "coachingPoint": "Ball on frame; YAC throw" }
+      ]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Apex", "if": "expands under glance due to flat threat", "then": "Give", "coachingPoint": "Don’t pull into inside help" },
+        { "step": 2, "keyDefender": "Half safety", "if": "stays wide/outside hash", "then": "Alert pull if apex fits late", "coachingPoint": "Velocity throw; window is tight" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens to glance and runs pole quickly", "then": "Give the run", "coachingPoint": "Pole eliminates glance window" },
+        { "step": 2, "keyDefender": "Mike", "if": "slow to pole", "then": "Pull & hit glance before overlap", "coachingPoint": "No air—line drive" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out/flat & apex widens", "then": "Give", "coachingPoint": "Trap compresses glance lane" },
+        { "step": 2, "keyDefender": "Safety", "if": "static at 10–12 inside", "then": "Only pull on clear leverage/cushion", "coachingPoint": "Err on give" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Inside quarter", "if": "static on hash inside of glance", "then": "Give", "coachingPoint": "Don’t throw into bracket seeds" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety", "if": "poised to poach glance from inside", "then": "Favor give unless apex fits hard", "coachingPoint": "Pull only with real cushion" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Quarter side safety", "if": "lurks inside glance path", "then": "Give", "coachingPoint": "Quarter-half squeezes benders" },
+        { "step": 2, "keyDefender": "Half side corner", "if": "soft outside & apex fits", "then": "Pull & replace fit quickly", "coachingPoint": "Fast ball; small window" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety", "if": "squeezes glance early", "then": "Give", "coachingPoint": "Don’t test match squeeze" },
+        { "step": 2, "keyDefender": "Apex", "if": "blitz/fit hard", "then": "Pull & throw into vacated area", "coachingPoint": "One-step rhythm" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Double-clutching the glance",
+    "Throwing into safety squeeze"
+  ],
+  "sources": [
+    { "title": "Run-pass option", "url": "https://en.wikipedia.org/wiki/Run-pass_option" }
+  ]
+}

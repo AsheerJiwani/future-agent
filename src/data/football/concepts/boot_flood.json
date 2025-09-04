@@ -1,0 +1,101 @@
+{
+  "id": "BOOT_FLOOD",
+  "name": "Boot Flood (Play-Action)",
+  "family": "PlayAction",
+  "bestInto": ["C3", "C1"],
+  "weakInto": ["Aggressive edge contain", "C2"],
+  "personnel": ["12", "21", "11"],
+  "formations": ["TE/Y off", "Nasty splits"],
+  "tags": ["naked/boot", "3-level flood"],
+  "preSnapKeys": [
+    "Edge contain behavior",
+    "Corner depth to boot side",
+    "Box sell for run"
+  ],
+  "postSnapKeys": [
+    "Flat defender widens with flat",
+    "Corner sinks with clear",
+    "Intermediate sail window"
+  ],
+  "footwork": "Under center/offset gun PA boot",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat to boot side", "if": "widens with flat/drag", "then": "Corner/Sail @18–22 over him", "coachingPoint": "Half-roll; shoulders to target; throw before overlap" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "hangs under corner", "then": "Flat/drag now", "coachingPoint": "No hesitation—YAC throw" },
+        { "step": 3, "keyDefender": "Corner", "if": "midpoints clear vs corner", "then": "Alert hole shot only if early and clean", "coachingPoint": "Don’t float to sideline" }
+      ],
+      "notes": ["Classic flood read: flat → corner → clear/hole."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on flat/drag", "if": "late through traffic", "then": "Flat/drag on the move", "coachingPoint": "Lead away from leverage" },
+        { "step": 2, "keyDefender": "Corner on corner route", "if": "outside leverage/no help", "then": "Corner shot", "coachingPoint": "Drive it; avoid hang time" }
+      ],
+      "hotRules": ["Vs boot edge blitz → throw away beyond LOS or hit flat hot"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Edge contain", "if": "free off boot", "then": "Throw away or flat hot immediately", "coachingPoint": "Gain width on rollout; protect" }
+      ]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits under corner", "then": "Flat now", "coachingPoint": "Hit upfield shoulder; get runner turned" },
+        { "step": 2, "keyDefender": "Half safety", "if": "late to overlap", "then": "Corner on time", "coachingPoint": "Anticipate window; no late sails" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "squat under corner", "then": "Flat immediate", "coachingPoint": "Rhythm throw" },
+        { "step": 2, "keyDefender": "Mike (pole)", "if": "slow to overlap corner window", "then": "Rip corner before pole arrives", "coachingPoint": "Throw on time or not at all" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out/flat", "then": "Avoid flat; favor corner only if safety is late", "coachingPoint": "Confirm corner behavior pre-throw" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "sits under corner", "then": "Flat/drag", "coachingPoint": "Take profit; stay on schedule" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "static on hash", "then": "Corner timing window exists—be early", "coachingPoint": "Velocity throw; don’t float" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match corner", "if": "carries corner", "then": "Flat/drag", "coachingPoint": "Get ball out—avoid sack on boot" },
+        { "step": 2, "keyDefender": "Safety", "if": "overlaps corner", "then": "Checkdown or throw away", "coachingPoint": "Live for next down" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "triggers under corner", "then": "Flat now", "coachingPoint": "On-time rhythm" },
+        { "step": 2, "keyDefender": "Quarter-side safety", "if": "late to overlap", "then": "Corner on quarter side", "coachingPoint": "Throw before close" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match corner", "if": "squeezes corner early", "then": "Flat now", "coachingPoint": "Anticipate squeeze; progress fast" },
+        { "step": 2, "keyDefender": "Match safety", "if": "over top of corner", "then": "Avoid late sideline throws", "coachingPoint": "Checkdown/throw away OK" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Drifting too deep on boot",
+    "Forcing corner late vs overlap"
+  ],
+  "sources": [
+    { "title": "Bootleg / Naked concepts", "url": "https://en.wikipedia.org/wiki/Play-action_pass" }
+  ]
+}

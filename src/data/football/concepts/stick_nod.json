@@ -1,0 +1,97 @@
+{
+  "id": "STICK_NOD",
+  "name": "Stick-Nod (Stick-Go)",
+  "family": "Dropback",
+  "bestInto": ["C1", "C3"],
+  "weakInto": ["C2", "PALMS"],
+  "personnel": ["10", "11"],
+  "formations": ["2x2", "3x1", "Bunch"],
+  "tags": ["double move on stick"],
+  "preSnapKeys": [
+    "Apex leverage on #2",
+    "Safety depth (robber?)",
+    "Flat defender habits"
+  ],
+  "postSnapKeys": [
+    "Apex squats on stick",
+    "Corner depth/leverage",
+    "MOF help"
+  ],
+  "footwork": "Gun 5",
+  "readPlans": [
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Apex/flat", "if": "jumps stick hard", "then": "Nod vertical shot", "coachingPoint": "Hold safety with eyes; drive seam" },
+        { "step": 2, "keyDefender": "Apex/flat", "if": "stays deep/outside", "then": "Work outside hitch/out", "coachingPoint": "Placement away from leverage" }
+      ],
+      "hotRules": ["Vs pressure → abandon double move; take quick stick/outlet"]
+    },
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat", "if": "widens with flat", "then": "Nod up the seam window", "coachingPoint": "On time before close" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "hangs under seam", "then": "Flat now", "coachingPoint": "Lead upfield" }
+      ]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "triggers out early", "then": "Nod vertical if half safety slow to overlap", "coachingPoint": "Confirm safety width" },
+        { "step": 2, "keyDefender": "Half safety", "if": "over seam fast", "then": "Checkdown/out", "coachingPoint": "No hero ball vs half" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Apex/Mike", "if": "expands to flat, pole opens late", "then": "Nod only if seam open early", "coachingPoint": "Timing critical; else take flat/out" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner(2-read)", "if": "traps out/flat", "then": "Nod through seam if corner commits under", "coachingPoint": "Confirm safety; else throw inside stick" }
+      ]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Immediate free", "if": "arrives", "then": "Quick stick/outlet (no nod)", "coachingPoint": "Hot rules over double move" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Inside quarter", "if": "static on hash", "then": "Nod into seam if clear", "coachingPoint": "Velocity throw; avoid float" },
+        { "step": 2, "keyDefender": "Outside quarter", "if": "sits under out", "then": "Take flat/out easy", "coachingPoint": "Don’t test bracket" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety", "if": "poaches seam", "then": "Out/flat", "coachingPoint": "Live to 2nd/short" },
+        { "step": 2, "keyDefender": "Match LB", "if": "expands with flat", "then": "Stick sit", "coachingPoint": "Location on frame" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Quarter side safety", "if": "late to overlap seam", "then": "Nod shot", "coachingPoint": "Be early or don’t take it" },
+        { "step": 2, "keyDefender": "Half side corner", "if": "triggers flat", "then": "Out/flat now", "coachingPoint": "Timing > arm" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety/corner", "if": "squeezes seam early", "then": "Out/flat", "coachingPoint": "Avoid match brackets" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Under-throwing the nod",
+    "Forcing into safety help"
+  ],
+  "sources": [
+    { "title": "Stick concept variants", "url": "https://en.wikipedia.org/wiki/West_Coast_offense" }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "id": "MESH",
+  "name": "Mesh",
+  "family": "Dropback",
+  "bestInto": ["C1", "C0", "C3"],
+  "weakInto": ["C2"],
+  "personnel": ["10", "11"],
+  "formations": ["2x2", "3x1", "Bunch"],
+  "tags": ["dual shallow cross", "rub", "sit in middle"],
+  "preSnapKeys": [
+    "Man indicators (CBs off vs speed? apex head up?)",
+    "Pressure threats (nickel, mugged backers)",
+    "LB depth for middle sit"
+  ],
+  "postSnapKeys": [
+    "Traffic created by crossing stems",
+    "Shallow vs trail technique (man)",
+    "Hook defenders squeezing middle sit (zone)"
+  ],
+  "footwork": "Gun 5 (tempo) or Gun 3 (quick)",
+  "readPlans": [
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Trail on shallow", "if": "in trail with no under", "then": "Hit frontside shallow on the run", "coachingPoint": "Lead away from leverage; let him run" },
+        { "step": 2, "keyDefender": "Low hole/robber", "if": "drives crosser", "then": "Backside shallow or sit route settles in void", "coachingPoint": "Replace vacated area immediately" },
+        { "step": 3, "keyDefender": "Man on RB/rail", "if": "loses track in traffic", "then": "Rail/wheel up sideline", "coachingPoint": "Ball out early; avoid floaters" }
+      ],
+      "hotRules": ["Vs pressure → throw to shallow crossing into vacated space"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Immediate blitzer", "if": "free runner", "then": "Hot to nearest shallow now", "coachingPoint": "Catch & stick it on his chest" },
+        { "step": 2, "keyDefender": "Trail leverage", "if": "protected", "then": "Pick on the worst leverage—shallow vs over", "coachingPoint": "No drift in pocket" }
+      ]
+    },
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Hook/curl", "if": "widens with frontside shallow", "then": "Backside sit/dig in the vacated window", "coachingPoint": "Throw firm into the window" },
+        { "step": 2, "keyDefender": "Hook/curl", "if": "sits under sit/dig", "then": "Frontside shallow (settle in zone)", "coachingPoint": "Receiver throttles in grass" }
+      ],
+      "notes": ["Mesh vs zone: shallow receivers settle; don’t lead into defenders."]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner/flat", "if": "widens with out/flat tag", "then": "Opposite shallow in under window", "coachingPoint": "Ball on time—let him run" },
+        { "step": 2, "keyDefender": "Half safety", "if": "drives cross too early", "then": "Alert post/over behind", "coachingPoint": "Only if clean; otherwise take easy shallow" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens to one crosser and drives it", "then": "Opposite shallow/sit behind vacated area", "coachingPoint": "Replace the pole runner" },
+        { "step": 2, "keyDefender": "Cloud", "if": "sits squat on out", "then": "Avoid throwing outs late; keep it inside", "coachingPoint": "Protect the ball vs squat corners" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps the flat/out", "then": "Skip the flat; work shallow → sit", "coachingPoint": "Do not throw traps; confirm corner first" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Under droppers", "if": "carry shallow laterally", "then": "Sit route between hook defenders", "coachingPoint": "Receiver throttles & shows numbers" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "robs sit window", "then": "Backside shallow with space", "coachingPoint": "Throw on time before close" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LBs", "if": "match shallow leverage outside-in", "then": "Settle in the first window", "coachingPoint": "Find grass; QB hit chest" },
+        { "step": 2, "keyDefender": "Safety", "if": "poaches over route", "then": "Underneath shallow/sit now", "coachingPoint": "No late sails over the middle" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side overhang", "if": "widens to flat tag", "then": "Shallow into vacated hook", "coachingPoint": "Ball out in stride" },
+        { "step": 2, "keyDefender": "Quarter-side hook", "if": "sits on sit route", "then": "Opposite shallow", "coachingPoint": "Progress fast" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match under defenders", "if": "collision crossers hard", "then": "Rail/wheel if uncovered up the sideline", "coachingPoint": "Anticipate the release window" },
+        { "step": 2, "keyDefender": "Inside match", "if": "walls sit", "then": "Work away to opposite shallow", "coachingPoint": "Take what the leverage gives" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Throwing shallow into cut/robber",
+    "Slow tempo on crosses (timing dies)",
+    "Forgetting the sit vs zone"
+  ],
+  "sources": [
+    { "title": "Air Raid Mesh concept", "url": "https://en.wikipedia.org/wiki/Air_Raid_offense" }
+  ]
+}

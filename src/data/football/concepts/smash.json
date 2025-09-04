@@ -1,0 +1,111 @@
+{
+  "id": "SMASH",
+  "name": "Smash",
+  "family": "Dropback",
+  "bestInto": ["C2", "TAMPA2", "PALMS"],
+  "weakInto": ["C4", "QUARTERS"],
+  "personnel": ["10", "11"],
+  "formations": ["2x2", "3x1", "Bunch"],
+  "tags": ["corner + hitch", "high-low corner"],
+  "preSnapKeys": [
+    "Two-high shell / cloud corners",
+    "Corner depth/leverage on #1",
+    "Apex width vs #2"
+  ],
+  "postSnapKeys": [
+    "Flat defender widens with hitch",
+    "Cloud corner bails/sinks with #1",
+    "MOF safety overlap on corner"
+  ],
+  "footwork": "Gun 3 + hitch",
+  "readPlans": [
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sinks with #1 deep", "then": "Hitch to #1 now", "coachingPoint": "Ball out on hitch foot; no drift" },
+        { "step": 2, "keyDefender": "Flat/overhang", "if": "widens hard with hitch", "then": "Corner at 18–22 on landmark", "coachingPoint": "Hold MOF safety with eyes one beat" },
+        { "step": 3, "if": "MOF safety overlaps the corner", "then": "Checkdown weak hook" }
+      ],
+      "hotRules": ["Replace nickel blitz with quick hitch"]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits squat", "then": "Favor hitch now", "coachingPoint": "No air; on numbers" },
+        { "step": 2, "keyDefender": "Mike (pole runner)", "if": "carries deep middle late", "then": "Corner once flat widens", "coachingPoint": "Throw before MOF overlap" }
+      ],
+      "notes": ["Confirm MLB depth—if he sprints to pole early, corner window shrinks"],
+      "hotRules": ["Hot → replace with hitch to #1 or stick/flat"]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps #2/flat", "then": "Hitch on time to #1", "coachingPoint": "Expect collision—place on frame" },
+        { "step": 2, "keyDefender": "Safety", "if": "drives corner route", "then": "No hero ball—checkdown" }
+      ],
+      "notes": ["Corners can drive the out/flat—don’t throw the out ‘blind’ into a trap"]
+    },
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat", "if": "widens with flat/hitch stem", "then": "Corner behind @18–22", "coachingPoint": "Hold MOF safety w/ eyes before launch" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "stays under corner", "then": "Hitch now or checkdown", "coachingPoint": "Don’t drift; reset base" }
+      ],
+      "notes": ["Alert back-side glance vs tilted MOF safety"]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (man on #1)", "if": "off/outside leverage", "then": "Hitch now vs cushion", "coachingPoint": "Give WR a runner" },
+        { "step": 2, "keyDefender": "Safety help", "if": "no help outside", "then": "Corner vs leverage", "coachingPoint": "Don’t float it" }
+      ],
+      "hotRules": ["Vs pressure, hot to hitch"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Nearest rusher", "if": "free blitzer", "then": "Immediate hitch (hot)", "coachingPoint": "Catch/rock/throw" },
+        { "step": 2, "keyDefender": "Corner leverage", "if": "no hot", "then": "Corner vs trail leverage away from help" }
+      ],
+      "notes": ["Expect press—convert hitch to slant/now vs hard press if needed"]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "sits under corner", "then": "Hitch now", "coachingPoint": "Don’t drift; ball out" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "doesn’t overlap", "then": "Hole shot only if clear—else checkdown" }
+      ],
+      "notes": ["Smash is OK vs spot C4, weaker vs match Quarters"]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside match corner", "if": "carries corner with safety overlap", "then": "Hitch now or work away", "coachingPoint": "Avoid throwing into trap" },
+        { "step": 2, "keyDefender": "Safety", "if": "poaches corner", "then": "Check weak/under" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half side corner", "if": "squats under corner", "then": "Hitch now", "coachingPoint": "Take the gift" },
+        { "step": 2, "keyDefender": "Quarter side safety", "if": "late overlap", "then": "Corner only on time/window" }
+      ],
+      "notes": ["Throw to the C3/C2 boundary you prefer—call it to the half side"]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside match corner", "if": "drives corner", "then": "Hitch now vs space", "coachingPoint": "Anticipate break" },
+        { "step": 2, "keyDefender": "Safety (match)", "if": "over the corner", "then": "Avoid hero throw; checkdown" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Late to hitch vs squat corner",
+    "Forcing corner vs safety overlap",
+    "Drifting on quick timing"
+  ],
+  "sources": [
+    { "title": "Tampa-2 (overview)", "url": "https://en.wikipedia.org/wiki/Tampa_2" }
+  ]
+}

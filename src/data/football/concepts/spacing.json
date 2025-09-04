@@ -1,0 +1,101 @@
+{
+  "id": "SPACING",
+  "name": "Spacing (Snag)",
+  "family": "Quick",
+  "bestInto": ["C3", "C1", "C4"],
+  "weakInto": ["PALMS", "C2"],
+  "personnel": ["10", "11", "12"],
+  "formations": ["2x2", "3x1", "Bunch", "Trips"],
+  "tags": ["snag", "triangle", "hook-flat"],
+  "preSnapKeys": [
+    "Flat defender leverage",
+    "Corner depth vs #1",
+    "Hook/curl width"
+  ],
+  "postSnapKeys": [
+    "Flat widens with swing/out",
+    "Hook defender midpoint on snag",
+    "Window for sit route"
+  ],
+  "footwork": "Gun 3",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat", "if": "widens with flat", "then": "Snag/sit now (hook window)", "coachingPoint": "Hit numbers; let WR settle" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "stays inside under snag", "then": "Flat immediately", "coachingPoint": "Lead upfield" },
+        { "step": 3, "keyDefender": "Corner", "if": "bails hard with clear", "then": "Arrow/out if tagged", "coachingPoint": "Only if free access" }
+      ],
+      "notes": ["Spacing punishes curl/flat expansion—be decisive."]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits squat under out", "then": "Snag inside", "coachingPoint": "Receiver sit—QB stick throw" },
+        { "step": 2, "keyDefender": "Half safety", "if": "drives snag late", "then": "Flat now", "coachingPoint": "Avoid late throws into squeeze" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Apex/Mike", "if": "expands with flat, pole opens", "then": "Snag settle in hook seam", "coachingPoint": "On time; no drift" },
+        { "step": 2, "keyDefender": "Mike (pole)", "if": "walls snag window", "then": "Flat", "coachingPoint": "Process fast—take the gift" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps flat/out", "then": "Snag/sit inside—do NOT throw flat blindly", "coachingPoint": "Confirm corner before the flat" }
+      ]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on snag", "if": "outside leverage/bails", "then": "Snag sit away from leverage", "coachingPoint": "Show numbers early" },
+        { "step": 2, "keyDefender": "Man on flat", "if": "late through traffic", "then": "Flat upfield", "coachingPoint": "Throw away from pursuit" }
+      ],
+      "hotRules": ["Vs pressure → hot to flat or quick sit"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to sit/now", "coachingPoint": "Catch/rock/throw" },
+        { "step": 2, "keyDefender": "Trail", "if": "protected", "then": "Pick best leverage: sit vs off, flat vs trail", "coachingPoint": "Ball placement wins" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "sits under out", "then": "Snag in hook seam", "coachingPoint": "Put it on frame" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "robs snag window", "then": "Flat/checkdown", "coachingPoint": "Don’t force into squeeze" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LB", "if": "expands with flat", "then": "Snag now", "coachingPoint": "Fast eyes/feet" },
+        { "step": 2, "keyDefender": "Match LB", "if": "walls sit", "then": "Flat", "coachingPoint": "Throw to grass" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "triggers flat", "then": "Snag inside", "coachingPoint": "Location over velocity" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match overhang", "if": "chases flat", "then": "Snag now", "coachingPoint": "Hit on rhythm" },
+        { "step": 2, "keyDefender": "Match overhang", "if": "walls snag", "then": "Flat", "coachingPoint": "On time, lead upfield" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Forcing the flat vs squat corner",
+    "Drifting on quick"
+  ],
+  "sources": [
+    { "title": "West Coast quick game", "url": "https://en.wikipedia.org/wiki/West_Coast_offense" }
+  ]
+}

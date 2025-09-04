@@ -1,0 +1,101 @@
+{
+  "id": "POST_WHEEL",
+  "name": "Post-Wheel",
+  "family": "Dropback",
+  "bestInto": ["C3", "C1"],
+  "weakInto": ["C2", "PALMS"],
+  "personnel": ["10", "11"],
+  "formations": ["2x2", "3x1"],
+  "tags": ["switch release", "vertical stress"],
+  "preSnapKeys": [
+    "Single-high shell",
+    "Corner leverage on #1",
+    "Apex on #2 (wheel runner)"
+  ],
+  "postSnapKeys": [
+    "Corner sinks with post",
+    "Flat/overhang loses wheel",
+    "MOF safety tilt"
+  ],
+  "footwork": "Gun 5 + hitch",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat", "if": "widens with flat", "then": "Wheel up sideline (switch release)", "coachingPoint": "Line-drive outside; away from corner overlap" },
+        { "step": 2, "keyDefender": "Corner", "if": "bails with post", "then": "Alert post if MOF free", "coachingPoint": "Only if clean leverage" }
+      ],
+      "notes": ["Stress curl/flat first; post is alert based on MOF."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Trail on wheel", "if": "late through traffic", "then": "Wheel now", "coachingPoint": "Lead upfield" },
+        { "step": 2, "keyDefender": "Corner on post", "if": "outside leverage/no help", "then": "Post shot", "coachingPoint": "Drive it; no air" }
+      ],
+      "hotRules": ["Vs pressure → quick to wheel if free, else outlet"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Immediate free", "if": "arrives", "then": "Hot to quick outlet/flat", "coachingPoint": "Catch & throw" },
+        { "step": 2, "keyDefender": "Trail", "if": "protected", "then": "Pick best leverage (wheel/post)", "coachingPoint": "No hero balls into cap" }
+      ]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits squat under wheel release", "then": "Avoid throwing into squat; progress to post if safety widens", "coachingPoint": "Confirm half safety width first" },
+        { "step": 2, "keyDefender": "Half safety", "if": "slow to overlap wheel", "then": "Hole the wheel early", "coachingPoint": "On time; firm" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)/flat", "if": "flat widens and pole opens", "then": "Wheel in the seam window", "coachingPoint": "Trajectory outside; before pole overlap" },
+        { "step": 2, "keyDefender": "Mike/MOF", "if": "cap seam", "then": "Checkdown", "coachingPoint": "Don’t force seam vs pole+half" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner(2-read)", "if": "traps flat/out", "then": "Wheel if corner commits under & safety late", "coachingPoint": "Confirm safety; otherwise inside throw" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "sits under wheel", "then": "Post if inside safety bites outside", "coachingPoint": "Read inside-out; avoid late sideline" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "over post", "then": "Checkdown", "coachingPoint": "Take profit" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match corner", "if": "carries wheel vertically", "then": "Inside post if safety displaced", "coachingPoint": "Eyes move safety" },
+        { "step": 2, "keyDefender": "Match safety", "if": "stays high on post", "then": "Outlet/under", "coachingPoint": "Don’t force into match" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "squat under wheel", "then": "Inside post/under", "coachingPoint": "Avoid squat sideline throws" },
+        { "step": 2, "keyDefender": "Quarter-side safety", "if": "late to overlap", "then": "Wheel hole if early", "coachingPoint": "Be early or don’t take it" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match corner", "if": "squeezes wheel early", "then": "Post now if MOF free", "coachingPoint": "Drive; avoid hang" },
+        { "step": 2, "keyDefender": "Under match", "if": "erases post window", "then": "Outlet", "coachingPoint": "Live for next down" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Throwing wheel into squat corner",
+    "Hanging post vs MOF safety"
+  ],
+  "sources": [
+    { "title": "Wheel route", "url": "https://en.wikipedia.org/wiki/Route-running#Wheel" }
+  ]
+}

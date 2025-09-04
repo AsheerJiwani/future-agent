@@ -1,0 +1,109 @@
+{
+  "id": "SAIL",
+  "name": "Sail / Flood",
+  "family": "Dropback",
+  "bestInto": ["C3", "C1"],
+  "weakInto": ["C2", "PALMS"],
+  "personnel": ["10", "11", "12"],
+  "formations": ["3x1", "2x2", "Trips"],
+  "tags": ["3-level flood", "clear-go + corner + flat"],
+  "preSnapKeys": [
+    "Single-high shell (MOF closed) favors flood",
+    "Curl/flat defender leverage to flood side",
+    "Corner depth to flood side"
+  ],
+  "postSnapKeys": [
+    "Curl/flat widens with flat route",
+    "Corner bails with clear-go",
+    "Hook/curl midpoint player depth"
+  ],
+  "footwork": "Gun 5 + hitch (or PA 7)",
+  
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat", "if": "widens hard with flat (RB/slot)", "then": "Corner (sail) at 18–22 behind him", "coachingPoint": "Hold MOF safety with eyes, drive the throw on a line" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "hangs under corner/sits shallow", "then": "Flat now—catch on the move & turn up", "coachingPoint": "No hesitation; throw to upfield shoulder" },
+        { "step": 3, "keyDefender": "Corner", "if": "midpoints go & corner, leaving a hole", "then": "Alert hole shot on rhythm (only if clean)", "coachingPoint": "No floaters—firm, early window" }
+      ],
+      "notes": ["Classic vs C3: read flat→corner. Backside glance or dig alert if MOF safety over-rotates."]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "squats under the corner route", "then": "Throw flat immediately", "coachingPoint": "Take the gift; get it out fast" },
+        { "step": 2, "keyDefender": "Half safety", "if": "too wide to #1/go & late to corner", "then": "Hole the corner before overlap", "coachingPoint": "Anticipate window; don’t sail it" }
+      ],
+      "notes": ["Expect squat clouds; the flat is often the money throw early."]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits squat & reroutes #1", "then": "Flat immediately", "coachingPoint": "Ball out; let WR turn up" },
+        { "step": 2, "keyDefender": "Mike (pole runner)", "if": "late to overlap corner window", "then": "Rip corner before pole arrives", "coachingPoint": "Throw on time—window closes fast" }
+      ],
+      "notes": ["Pole runner can erase late corners; prioritize flat unless MLB is slow to the pole."]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps flat/out by #2", "then": "Do NOT throw out/flat blindly; work corner/hole if safety is late", "coachingPoint": "Confirm corner behavior before releasing" },
+        { "step": 2, "keyDefender": "Safety", "if": "drives the corner quickly", "then": "Check down to flat/drag", "coachingPoint": "Live for the next down" }
+      ],
+      "notes": ["Palms invites trap on out/flat—confirm corner before the throw."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on flat", "if": "trail is late through traffic", "then": "Flat on the move", "coachingPoint": "Lead upfield away from leverage" },
+        { "step": 2, "keyDefender": "Corner on #1", "if": "outside leverage/no safety help", "then": "Corner vs leverage", "coachingPoint": "Drive it; don’t hang it" }
+      ],
+      "hotRules": ["Vs pressure → hot to flat or quick slant away from blitz"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot: throw flat now or replace with quick slant/smoke", "coachingPoint": "Catch/rock/throw" },
+        { "step": 2, "keyDefender": "Trail leverage", "if": "protected", "then": "Corner vs outside leverage away from help", "coachingPoint": "Give WR room to the sideline" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "sits under corner", "then": "Flat now", "coachingPoint": "Don’t hold the ball—timing wins" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "late to overlap sail", "then": "Corner on rhythm only if window is clean", "coachingPoint": "If capped, take the flat" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match corner", "if": "carries corner vertically", "then": "Flat/underneath", "coachingPoint": "Check it down; avoid trap windows" },
+        { "step": 2, "keyDefender": "Safety", "if": "over the corner", "then": "No hero ball—checkdown", "coachingPoint": "Live to 2nd/short" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "squats under corner", "then": "Flat immediately", "coachingPoint": "Throw on time" },
+        { "step": 2, "keyDefender": "Quarter-side safety", "if": "slow to overlap", "then": "Corner on time (toward quarter side if window)", "coachingPoint": "Call it into the boundary you prefer" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match corner", "if": "squeezes corner early", "then": "Flat now", "coachingPoint": "Anticipate squeeze; don’t stare it down" },
+        { "step": 2, "keyDefender": "Safety (match)", "if": "over top of corner", "then": "Checkdown; avoid late throw to sideline", "coachingPoint": "Timing > arm talent here" }
+      ]
+    }
+  ],
+
+  "commonMistakes": [
+    "Forcing corner vs half safety",
+    "Late to flat vs squat corner",
+    "Drifting into pressure while waiting on the corner"
+  ],
+  "sources": [
+    { "title": "Route concepts overview", "url": "https://en.wikipedia.org/wiki/Route-running#Route_tree" }
+  ]
+}

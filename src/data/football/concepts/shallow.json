@@ -1,0 +1,102 @@
+{
+  "id": "SHALLOW",
+  "name": "Shallow Cross",
+  "family": "Dropback",
+  "bestInto": ["C1", "C0", "C3"],
+  "weakInto": ["C2"],
+  "personnel": ["10", "11"],
+  "formations": ["3x1", "2x2"],
+  "tags": ["drive/shallow", "runaway vs man"],
+  "preSnapKeys": [
+    "Man indicators (press/trail)",
+    "LB depth for dig window",
+    "Pressure threats"
+  ],
+  "postSnapKeys": [
+    "Trail leverage on shallow",
+    "Hook/curl midpoint vs dig",
+    "Flat defender buzz"
+  ],
+  "footwork": "Gun 5",
+  "readPlans": [
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on shallow", "if": "trailing through traffic", "then": "Hit shallow on the run", "coachingPoint": "Lead away from leverage; YAC throw" },
+        { "step": 2, "keyDefender": "Robber/low hole", "if": "drives under shallow", "then": "Dig/Basic over top", "coachingPoint": "Replace the robber fast" },
+        { "step": 3, "keyDefender": "Man on RB/flat", "if": "late through traffic", "then": "RB check/flat outlet", "coachingPoint": "No sacks—take profit" }
+      ],
+      "hotRules": ["Vs pressure → throw to shallow crossing away from blitz"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to shallow now", "coachingPoint": "Catch/rock/throw—no laces if needed" },
+        { "step": 2, "keyDefender": "Trail leverage", "if": "protected", "then": "Shallow or dig vs leverage", "coachingPoint": "Ball location wins vs man" }
+      ]
+    },
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Hook/curl", "if": "widens with shallow", "then": "Dig/Basic behind @14–18", "coachingPoint": "Drive it—no air" },
+        { "step": 2, "keyDefender": "Hook/curl", "if": "sits under dig", "then": "Throttle shallow in first window", "coachingPoint": "WR find grass; QB throw on time" }
+      ]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits squat on out tag", "then": "Keep ball inside—shallow/dig progression", "coachingPoint": "Avoid throwing into squat trap" },
+        { "step": 2, "keyDefender": "Half safety", "if": "drives dig from depth", "then": "Checkdown underneath", "coachingPoint": "Don’t float into overlap" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens to dig & runs", "then": "Shallow settle then run", "coachingPoint": "Ball on chest; WR eyes up" },
+        { "step": 2, "keyDefender": "Mike (pole)", "if": "walls shallow window", "then": "Backside check or under", "coachingPoint": "Live for next down" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out/flat", "then": "Ignore out; stay inside on shallow/dig", "coachingPoint": "Confirm corner before any flat throw" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Under droppers", "if": "carry shallow laterally", "then": "Settle shallow; QB hit chest", "coachingPoint": "Let WR throttle in grass" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "robs dig window", "then": "Checkdown", "coachingPoint": "Avoid late seam/middle throws" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LB", "if": "walls shallow from inside", "then": "Under route/spot replaces", "coachingPoint": "Throw into first clean window" },
+        { "step": 2, "keyDefender": "Safety", "if": "poaches dig", "then": "Shallow stays alive; avoid forcing dig", "coachingPoint": "Take profit" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "sits squat on out tag", "then": "Stay inside to shallow/dig", "coachingPoint": "Don’t test squat corner" },
+        { "step": 2, "keyDefender": "Quarter-side hook", "if": "widens with shallow", "then": "Bang dig behind", "coachingPoint": "Firm throw before close" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match under defenders", "if": "collision shallow hard", "then": "Replace with under/sit", "coachingPoint": "Feet set—stick throw" },
+        { "step": 2, "keyDefender": "Match safety", "if": "squeezes dig early", "then": "Stay on shallow/checkdown", "coachingPoint": "No late middle shots vs match" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Late to shallow",
+    "Floating the dig",
+    "Forcing into buzzed flat"
+  ],
+  "sources": [
+    { "title": "Drive/Shallow concept", "url": "https://en.wikipedia.org/wiki/Route-running#Drag" }
+  ]
+}

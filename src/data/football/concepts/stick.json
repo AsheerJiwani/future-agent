@@ -1,0 +1,98 @@
+{
+  "id": "STICK",
+  "name": "Stick",
+  "family": "Quick",
+  "bestInto": ["C3", "C1", "C4"],
+  "weakInto": ["PALMS", "C2"],
+  "personnel": ["10", "11", "12"],
+  "formations": ["2x2", "3x1", "Trips", "Bunch"],
+  "tags": ["quick game", "hook/outs", "flat control"],
+  "preSnapKeys": [
+    "Flat defender leverage on #2",
+    "Corner depth vs #1",
+    "Apex width"
+  ],
+  "postSnapKeys": [
+    "Flat defender widens on swing/out",
+    "Hook curl stays inside stick",
+    "Corner squat vs speed out"
+  ],
+  "footwork": "Gun 1 (RPO) or Gun 3",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Curl/flat (apex)", "if": "widens with flat/swing", "then": "Stick now in the vacated window", "coachingPoint": "No drift; foot in ground, ball out" },
+        { "step": 2, "keyDefender": "Curl/flat", "if": "stays inside under stick", "then": "Flat immediately", "coachingPoint": "Lead upfield to maximize YAC" }
+      ],
+      "notes": ["Rhythm: pre-snap leverage can make stick #1 if apex is wide."]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Cloud corner", "if": "sits squat under out", "then": "Stick/snag inside", "coachingPoint": "Place on frame; anticipate collision" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Apex/Mike", "if": "expands w/ flat and Mike opens pole", "then": "Stick settle in hook window", "coachingPoint": "Eyes snap; throw now" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out/flat", "then": "Stick/inside sit—do NOT throw the out blindly", "coachingPoint": "Confirm corner before flat" }
+      ]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on #2", "if": "outside leverage & bails to flat", "then": "Stick break inside now", "coachingPoint": "Snap off & present hands early" },
+        { "step": 2, "keyDefender": "Man on flat", "if": "late through traffic", "then": "Lead flat upfield", "coachingPoint": "Throw away from pursuit" }
+      ],
+      "hotRules": ["Vs pressure → replace with quick stick/now/slant"]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to quick stick/now", "coachingPoint": "Catch/rock/throw—no laces if needed" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "sits under out", "then": "Stick settle in hook seam", "coachingPoint": "Put it on his chest to avoid hits" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match LB", "if": "expands with flat", "then": "Stick now", "coachingPoint": "Fast eyes, fast feet" },
+        { "step": 2, "keyDefender": "Match LB", "if": "sits under stick", "then": "Flat", "coachingPoint": "No hesitation" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "triggers out", "then": "Stick inside", "coachingPoint": "Aim at near number" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match overhang", "if": "chases flat", "then": "Stick now", "coachingPoint": "Hit on rhythm" },
+        { "step": 2, "keyDefender": "Match overhang", "if": "walls stick", "then": "Flat immediately", "coachingPoint": "Throw to grass" }
+      ]
+    }
+  ],
+
+  "commonMistakes": [
+    "Drifting on quick game",
+    "Throwing the out vs squat corner",
+    "Late to the stick"
+  ],
+  "sources": [
+    { "title": "West Coast – Stick concept", "url": "https://en.wikipedia.org/wiki/West_Coast_offense" }
+  ]
+}

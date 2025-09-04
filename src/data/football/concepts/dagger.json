@@ -1,0 +1,102 @@
+{
+  "id": "DAGGER",
+  "name": "Dagger",
+  "family": "Dropback",
+  "bestInto": ["C3", "C1", "QUARTERS"],
+  "weakInto": ["C2"],
+  "personnel": ["10", "11"],
+  "formations": ["3x1", "2x2"],
+  "tags": ["clear seam + deep dig", "MOF stretch"],
+  "preSnapKeys": [
+    "Single-high shell",
+    "Nickel leverage on #2 (seam runner)",
+    "Hook/curl depth"
+  ],
+  "postSnapKeys": [
+    "Seam runner carry (LB/Nickel)",
+    "Hook/curl midpoint",
+    "MOF safety width"
+  ],
+  "footwork": "Gun 5 + hitch",
+  "readPlans": [
+    {
+      "vs": "C3",
+      "progression": [
+        { "step": 1, "keyDefender": "Hook/curl", "if": "widens with seam/clear", "then": "Dig at 14–18 behind him", "coachingPoint": "Drive it—no air under" },
+        { "step": 2, "keyDefender": "Hook/curl", "if": "sits under dig", "then": "Checkdown/under", "coachingPoint": "Don’t force into squeeze" },
+        { "step": 3, "keyDefender": "Corner", "if": "midpoints go vs dig", "then": "Alert outside go if capped inside", "coachingPoint": "Only if clean leverage" }
+      ],
+      "notes": ["Classic: clear holds corner/safety, dig opens behind curl/flat."]
+    },
+    {
+      "vs": "C1",
+      "progression": [
+        { "step": 1, "keyDefender": "Man on dig", "if": "trailing leverage", "then": "Hit dig crossing face on time", "coachingPoint": "Throw him open away from leverage" },
+        { "step": 2, "keyDefender": "Middle help", "if": "robber drives dig", "then": "Backside crosser/under", "coachingPoint": "Replace the robber" }
+      ],
+      "hotRules": ["Vs pressure → hot to under/sit"]
+    },
+    {
+      "vs": "C2",
+      "progression": [
+        { "step": 1, "keyDefender": "Half safety", "if": "expands with outside go", "then": "Dig behind curl/flat window", "coachingPoint": "On time; avoid undercut" },
+        { "step": 2, "keyDefender": "Cloud corner", "if": "sits squat", "then": "Do not throw out; keep eyes inside to dig/checkdown", "coachingPoint": "Protect the ball" }
+      ]
+    },
+    {
+      "vs": "TAMPA2",
+      "progression": [
+        { "step": 1, "keyDefender": "Mike (pole)", "if": "opens to seam and runs", "then": "Dig behind curl/flat", "coachingPoint": "Rhythm + drive" },
+        { "step": 2, "keyDefender": "Mike (pole)", "if": "walls dig window", "then": "Under/checkdown", "coachingPoint": "Don’t force vs pole overlap" }
+      ]
+    },
+    {
+      "vs": "PALMS",
+      "progression": [
+        { "step": 1, "keyDefender": "Corner (2-read)", "if": "traps out by #2", "then": "Ignore out; work dig behind hook", "coachingPoint": "Throw on time; inside window" }
+      ]
+    },
+    {
+      "vs": "C0",
+      "progression": [
+        { "step": 1, "keyDefender": "Free rusher", "if": "immediate", "then": "Hot to under/sit", "coachingPoint": "Catch & stick—no drift" },
+        { "step": 2, "keyDefender": "Trail on dig", "if": "protected", "then": "Dig vs trail away from help", "coachingPoint": "No air; protect ribs" }
+      ]
+    },
+    {
+      "vs": "C4",
+      "progression": [
+        { "step": 1, "keyDefender": "Outside quarter", "if": "carries go & sinks under dig", "then": "Under/checkdown", "coachingPoint": "Don’t force into bracket" },
+        { "step": 2, "keyDefender": "Inside quarter", "if": "static on hash", "then": "Bang dig in the seam-side window", "coachingPoint": "Timing is everything" }
+      ]
+    },
+    {
+      "vs": "QUARTERS",
+      "progression": [
+        { "step": 1, "keyDefender": "Match safety", "if": "poaches dig", "then": "Work under/drag", "coachingPoint": "Avoid late middle throws" },
+        { "step": 2, "keyDefender": "Match LB", "if": "widens with under", "then": "Dig behind if window opens", "coachingPoint": "Reset base; drive it" }
+      ]
+    },
+    {
+      "vs": "C6",
+      "progression": [
+        { "step": 1, "keyDefender": "Half-side corner", "if": "sits squat", "then": "Ignore out; dig/checkdown", "coachingPoint": "Keep it inside" },
+        { "step": 2, "keyDefender": "Quarter-side safety", "if": "late to overlap", "then": "Bang dig on time", "coachingPoint": "Don’t be late" }
+      ]
+    },
+    {
+      "vs": "C9",
+      "progression": [
+        { "step": 1, "keyDefender": "Match inside", "if": "walls dig hard", "then": "Under/checkdown", "coachingPoint": "Take profit" },
+        { "step": 2, "keyDefender": "Match outside", "if": "midpoints clear & dig", "then": "Alert go if free outside", "coachingPoint": "Only if leverage is clean" }
+      ]
+    }
+  ],
+  "commonMistakes": [
+    "Floating the dig",
+    "Forcing seam vs closed MOF"
+  ],
+  "sources": [
+    { "title": "Route tree / Dig", "url": "https://en.wikipedia.org/wiki/Route-running#Dig" }
+  ]
+}
