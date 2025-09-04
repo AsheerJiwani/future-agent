@@ -182,7 +182,7 @@ function HoopsChat() {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let done = false;
-        let nextArr = [...base];
+        const nextArr = [...base];
 
         while (!done) {
           const chunk = await reader.read();
