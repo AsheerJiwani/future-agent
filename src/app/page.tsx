@@ -50,7 +50,7 @@ export default function Page() {
       if (!res.ok) throw new Error(await res.text());
       const json: Payload = await res.json();
       setData(json);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setError("Something went wrong. Please try again.");
     } finally {
@@ -244,8 +244,8 @@ export default function Page() {
           © {new Date().getFullYear()} Asheer Jiwani · Source available on request
         </footer>
       </main>
-      <div className="grid-overlay" />
-      <div className="scanlines" />
+      
     </div>
   );
+  
 }
