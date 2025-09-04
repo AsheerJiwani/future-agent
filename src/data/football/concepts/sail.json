@@ -2,6 +2,15 @@
   "id": "SAIL",
   "name": "Sail / Flood",
   "family": "Dropback",
+  "diagram": {
+  "assignments": {
+    "X": "CORNER",
+    "Z": "HITCH",
+    "SLOT": "FLAT",
+    "TE": "DIG",
+    "RB": "CHECK"
+  }
+},
   "bestInto": ["C3", "C1"],
   "weakInto": ["C2", "PALMS"],
   "personnel": ["10", "11", "12"],

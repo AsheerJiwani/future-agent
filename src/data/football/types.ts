@@ -4,7 +4,7 @@ export type CoverageID =
 export type Personnel = "10"|"11"|"12"|"21"|"22";
 export type FormationFamily = "2x2"|"3x1"|"Bunch"|"Trips"|"Empty"|"I"|"OffsetGun";
 
-export type ReadStep = {
+export type ProgressionStep = {
   step: number;
   keyDefender?: string;
   if?: string;
@@ -14,7 +14,7 @@ export type ReadStep = {
 
 export type ReadPlan = {
   vs: CoverageID;
-  progression: ReadStep[];
+  progression: ProgressionStep[];
   hotRules?: string[];
   notes?: string[];
 };
@@ -25,11 +25,21 @@ export type DiagramRoute = {
   path: Array<{ x: number; y: number }>; // 0..100 coords (offense at bottom)
 };
 
-export type Diagram = {
-  losY?: number;
-  players: Array<{ label: string; x: number; y: number; side: "O"|"D" }>;
-  routes: DiagramRoute[];
-  coverage?: CoverageID;
+export type ReceiverID = "X" | "Z" | "SLOT" | "TE" | "RB";
+export type RouteKeyword =
+  | "HITCH" | "OUT" | "CORNER" | "FLAT" | "DIG"
+  | "POST" | "CROSS" | "SEAM" | "CHECK" | "STICK";
+
+export type Pt = { x: number; y: number };
+export type AlignMap = Record<ReceiverID, Pt>;
+
+export interface Diagram {
+  // ⬇️ make these optional so JSON with only assignments compiles
+  players?: Array<{ id: string; label?: string; start?: Pt }>;
+  routes?: Partial<Record<ReceiverID, Pt[]>>;
+  assignments?: Partial<Record<ReceiverID, RouteKeyword>>;
+  align?: Partial<AlignMap>;
+  defense?: Partial<Record<CoverageID, Record<string, Pt[]>>>;
 };
 
 export type Concept = {

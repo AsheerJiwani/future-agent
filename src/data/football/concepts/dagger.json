@@ -2,6 +2,15 @@
   "id": "DAGGER",
   "name": "Dagger",
   "family": "Dropback",
+  "diagram": {
+  "assignments": {
+    "X": "DIG",
+    "Z": "HITCH",
+    "SLOT": "SEAM",
+    "TE": "CHECK",
+    "RB": "CHECK"
+  }
+},
   "bestInto": ["C3", "C1", "QUARTERS"],
   "weakInto": ["C2"],
   "personnel": ["10", "11"],
