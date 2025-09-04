@@ -1,10 +1,10 @@
-/* Tailwind v4 import */
 @import "tailwindcss";
 
 /* ---------- Base ---------- */
 @layer base {
   :root { color-scheme: dark; }
   html, body { @apply min-h-screen text-white; background-color: #0b0f17; }
+  html { scroll-behavior: smooth; }
 }
 
 /* ---------- Reusable helpers ---------- */
@@ -14,11 +14,10 @@
   .gradient-text { @apply bg-clip-text text-transparent; }
 }
 .gradient-text {
-  /* keep gradient as plain CSS (avoids Tailwind 'background-image' parsing) */
   background-image: linear-gradient(90deg, #22d3ee, #60a5fa, #a78bfa);
 }
 
-/* ---------- Futuristic background layers ---------- */
+/* ---------- Dreamy background layers ---------- */
 .aurora {
   position: absolute; inset: -20%;
   background:
@@ -28,8 +27,7 @@
   filter: blur(40px) saturate(115%);
   animation: auroraShift 18s linear infinite;
   transform: translateZ(0);
-  pointer-events: none;
-  z-index: 0;
+  pointer-events: none; z-index: 0;
 }
 @keyframes auroraShift {
   0% { transform: translate3d(0,0,0) rotate(0) scale(1.0); }
@@ -54,21 +52,15 @@
     transparent 2px,
     transparent 4px
   );
-  mix-blend-mode: soft-light;
-  opacity: .5;
-  animation: scan 8s linear infinite;
+  mix-blend-mode: soft-light; opacity: .5; animation: scan 8s linear infinite;
 }
-@keyframes scan {
-  0% { transform: translateY(-1%); }
-  50% { transform: translateY(1%); }
-  100% { transform: translateY(-1%); }
-}
+@keyframes scan { 0% { transform: translateY(-1%);} 50% { transform: translateY(1%);} 100% { transform: translateY(-1%);} }
 
 @media (prefers-reduced-motion: reduce) {
   .aurora, .scanlines { animation: none !important; }
 }
 
-/* ---------- Big, clickable tabs ---------- */
+/* ---------- Big, clickable tabs (homepage) ---------- */
 .tab-card {
   position: relative; aspect-ratio: 1 / 1;
   border-radius: 1.5rem; padding: 1.25rem; text-align: left;
@@ -81,7 +73,7 @@
 .tab-title { font-weight: 700; font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
 .tab-sub { color: rgba(255,255,255,.7); margin-top: .35rem; font-size: .95rem; }
 
-/* Purple/blue starry tab (Futurecasting) */
+/* Futurecasting tab visual */
 .tab-future {
   background:
     radial-gradient(120% 90% at 10% 10%, rgba(34,211,238,.15), transparent 60%),
@@ -96,7 +88,7 @@
   opacity:.7; filter: drop-shadow(0 0 6px rgba(180,200,255,.25));
 }
 
-/* Bright “Wonderland” tab (Hoops) */
+/* Wonderland tab visual */
 .wonder-card {
   position: relative;
   background:
@@ -114,7 +106,7 @@
     rgba(255,255,255,.06);
 }
 
-/* Sparkles + sheen for Wonderland vibe */
+/* Sparkles + sheen */
 .sparkles::before {
   content:""; position:absolute; inset: -10%;
   background:
@@ -123,22 +115,49 @@
     radial-gradient(2px 2px at 80% 70%, rgba(255,255,255,.7), transparent 30%),
     radial-gradient(1.5px 1.5px at 35% 80%, rgba(255,255,255,.6), transparent 30%);
   filter: drop-shadow(0 0 10px rgba(255,255,255,.35));
-  animation: sparkleShift 12s linear infinite;
-  pointer-events: none;
+  animation: sparkleShift 12s linear infinite; pointer-events: none;
 }
-@keyframes sparkleShift {
-  0% { transform: translate3d(0,0,0) }
-  50% { transform: translate3d(2%, -2%, 0) }
-  100% { transform: translate3d(0,0,0) }
-}
+@keyframes sparkleShift { 0% { transform: translate3d(0,0,0)} 50% { transform: translate3d(2%, -2%, 0)} 100% { transform: translate3d(0,0,0)} }
 .shine::after {
   content:""; position:absolute; inset:-20%;
   background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.25) 50%, transparent 70%);
-  transform: rotate(5deg);
-  animation: sheen 6s linear infinite;
-  pointer-events: none;
+  transform: rotate(5deg); animation: sheen 6s linear infinite; pointer-events: none;
 }
-@keyframes sheen {
-  0% { transform: translateX(-60%) rotate(5deg); }
-  100% { transform: translateX(60%) rotate(5deg); }
+@keyframes sheen { 0% { transform: translateX(-60%) rotate(5deg);} 100% { transform: translateX(60%) rotate(5deg);} }
+
+/* ---------- Full-screen panels with theme variables ---------- */
+.panel-overlay { position: fixed; inset: 0; z-index: 40; overflow-y: auto; padding: 24px; }
+.panel-wrap    { max-width: 68rem; margin: 0 auto; }
+.panel-surface { border-radius: 1.5rem; padding: 1.5rem; }
+/* Inline panel wrapper */
+.panel-inline { margin-top: 1rem; }
+
+/* Theme tokens (Futurecasting vs Hoops) */
+.theme-future {
+  --accent-from: #22d3ee; --accent-to: #a78bfa; --ring: rgba(56,189,248,.45);
+  --surface: rgba(18,24,38,.80); /* slightly more opaque so it doesn't look "too transparent" */
+  --bubbleUserFrom:#22d3ee4d; --bubbleUserTo:#a78bfa4d; --bubbleBot: rgba(255,255,255,.10);
+}
+.theme-hoops {
+  --accent-from: #f0abfc; --accent-to: #fbbf24; --ring: rgba(251,191,36,.45);
+  --surface: rgba(255,255,255,.12);
+  --bubbleUserFrom:#f0abfc66; --bubbleUserTo:#fbbf2466; --bubbleBot: rgba(255,255,255,.14);
+}
+
+/* Utility classes used inside panels */
+.btn-accent {
+  background-image: linear-gradient(90deg, var(--accent-from), var(--accent-to));
+  color: #0a0a0a; font-weight: 700; border-radius: .75rem; padding: .75rem 1rem;
+  transition: filter .2s ease, opacity .2s ease;
+}
+.btn-accent:hover { filter: brightness(1.05); }
+.ring-accent:focus { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+.panel-surface { border-radius: 1.5rem; padding: 1.25rem; }
+.bubble-user {
+  background-image: linear-gradient(90deg, var(--bubbleUserFrom), var(--bubbleUserTo));
+  border: 1px solid rgba(255,255,255,.15);
+}
+.bubble-bot {
+  background: var(--bubbleBot);
+  border: 1px solid rgba(255,255,255,.12);
 }

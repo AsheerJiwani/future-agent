@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* 3D background (client-only) */
+/* Backgrounds (client-only) */
 const Starfield = dynamic(() => import("../components/Starfield").then(m => m.default), { ssr: false });
+const Nebula   = dynamic(() => import("../components/Nebula").then(m => m.default),   { ssr: false });
 
 /* ---------------- Types ---------------- */
 type Timeline = { year: number; milestones: string[] };
@@ -61,26 +62,24 @@ function FuturecastingPanel() {
   }
 
   return (
-    <div className="glass rounded-3xl p-6 md:p-8">
+    <div className="panel-surface glass thin-border" style={{ background: "var(--surface)" }}>
       <h2 className="text-xl font-semibold mb-4">Futurecasting AI</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm mb-2 opacity-80">Enter a topic and let the AI predict what will happen to it in 50 years!</label>
+          <label className="block text-sm mb-2 opacity-80">
+            Enter a topic and let the AI predict what will happen to it in 50 years!
+          </label>
           <input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder="e.g., Quantum computing in medicine"
-            className="w-full rounded-xl bg-white/5 thin-border px-3 py-3 outline-none focus:ring-2 focus:ring-cyan-400"
+            className="w-full rounded-xl bg-white/5 thin-border px-3 py-3 ring-accent"
             required
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl py-3 font-semibold bg-gradient-to-r from-cyan-500 to-purple-500 hover:opacity-90 transition disabled:opacity-60"
-        >
+        <button type="submit" disabled={loading} className="w-full btn-accent">
           {loading ? "Generating…" : "Generate Scenarios"}
         </button>
 
@@ -130,9 +129,7 @@ function FuturecastingPanel() {
                   {blk.items.length === 0 ? (
                     <div className="text-white/50 text-sm">—</div>
                   ) : (
-                    <ul className="list-disc ml-5 space-y-1 text-sm">
-                      {blk.items.map((x, i) => <li key={i}>{x}</li>)}
-                    </ul>
+                    <ul className="list-disc ml-5 space-y-1 text-sm">{blk.items.map((x, i) => <li key={i}>{x}</li>)}</ul>
                   )}
                 </div>
               ))}
@@ -144,14 +141,13 @@ function FuturecastingPanel() {
   );
 }
 
-/* ---------------- HoopsChat with client-side streaming ---------------- */
+/* ---------------- HoopsChat (streaming-ready) ---------------- */
 function HoopsChat() {
   const [history, setHistory] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  // boot message
   useEffect(() => {
     const saved = localStorage.getItem("hoops_history");
     if (saved) setHistory(JSON.parse(saved) as ChatMsg[]);
@@ -168,7 +164,6 @@ function HoopsChat() {
     setInput("");
 
     const base = [...history, { role: "user", content: text } as ChatMsg];
-    // optimistic assistant placeholder for streaming
     const placeholderIndex = base.length;
     base.push({ role: "assistant", content: "" });
     setHistory(base);
@@ -183,30 +178,26 @@ function HoopsChat() {
 
       const ct = res.headers.get("content-type") || "";
 
-      // --- If server streams text (SSE or chunked) ---
       if (res.body && (ct.includes("text/event-stream") || ct.includes("text/plain"))) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let done = false;
-        const next = [...base];
+        let nextArr = [...base];
 
         while (!done) {
           const chunk = await reader.read();
           done = chunk.done;
           if (chunk.value) {
             const s = decoder.decode(chunk.value, { stream: true });
-            // If SSE-style lines: "data: ...\n\n"
             const append = s.replace(/^data:\s*/gm, "");
-            next[placeholderIndex] = {
+            nextArr[placeholderIndex] = {
               role: "assistant",
-              content: (next[placeholderIndex]?.content || "") + append
-            } as ChatMsg;
-            setHistory(next as ChatMsg[]);
+              content: (nextArr[placeholderIndex]?.content || "") + append
+            };
+            setHistory([...nextArr]);
           }
         }
-      }
-      // --- JSON response fallback (current API behavior) ---
-      else {
+      } else {
         if (!res.ok) throw new Error(await res.text());
         const data = (await res.json()) as HoopsResp | { error: string };
         if ("error" in data) throw new Error(data.error);
@@ -215,14 +206,13 @@ function HoopsChat() {
           ? "\n\nSources:\n" + data.sources.map(s => `• ${s.title} — ${s.url}`).join("\n")
           : "";
 
-        const next = [...base];
-        next[placeholderIndex] = { role: "assistant", content: `${data.answer}\n\n${data.follow_up}${sources}` };
-        setHistory(next as ChatMsg[]);
+        const nextArr = [...base];
+        nextArr[placeholderIndex] = { role: "assistant", content: `${data.answer}\n\n${data.follow_up}${sources}` };
+        setHistory(nextArr);
       }
     } catch (e) {
       console.error(e);
-      const next = [...history, { role: "user", content: text }, { role: "assistant", content: "My bad—something glitched. Try again in a sec." }];
-      setHistory(next as ChatMsg[]);
+      setHistory([...history, { role: "user", content: text }, { role: "assistant", content: "My bad—something glitched. Try again in a sec." }]);
     } finally {
       setLoading(false);
     }
@@ -236,15 +226,15 @@ function HoopsChat() {
   }
 
   return (
-    <div className="rounded-3xl p-4 md:p-6 wonder-card thin-border relative overflow-hidden">
+    <div className="panel-surface thin-border wonder-card" style={{ background: "var(--surface)" }}>
       <div className="text-lg font-semibold mb-2">Hoops Tutor</div>
       <div className="text-white/70 text-sm mb-4">Ask me about eras, sets, rules, or strategy. I’ll quiz you back 😏</div>
 
-      <div className="h-80 overflow-y-auto rounded-2xl p-3 bg-white/5 thin-border">
+      <div className="h-80 overflow-y-auto rounded-2xl p-3 thin-border bubble-bot">
         {history.map((m, i) => (
           <div key={i} className={`mb-3 ${m.role === "user" ? "text-right" : "text-left"}`}>
             <div className={`inline-block max-w-[85%] rounded-2xl px-3 py-2 whitespace-pre-wrap ${
-              m.role === "user" ? "bg-gradient-to-r from-pink-400/30 to-yellow-300/30 thin-border" : "bg-white/10 thin-border"
+              m.role === "user" ? "bubble-user" : "bubble-bot"
             }`}>
               {m.content}
             </div>
@@ -255,17 +245,13 @@ function HoopsChat() {
 
       <div className="mt-3 flex gap-2">
         <input
-          className="flex-1 rounded-xl px-3 py-3 bg-white/5 thin-border outline-none focus:ring-2 focus:ring-fuchsia-400"
+          className="flex-1 rounded-xl px-3 py-3 bg-white/5 thin-border ring-accent"
           placeholder="E.g., how did the 24-second clock change the NBA?"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKey}
         />
-        <button
-          onClick={send}
-          disabled={loading}
-          className="rounded-xl px-4 py-3 font-semibold bg-gradient-to-r from-fuchsia-500 to-amber-400 hover:opacity-90 disabled:opacity-60"
-        >
+        <button onClick={send} disabled={loading} className="btn-accent">
           {loading ? "Thinking…" : "Send"}
         </button>
       </div>
@@ -277,22 +263,39 @@ function HoopsChat() {
   );
 }
 
-/* ---------------- Page (two large tabs) ---------------- */
+/* ---------------- Page: tiles + inline themed panels ---------------- */
 export default function Page() {
-  const [open, setOpen] = useState<"future" | "hoops" | null>(null);
+  // independent toggles so each panel opens below its tile without affecting scroll
+  const [openFuture, setOpenFuture] = useState(false);
+  const [openHoops, setOpenHoops] = useState(false);
+
+  const futureRef = useRef<HTMLDivElement>(null);
+  const hoopsRef = useRef<HTMLDivElement>(null);
+
+  function toggleFuture() {
+    const next = !openFuture;
+    setOpenFuture(next);
+    if (next) setTimeout(() => futureRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+  function toggleHoops() {
+    const next = !openHoops;
+    setOpenHoops(next);
+    if (next) setTimeout(() => hoopsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* BACKGROUND */}
+    <div className="relative min-h-screen">
+      {/* Dreamy site background (distinct from both tools) */}
       <div className="aurora" />
       <div className="pointer-events-none absolute inset-0 -z-10">
+        <Nebula />
         <Starfield />
       </div>
 
-      {/* HEADER */}
+      {/* Header */}
       <header className="relative z-10 max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between">
-          <div className="text-sm opacity-80">asheerjiwani.dev</div>
+          <div className="text-sm opacity-80">ashujani.dev</div>
           <nav className="text-sm opacity-80 space-x-5">
             <a href="#tabs" className="hover:opacity-100">Home</a>
             <a href="#about" className="hover:opacity-100">About</a>
@@ -300,16 +303,16 @@ export default function Page() {
         </div>
       </header>
 
-      {/* TABS GRID */}
+      {/* Tiles */}
       <main id="tabs" className="relative z-10 max-w-6xl mx-auto px-6 pb-24">
         <section className="text-center py-6">
           <h1 className="text-4xl md:text-5xl font-semibold gradient-text">Interactive Labs</h1>
-          <p className="mt-2 text-white/70">Pick a tile to open a full experience.</p>
+          <p className="mt-2 text-white/70">Pick a tile to open a full experience below.</p>
         </section>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* FUTURECAST TAB */}
-          <button onClick={() => setOpen(open === "future" ? null : "future")} className="tab-card tab-future group">
+          {/* FUTURECAST TILE */}
+          <button onClick={toggleFuture} className="tab-card tab-future group" aria-expanded={openFuture} aria-controls="future-panel">
             <div className="tab-inner">
               <div className="tab-title">Futurecasting AI</div>
               <div className="tab-sub">50-year scenarios across markets, politics, tech.</div>
@@ -317,8 +320,8 @@ export default function Page() {
             <div className="tab-dots" />
           </button>
 
-          {/* HOOPS TAB */}
-          <button onClick={() => setOpen(open === "hoops" ? null : "hoops")} className="tab-card tab-wonder group">
+          {/* HOOPS TILE */}
+          <button onClick={toggleHoops} className="tab-card tab-wonder group" aria-expanded={openHoops} aria-controls="hoops-panel">
             <div className="tab-inner">
               <div className="tab-title">Hoops Tutor</div>
               <div className="tab-sub">Learn plays, eras, and strategy—get quizzed as you go.</div>
@@ -328,44 +331,49 @@ export default function Page() {
           </button>
         </div>
 
-        {/* PANELS */}
-        <AnimatePresence>
-          {open === "future" && (
-            <motion.section
-              key="future"
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
-              className="mt-6"
-            >
-              <FuturecastingPanel />
-            </motion.section>
-          )}
+        {/* Inline panels (don’t block scroll) */}
+        <div ref={futureRef} id="future-panel" className="panel-inline">
+          <AnimatePresence>
+            {openFuture && (
+              <motion.section
+                key="future"
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+                className="theme-future"
+              >
+                <FuturecastingPanel />
+              </motion.section>
+            )}
+          </AnimatePresence>
+        </div>
 
-          {open === "hoops" && (
-            <motion.section
-              key="hoops"
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
-              className="mt-6"
-            >
-              <HoopsChat />
-            </motion.section>
-          )}
-        </AnimatePresence>
+        <div ref={hoopsRef} id="hoops-panel" className="panel-inline">
+          <AnimatePresence>
+            {openHoops && (
+              <motion.section
+                key="hoops"
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+                className="theme-hoops"
+              >
+                <HoopsChat />
+              </motion.section>
+            )}
+          </AnimatePresence>
+        </div>
 
-        {/* ABOUT */}
+        {/* About */}
         <section id="about" className="mt-16 glass rounded-3xl p-6 md:p-8">
           <h3 className="text-lg font-semibold mb-2">About</h3>
           <p className="text-white/70">
-            Two interactive tiles: a star-lit Futurecasting AI and a bright, playful Hoops Tutor.
-            Built with Next.js, Tailwind, and OpenAI.
+            Three vibes: a dreamy site background, a star-lit Futurecasting AI, and a bright, playful Hoops Tutor.
           </p>
         </section>
 
         <footer className="mt-10 text-center text-white/50 text-xs">
-          © {new Date().getFullYear()} Asheer Jiwani · Exploratory only
+          © {new Date().getFullYear()} Ashu Jani · Exploratory only
         </footer>
       </main>
 
-      {/* FOREGROUND OVERLAYS */}
+      {/* Foreground HUD overlays */}
       <div className="grid-overlay" />
       <div className="scanlines" />
     </div>
