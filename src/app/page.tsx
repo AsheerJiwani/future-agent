@@ -295,7 +295,7 @@ export default function Page() {
       {/* Header */}
       <header className="relative z-10 max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between">
-          <div className="text-sm opacity-80">ashujani.dev</div>
+          <div className="text-sm opacity-80">asheerjiwani.dev</div>
           <nav className="text-sm opacity-80 space-x-5">
             <a href="#tabs" className="hover:opacity-100">Home</a>
             <a href="#about" className="hover:opacity-100">About</a>
@@ -369,7 +369,7 @@ export default function Page() {
         </section>
 
         <footer className="mt-10 text-center text-white/50 text-xs">
-          © {new Date().getFullYear()} Ashu Jani · Exploratory only
+          © {new Date().getFullYear()} Asheer Jiwani · Exploratory only
         </footer>
       </main>
 
