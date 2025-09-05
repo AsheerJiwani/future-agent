@@ -270,22 +270,6 @@ function HoopsChat() {
    ==============  FOOTBALL PLAYBOOK COACH  ================
    ========================================================= */
 
-/* --- Football types (inline so no extra files needed) --- */
-type CoverageID =
-  | "C0" | "C1" | "C2" | "TAMPA2" | "PALMS" | "C3" | "C4" | "QUARTERS" | "C6" | "C9";
-type Personnel = "10"|"11"|"12"|"21"|"22";
-type FormationFamily = "2x2"|"3x1"|"Bunch"|"Trips"|"Empty"|"I"|"OffsetGun";
-
-type ReadStep = { step: number; keyDefender?: string; if?: string; then?: string; coachingPoint?: string; };
-type ReadPlan  = { vs: CoverageID; progression: ReadStep[]; hotRules?: string[]; notes?: string[]; };
-type DiagramRoute = { label: string; color?: string; path: Array<{ x:number; y:number }>; };
-type Diagram = {
-  losY?: number;
-  players: Array<{ label: string; x: number; y: number; side: "O"|"D" }>;
-  routes: DiagramRoute[];
-  coverage?: CoverageID;
-};
-
 /* =========================================================
    =======================  PAGE  ==========================
    ========================================================= */
