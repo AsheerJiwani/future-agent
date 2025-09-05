@@ -2,7 +2,9 @@
 
 import { JSX, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { FootballConceptId } from "../../data/football/catalog";
-import type { CoverageID } from "../../data/football/types";
+import type { CoverageID, ReceiverID, RouteKeyword, Pt, AlignMap } from "../../data/football/types";
+import { usePlayClock } from "./hooks/usePlayClock";
+import { XorShift32, mixSeed } from "../../lib/rng";
 
 /* --------- Audio helpers --------- */
 interface AudioWindow extends Window {
@@ -31,13 +33,10 @@ const YPX = PX_H / FIELD_LENGTH_YDS;
 const xAcross = (ydsAcross: number) => ydsAcross * XPX;
 const yUp = (ydsUp: number) => PX_H - ydsUp * YPX;
 
-const DECISION_POINTS = [0.35, 0.6];
-
 // QB at bottom-middle, ~12 yds from GL
 const QB = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(12) };
 
 /* --------- Types --------- */
-export type ReceiverID = "X" | "Z" | "SLOT" | "TE" | "RB";
 type DefenderID =
   | "CB_L"
   | "CB_R"
@@ -48,33 +47,10 @@ type DefenderID =
   | "MIKE"
   | "WILL";
 
-export type RouteKeyword =
-  | "GO"
-  | "SEAM"
-  | "BENDER"
-  | "HITCH"
-  | "OUT"
-  | "SPEED_OUT"
-  | "COMEBACK"
-  | "CURL"
-  | "DIG"
-  | "POST"
-  | "CORNER"
-  | "CROSS"
-  | "OVER"
-  | "SHALLOW"
-  | "SLANT"
-  | "FLAT"
-  | "WHEEL"
-  | "CHECK"
-  | "STICK";
-
-type Pt = { x: number; y: number };
 type Actor = { id: string; color: string; path: Pt[] };
 
 type RouteMap = Record<ReceiverID, Pt[]>;
 type AssignMap = Partial<Record<ReceiverID, RouteKeyword>>;
-type AlignMap = Record<ReceiverID, Pt>;
 
 type FormationName = "TRIPS_RIGHT" | "DOUBLES" | "BUNCH_LEFT";
 
@@ -227,14 +203,40 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
       const breakPt = { x: s.x + outSign(s) * xAcross(H.outDeep), y: stem.y };
       return [s, stem, breakPt];
     }
+    case "OUT_LOW": {
+      const stem = { x: s.x, y: yUp(DEPTH.quick) };
+      const breakPt = { x: s.x + outSign(s) * xAcross(H.outQuick), y: stem.y };
+      return [s, stem, breakPt];
+    }
+    case "OUT_MID": {
+      const stem = { x: s.x, y: yUp(DEPTH.mid) };
+      const breakPt = { x: s.x + outSign(s) * xAcross(12), y: stem.y };
+      return [s, stem, breakPt];
+    }
+    case "OUT_HIGH": {
+      const stem = { x: s.x, y: yUp(DEPTH.deep) };
+      const breakPt = { x: s.x + outSign(s) * xAcross(H.outDeep), y: stem.y };
+      return [s, stem, breakPt];
+    }
     case "CURL": {
       const stem = { x: s.x, y: yUp(DEPTH.curl) };
       const work = { x: stem.x, y: yUp(DEPTH.curl - 2) };
       return [s, stem, work];
     }
-    case "COMEBACK": {
+    case "COMEBACK":
+    case "COMEBACK_MID": {
       const stem = { x: s.x, y: yUp(DEPTH.dig) };
       const back = { x: sidelineX(s, 6), y: yUp(DEPTH.curl) };
+      return [s, stem, back];
+    }
+    case "COMEBACK_LOW": {
+      const stem = { x: s.x, y: yUp(DEPTH.curl) };
+      const back = { x: sidelineX(s, 8), y: yUp(DEPTH.quick) };
+      return [s, stem, back];
+    }
+    case "COMEBACK_HIGH": {
+      const stem = { x: s.x, y: yUp(DEPTH.shot - 2) };
+      const back = { x: sidelineX(s, 6), y: yUp(DEPTH.dig) };
       return [s, stem, back];
     }
     case "DIG": {
@@ -249,10 +251,24 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
       const bend = { x: QB.x, y: yUp(DEPTH.shot) };
       return [s, stem, bend];
     }
-    case "CORNER": {
-      const stem = { x: s.x, y: yUp(DEPTH.deep) };
-      const flag = { x: sidelineX(s, 8), y: yUp(DEPTH.shot) };
-      return [s, stem, flag];
+    case "CORNER":
+    case "CORNER_MID": {
+      const stem  = { x: s.x, y: yUp(DEPTH.deep - 2) };
+      const breakOut = { x: s.x + outSign(s) * xAcross(10), y: yUp(DEPTH.deep - 4) };
+      const flag  = { x: sidelineX(s, 10), y: yUp(DEPTH.shot - 2) };
+      return [s, stem, breakOut, flag];
+    }
+    case "CORNER_LOW": {
+      const stem  = { x: s.x, y: yUp(DEPTH.mid) };
+      const breakOut = { x: s.x + outSign(s) * xAcross(9), y: yUp(DEPTH.mid - 1) };
+      const flag  = { x: sidelineX(s, 12), y: yUp(DEPTH.deep) };
+      return [s, stem, breakOut, flag];
+    }
+    case "CORNER_HIGH": {
+      const stem  = { x: s.x, y: yUp(DEPTH.deep) };
+      const breakOut = { x: s.x + outSign(s) * xAcross(10), y: yUp(DEPTH.deep - 2) };
+      const flag  = { x: sidelineX(s, 8), y: yUp(DEPTH.shot) };
+      return [s, stem, breakOut, flag];
     }
 
     /* Crossers */
@@ -281,6 +297,74 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
     default:
       return [s];
   }
+}
+
+// Man leverage helper: rough outside/inside leverage based on defender start vs receiver align
+// pick likely man defender for the receiver (by alignment side)
+function likelyManDefender(rid: ReceiverID, sAlign: Pt): DefenderID {
+  if (rid === "SLOT") return "NICKEL";
+  if (rid === "TE") return "SS";
+  if (rid === "RB") return "MIKE";
+  return sAlign.x < QB.x ? "CB_L" : "CB_R";
+}
+
+function isOutsideLeverage(rid: ReceiverID, A: AlignMap, starts: Record<DefenderID, Pt>): boolean {
+  const s = A[rid];
+  if (!s) return false;
+  const did: DefenderID = likelyManDefender(rid, s);
+  const d = starts[did] ?? { x: s.x, y: s.y };
+  const left = s.x < QB.x;
+  return left ? d.x < s.x : d.x > s.x;
+}
+
+function leverageAdjustPath(
+  rid: ReceiverID,
+  path: Pt[],
+  cover: CoverageID,
+  A: AlignMap,
+  starts: Record<DefenderID, Pt>,
+  levMeta?: Record<ReceiverID, { side: 'inside' | 'outside' | 'even'; via: string }>,
+  adjMeta?: Record<ReceiverID, { dxYds: number; dDepthYds: number }>
+): Pt[] {
+  if (!path || path.length < 2) return path;
+  const isMan = MAN_COVERAGES.has(cover);
+  const isMatch = cover === 'PALMS' || cover === 'QUARTERS' || cover === 'C6';
+  if (!(isMan || isMatch)) return path;
+  const outside = isOutsideLeverage(rid, A, starts);
+  const s = A[rid];
+  const sign = outSign(s);
+
+  const clone = path.map(p => ({ ...p }));
+  const n = clone.length;
+  let totalDx = 0, totalDy = 0;
+  const adjustBreak = (idx: number, horizYds: number, depthDeltaYds: number) => {
+    if (idx <= 0 || idx >= n) return;
+    const p = clone[idx];
+    // Horizontal adjust toward/away from sideline
+    const targetX = outside ? s.x + sign * xAcross(horizYds * 0.75) : s.x + sign * xAcross(horizYds * 1.1);
+    const maxX = sidelineX(s, 6);
+    const oldX = clone[idx].x;
+    clone[idx].x = sign > 0 ? Math.min(targetX, maxX) : Math.max(targetX, maxX);
+    // Depth tweak
+    const dy = (outside ? Math.abs(depthDeltaYds) : -Math.abs(depthDeltaYds)) * YPX;
+    const oldY = clone[idx].y;
+    clone[idx].y = p.y - dy;
+    totalDx += (clone[idx].x - oldX) / XPX;
+    totalDy += (oldY - clone[idx].y) / YPX; // positive = deeper
+  };
+
+  // Identify route class by geometry and adjust 2nd and/or last points
+  if (n === 3) {
+    // likely OUT/COMEBACK
+    adjustBreak(2, Math.abs(clone[2].x - s.x) / XPX, 1.0);
+  } else if (n >= 4) {
+    // likely CORNER family
+    adjustBreak(2, Math.abs(clone[2].x - s.x) / XPX, 0.8);
+    adjustBreak(n - 1, Math.abs(clone[n - 1].x - s.x) / XPX, 1.2);
+  }
+  if (levMeta) levMeta[rid] = { side: outside ? 'outside' : 'inside', via: isMan ? 'man' : cover };
+  if (adjMeta) adjMeta[rid] = { dxYds: totalDx, dDepthYds: totalDy };
+  return clone;
 }
 
 /* --------- Formations (fixed align) --------- */
@@ -429,7 +513,7 @@ export default function PlaySimulator({
   coverage: CoverageID;
 }) {
   const [phase, setPhase] = useState<"pre" | "post" | "decided">("pre");
-  const [t, setT] = useState(0);
+  const { t, setT, seek, start: startClock, stop: stopClock, reset: resetClock } = usePlayClock(3000);
   const [decision, setDecision] = useState<ReceiverID | null>(null);
   const [grade, setGrade] = useState<string | null>(null);
   const [explain, setExplain] = useState<string | null>(null);
@@ -478,7 +562,64 @@ export default function PlaySimulator({
 
   const [caught, setCaught] = useState(false);
 
+  // Relative speed multipliers by position (realistic-ish deltas)
+  function receiverSpeedMult(id: ReceiverID): number {
+    switch (id) {
+      case "TE": return 0.90; // TEs a bit slower top-end vs WRs
+      case "RB": return 0.98; // RBs quick but shorter stride on routes
+      case "SLOT": return 0.98; // quick area burst, slightly less stride on deep
+      default: return 1.00; // X/Z boundary WRs baseline
+    }
+  }
+  function defenderSpeedMult(id: DefenderID): number {
+    switch (id) {
+      case "CB_L":
+      case "CB_R":
+        return 1.00; // top-end corners
+      case "NICKEL":
+        return 0.98; // close to CB
+      case "FS":
+      case "SS":
+        return 0.96; // a touch slower than CBs
+      case "SAM":
+      case "MIKE":
+      case "WILL":
+        return 0.88; // LBs
+      default:
+        return 1.0;
+    }
+  }
+
+  // Deterministic RNG per play
+  const [playId, setPlayId] = useState(0);
+  const [rngSeed, setRngSeed] = useState<number>(() => mixSeed(Date.now() >>> 0, Math.floor(Math.random() * 0x7fffffff)));
+  const rngRef = useRef<XorShift32>(new XorShift32(mixSeed(rngSeed, playId)));
+  useEffect(() => {
+    rngRef.current = new XorShift32(mixSeed(rngSeed, playId));
+  }, [rngSeed, playId]);
+
+  // Openness metric per frame
+  type OpenInfo = { score: number; sepYds: number; nearest: DefenderID | null };
+  const [openness, setOpenness] = useState<Record<ReceiverID, OpenInfo>>({
+    X: { score: 0, sepYds: 0, nearest: null },
+    Z: { score: 0, sepYds: 0, nearest: null },
+    SLOT: { score: 0, sepYds: 0, nearest: null },
+    TE: { score: 0, sepYds: 0, nearest: null },
+    RB: { score: 0, sepYds: 0, nearest: null },
+  });
+  const [lastWindow, setLastWindow] = useState<{ rid: ReceiverID; info: OpenInfo } | null>(null);
+  // Leverage meta for UI/AI
+  const [levInfo, setLevInfo] = useState<Record<ReceiverID, { side: 'inside'|'outside'|'even'; via: string }>>({
+    X: { side: 'even', via: '' }, Z: { side: 'even', via: '' }, SLOT: { side: 'even', via: '' }, TE: { side: 'even', via: '' }, RB: { side: 'even', via: '' }
+  });
+  const [levAdjust, setLevAdjust] = useState<Record<ReceiverID, { dxYds: number; dDepthYds: number }>>({
+    X: { dxYds: 0, dDepthYds: 0 }, Z: { dxYds: 0, dDepthYds: 0 }, SLOT: { dxYds: 0, dDepthYds: 0 }, TE: { dxYds: 0, dDepthYds: 0 }, RB: { dxYds: 0, dDepthYds: 0 }
+  });
+  // Minimal AI log (append per snap)
+  const [aiLog, setAiLog] = useState<Array<{ playId: number; coverage: CoverageID; formation: FormationName; leverage: typeof levInfo; adjustments: typeof levAdjust }>>([]);
+
   const PLAY_MS = 3000; // play clock duration (matches Snap timer)
+  
 
   type ThrowMeta = { p0: Pt; p1: Pt; p2: Pt; tStart: number; frac: number };
   const [throwMeta, setThrowMeta] = useState<ThrowMeta | null>(null);
@@ -486,7 +627,10 @@ export default function PlaySimulator({
   // Generous menu of routes
   const ROUTE_MENU: RouteKeyword[] = [
     "GO","SPEED_OUT","CURL",
-    "DIG","POST","CORNER",
+    "OUT_LOW","OUT_MID","OUT_HIGH",
+    "CORNER_LOW","CORNER_MID","CORNER_HIGH",
+    "COMEBACK_LOW","COMEBACK_MID","COMEBACK_HIGH",
+    "DIG","POST",
     "SLANT","WHEEL","CHECK",
   ];
 
@@ -504,20 +648,155 @@ export default function PlaySimulator({
 
   const hasAudibles = useMemo(() => Object.keys(manualAssignments).length > 0, [manualAssignments]);
 
-  // === Single fast play clock (3000ms) ===
-  const playRef = useRef<number | null>(null);
+  // Drive the play clock via hook based on phase
   useEffect(() => {
-    if (phase !== "post") return;
-    const t0 = performance.now();
-    const tick = (now: number) => {
-      const u = Math.min(1, (now - t0) / 3000);
-      setT(u);
-      if (u < 1) playRef.current = requestAnimationFrame(tick);
-      else cancelAnimationFrame(playRef.current!);
-    };
-    playRef.current = requestAnimationFrame(tick);
-    return () => { if (playRef.current) cancelAnimationFrame(playRef.current); };
+    if (phase === "post") {
+      // Restart clock cleanly for a new snap
+      resetClock();
+      // Defer start to next microtask to let reset state settle
+      queueMicrotask(() => startClock());
+    } else {
+      stopClock();
+    }
   }, [phase]);
+
+
+  // --- CB technique: normal, press on both, press only to strength
+type CBTechnique = "normal" | "press" | "pressStrong";
+const [cbTechnique, setCbTechnique] = useState<CBTechnique>("normal");
+
+// Press outcomes per CB at the snap
+type CBPressOutcome = "NONE" | "JAM_LOCK" | "WHIFF" | "JAM_AND_RELEASE";
+type CBPressState = { rid: ReceiverID | null; outcome: CBPressOutcome };
+type CBPressInfo = { outcome: CBPressOutcome; untilT: number }; // untilT is play-clock fraction [0..1]
+
+const [cbPress, setCbPress] = useState<{ CB_L: CBPressState; CB_R: CBPressState }>({
+    CB_L: { rid: null, outcome: "NONE" },
+    CB_R: { rid: null, outcome: "NONE" },
+});
+
+// Fractions of play clock for delays (uses your PLAY_MS)
+const PRESS_DELAY_FRAC = 0.3 / (PLAY_MS / 1000);   // ~0.10 if PLAY_MS=3000
+const WHIFF_DELAY_FRAC = 1.0 / (PLAY_MS / 1000);   // ~0.33 if PLAY_MS=3000
+
+// Sample press outcomes for corners at the instant the play starts
+useEffect(() => {
+  // Ensure pre-snap clears any prior press state
+  if (phase !== "post") {
+    const leftOne  = left1();
+    const rightOne = right1();
+    setCbPress({
+      CB_L: { rid: leftOne,  outcome: "NONE" },
+      CB_R: { rid: rightOne, outcome: "NONE" },
+    });
+    return;
+  }
+
+  const isMan = coverage === "C0" || coverage === "C1";
+  const sr = strongIsRight();                     // true if strength = right
+  const strongCB: DefenderID = sr ? "CB_R" : "CB_L";
+  const weakCB:   DefenderID = sr ? "CB_L" : "CB_R";
+
+  // 70% strong, 20% weak (C0/C1 only). Otherwise no auto press.
+  const wantStrong = isMan && rngRef.current.nextFloat() < 0.70;
+  const wantWeak   = isMan && rngRef.current.nextFloat() < 0.20;
+
+  // If you support manual technique overrides, honor them here:
+  // - "press": force both to press in man
+  // - "pressStrong": force strong CB to press in man
+  // - "normal": use the auto 70/20 above
+  // (Remove/adjust this block if you don’t have `cbTechnique`.)
+  if (typeof cbTechnique !== "undefined") {
+    if (cbTechnique === "press") {
+      if (isMan) { (cbTechnique as string); }
+    }
+  }
+  const forceBoth   = (typeof cbTechnique !== "undefined") && cbTechnique === "press";
+  const forceStrong = (typeof cbTechnique !== "undefined") && cbTechnique === "pressStrong";
+
+  const active: Record<DefenderID, boolean> = {
+    CB_L: false, CB_R: false, NICKEL: false, FS: false, SS: false, SAM: false, MIKE: false, WILL: false
+  };
+  if (isMan) {
+    if (forceBoth) {
+      active.CB_L = true; active.CB_R = true;
+    } else if (forceStrong) {
+      active[strongCB] = true;
+    } else {
+      active[strongCB] = wantStrong;
+      active[weakCB]   = wantWeak;
+    }
+  }
+
+  // Convert “press” into an outcome with the requested odds:
+  // - 10% JAM_LOCK (stuck at LOS)
+  // - 20% WHIFF (stands still 1.0s then chases)
+  // - 70% JAM_AND_RELEASE (holds 0.3s then chases)
+  const secToFrac = (ms: number) => ms / (PLAY_MS); // 300ms -> 0.1 when PLAY_MS=3000
+  const pick = (on: boolean): CBPressInfo => {
+    if (!on) return { outcome: "NONE", untilT: 0 };
+    const r = rngRef.current.nextFloat();
+    if (r < 0.10) return { outcome: "JAM_LOCK",         untilT: 9 };                 // >1 means “whole play”
+    if (r < 0.30) return { outcome: "WHIFF",            untilT: secToFrac(1000) };   // ~1.0s
+    return            { outcome: "JAM_AND_RELEASE", untilT: secToFrac(300)  };   // ~0.3s
+  };
+
+  
+
+  
+
+  const leftActive  = active.CB_L;
+  const rightActive = active.CB_R;
+  const L = pick(leftActive);
+  const R = pick(rightActive);
+  const leftOne  = left1();   // helper you already have
+  const rightOne = right1();  // helper you already have
+
+setCbPress({
+  CB_L: { rid: L.outcome === "NONE" ? null : leftOne,  outcome: L.outcome as CBPressOutcome },
+  CB_R: { rid: R.outcome === "NONE" ? null : rightOne, outcome: R.outcome as CBPressOutcome },
+});
+
+
+  // Pre-snap depth look (press ≈ 1–2 yds; normal ≈ 7 yds)
+  const yPress = yUp(16.5);
+  const yOff   = yUp(22);
+  const leftOuter:  ReceiverID = align.X.x < align.Z.x ? "X" : "Z";
+  const rightOuter: ReceiverID = leftOuter === "X" ? "Z" : "X";
+
+  setDstart(s => ({
+    ...s,
+    CB_L: { x: align[leftOuter].x,  y: L.outcome !== "NONE" ? yPress : yOff },
+    CB_R: { x: align[rightOuter].x, y: R.outcome !== "NONE" ? yPress : yOff },
+  }));
+}, [phase, coverage, align, numbering /* reads strongIsRight() */, cbTechnique]);
+
+  // --- AI Audible ---
+  async function aiAudible() {
+    try {
+      const payload = { conceptId, coverage, formation, assignments: manualAssignments, numbering };
+      const res = await fetch("/api/football-audible", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const suggestion: { formation?: FormationName; assignments?: Partial<Record<ReceiverID, RouteKeyword>>; rationale?: string } = await res.json();
+      if (suggestion.formation) setFormation(suggestion.formation);
+      if (suggestion.assignments) setManualAssignments(suggestion.assignments);
+      setAudibleNote(suggestion.rationale ?? "Audible applied.");
+      // Reset to pre-snap after changing routes
+      setPhase("pre");
+      setT(0);
+      setDecision(null);
+      setGrade(null);
+      setExplain(null);
+      setBallFlying(false);
+      setBallT(0);
+      setCatchAt(null);
+    } catch {
+      setAudibleNote("AI audible unavailable. Try again.");
+    }
+  }
 
   /** -------- MAN (C0/C1) snap-time extra roles -------- */
 type ExtraRoles = { blitzers: DefenderID[]; spy: DefenderID | null };
@@ -544,28 +823,31 @@ useEffect(() => {
   let spy: DefenderID | null = null;
 
   if (extras.length === 2) {
-    if (Math.random() < 0.5) {
+    if (rngRef.current.nextFloat() < 0.5) {
       // both blitz
       blitzers = extras.slice();
     } else {
       // one spies, the other blitzes
-      spy = Math.random() < 0.5 ? extras[0] : extras[1];
+      spy = rngRef.current.nextFloat() < 0.5 ? extras[0] : extras[1];
       blitzers = [spy === extras[0] ? extras[1] : extras[0]];
     }
   } else if (extras.length === 1) {
     // single extra: blitz 70% else spy
-    if (Math.random() < 0.7) blitzers = extras;
+    if (rngRef.current.nextFloat() < 0.7) blitzers = extras;
     else spy = extras[0];
   }
 
   setManExtraRoles({ blitzers, spy });
 }, [phase, coverage]);
 
-  // Rebuild alignment, numbering, routes, and defender starts whenever inputs change
+  // Rebuild alignment, numbering, routes (with leverage), and defender starts whenever inputs change
   useEffect(() => {
     const A = FORMATIONS[formation];
     setAlign(A);
     setNumbering(computeNumbering(A));
+
+    // Compute defender starts first so we can adjust routes by leverage
+    const starts = computeDefenderStarts(A);
 
     const routes = buildConceptRoutes(conceptId, A, coverage);
 
@@ -579,10 +861,18 @@ useEffect(() => {
         routes[rid] = routeFromKeyword(kw, A[rid], coverage);
       });
 
+    // Leverage-driven tweaks (man + match) and collect meta
+    const levMeta: Record<ReceiverID, { side: 'inside'|'outside'|'even'; via: string }> = { X: {side:'even', via:''}, Z: {side:'even', via:''}, SLOT: {side:'even', via:''}, TE: {side:'even', via:''}, RB: {side:'even', via:''} };
+    const adjMeta: Record<ReceiverID, { dxYds: number; dDepthYds: number }> = { X: {dxYds:0,dDepthYds:0}, Z: {dxYds:0,dDepthYds:0}, SLOT: {dxYds:0,dDepthYds:0}, TE: {dxYds:0,dDepthYds:0}, RB: {dxYds:0,dDepthYds:0} };
+    (Object.keys(routes) as ReceiverID[]).forEach((rid) => {
+      if ((rid === "TE" && teBlock) || (rid === "RB" && rbBlock)) return;
+      routes[rid] = leverageAdjustPath(rid, routes[rid], coverage, A, starts, levMeta, adjMeta);
+    });
+
     setO(routes);
 
     // strength-aware defensive starting spots
-    setDstart(computeDefenderStarts(A));
+    setDstart(starts);
 
     // reset to pre-snap for consistency
     setPhase("pre");
@@ -593,6 +883,9 @@ useEffect(() => {
     setBallFlying(false);
     setBallT(0);
     setCatchAt(null);
+    // expose leverage info for UI/AI
+    setLevInfo(levMeta);
+    setLevAdjust(adjMeta);
   }, [formation, conceptId, coverage, teBlock, rbBlock, manualAssignments]);
 
   useEffect(() => {
@@ -611,7 +904,7 @@ useEffect(() => {
     if (teBlock) {
       const tgt = computeBlockTarget("TE", coverage, align, Dstart, sr);
       assigns.TE = tgt ?? null;
-      const ok = Math.random() < 0.90; // TE success 90%
+      const ok = rngRef.current.nextFloat() < 0.90; // TE success 90%
       if (tgt && ok) {
         blocked.add(tgt);
         engages[tgt] = computeEngagePoint("TE", (O.TE[0] ?? align.TE), Dstart[tgt]);
@@ -621,7 +914,7 @@ useEffect(() => {
     if (rbBlock) {
       const tgt = computeBlockTarget("RB", coverage, align, Dstart, sr);
       assigns.RB = tgt ?? null;
-      const ok = Math.random() < 0.70; // RB success 70%
+      const ok = rngRef.current.nextFloat() < 0.70; // RB success 70%
       if (tgt && ok) {
         blocked.add(tgt);
         engages[tgt] = computeEngagePoint("RB", (O.RB[0] ?? align.RB), Dstart[tgt]);
@@ -645,49 +938,119 @@ useEffect(() => {
   ]), [O]);
 
   function wrPosSafe(id: ReceiverID, tt: number): Pt {
-    const path = O[id];
-    if (path && path.length > 0) return posOnPathLenScaled(path, Math.min(1, tt * recSpeed));
-    return align[id] ?? QB;
+  const path = O[id];
+  const tPlay = Math.max(0, Math.min(1, tt));
+  let tAdj = tPlay;
+
+  // NB: must be CB_L / CB_R (underscore), and guard with optional chaining
+  const pressL = cbPress?.CB_L;
+  const pressR = cbPress?.CB_R;
+
+  const mine =
+    pressL?.rid === id ? pressL :
+    pressR?.rid === id ? pressR :
+    undefined;
+
+  if (mine && mine.outcome !== "NONE") {
+    if (mine.outcome === "JAM_LOCK") {
+      // stuck on LOS for the whole play
+      return align[id] ?? QB;
+    }
+    if (mine.outcome === "JAM_AND_RELEASE") {
+      // delay WR’s route by PRESS_DELAY_FRAC, then continue
+      const denom = (1 - PRESS_DELAY_FRAC) || 1; // guard divide-by-zero
+      tAdj = tPlay < PRESS_DELAY_FRAC ? 0 : (tPlay - PRESS_DELAY_FRAC) / denom;
+    }
+    // WHIFF → no WR delay
   }
+
+  const s = Math.min(1, tAdj * recSpeed * receiverSpeedMult(id));
+  if (!path || path.length === 0) return align[id] ?? QB;
+  return posOnPathLenScaled(path, s);
+}
+
+  // Distance in yards accounting for non-uniform px scales
+  function distYds(a: Pt, b: Pt): number {
+    const dx = (a.x - b.x) / XPX;
+    const dy = (a.y - b.y) / YPX;
+    return Math.hypot(dx, dy);
+  }
+
+  // Compute openness for a single receiver at time tt
+  function computeReceiverOpenness(rid: ReceiverID, tt: number): OpenInfo {
+    const rp = wrPosSafe(rid, tt);
+    let bestYds = Infinity;
+    let nearest: DefenderID | null = null;
+    for (const did of DEFENDER_IDS) {
+      const dp = defenderPos(coverage, did, tt);
+      const yds = distYds(rp, dp);
+      if (yds < bestYds) { bestYds = yds; nearest = did; }
+    }
+    // Map separation yards to 0..1 score: 1.5 yds = tight (0), 6.0 yds = open (1)
+    const MIN_SEP = 1.5, MAX_SEP = 6.0;
+    const score = Math.max(0, Math.min(1, (bestYds - MIN_SEP) / (MAX_SEP - MIN_SEP)));
+    return { score, sepYds: bestYds, nearest };
+  }
+
+  // Update openness every frame while play is live
+  useEffect(() => {
+    if (phase !== "post") {
+      setOpenness((prev) => ({ ...prev, X: { score: 0, sepYds: 0, nearest: null }, Z: { score: 0, sepYds: 0, nearest: null }, SLOT: { score: 0, sepYds: 0, nearest: null }, TE: { score: 0, sepYds: 0, nearest: null }, RB: { score: 0, sepYds: 0, nearest: null } }));
+      return;
+    }
+    const infoX = computeReceiverOpenness("X", t);
+    const infoZ = computeReceiverOpenness("Z", t);
+    const infoS = computeReceiverOpenness("SLOT", t);
+    const infoT = computeReceiverOpenness("TE", t);
+    const infoR = computeReceiverOpenness("RB", t);
+    setOpenness({ X: infoX, Z: infoZ, SLOT: infoS, TE: infoT, RB: infoR });
+  }, [t, phase, coverage, recSpeed, defSpeed, O, Dstart, blockedDefenders]);
+
 
   /* --------- Dynamic pre-snap defender starts --------- */
   function computeDefenderStarts(A: AlignMap): Record<DefenderID, Pt> {
-    // Find outside receivers left/right for CB alignment
-    const outsideLeft: ReceiverID = A.X.x < A.Z.x ? "X" : "Z";
-    const outsideRight: ReceiverID = outsideLeft === "X" ? ("Z" as ReceiverID) : ("X" as ReceiverID);
-    const slot = A.SLOT;
+  const outsideLeft: ReceiverID  = A.X.x < A.Z.x ? "X" : "Z";
+  const outsideRight: ReceiverID = outsideLeft === "X" ? "Z" : "X";
+  const slot = A.SLOT;
 
-    const ssRight = strongSide(A) === "right";
-    const yPressCB = yUp(16.5);
-    const yNickel = yUp(17);
-    const ySafety = yUp(32);
-    const yFS = yUp(35);
-    const yBacker = yUp(22);
+  const ssRight = strongSide(A) === "right";
+  const yCBPress = yUp(16.5); // ~1–2 yds
+  const yCBNorm  = yUp(22);   // ~7 yds
 
-    const CB_L: Pt = { x: A[outsideLeft].x, y: yPressCB };
-    const CB_R: Pt = { x: A[outsideRight].x, y: yPressCB };
+  // Per-side CB depth
+  const yCB_L =
+    cbTechnique === "press"      ? yCBPress :
+    cbTechnique === "pressStrong" ? (ssRight ? yCBNorm : yCBPress) :
+    yCBNorm;
 
-    const insideBias = xAcross(2);
-    const nickelX =
-      slot?.x !== undefined
-        ? (slot.x > QB.x ? slot.x - insideBias : slot.x + insideBias)
-        : ssRight
-        ? xAcross(FIELD_WIDTH_YDS - 18)
-        : xAcross(18);
-    const NICKEL: Pt = { x: nickelX, y: yNickel };
+  const yCB_R =
+    cbTechnique === "press"      ? yCBPress :
+    cbTechnique === "pressStrong" ? (ssRight ? yCBPress : yCBNorm) :
+    yCBNorm;
 
-    const SS: Pt = {
-      x: ssRight ? xAcross(FIELD_WIDTH_YDS / 2 + 8) : xAcross(FIELD_WIDTH_YDS / 2 - 8),
-      y: ySafety,
-    };
-    const FS: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yFS };
+  const CB_L: Pt = { x: A[outsideLeft].x,  y: yCB_L };
+  const CB_R: Pt = { x: A[outsideRight].x, y: yCB_R };
 
-    const SAM: Pt = { x: ssRight ? xAcross(20) : xAcross(FIELD_WIDTH_YDS - 20), y: yBacker };
-    const MIKE: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yBacker };
-    const WILL: Pt = { x: ssRight ? xAcross(FIELD_WIDTH_YDS - 20) : xAcross(20), y: yBacker };
+  const yNickel = yUp(17), ySafety = yUp(32), yFS = yUp(35), yBacker = yUp(22);
+  const insideBias = xAcross(2);
+  const nickelX =
+    slot?.x !== undefined
+      ? (slot.x > QB.x ? slot.x - insideBias : slot.x + insideBias)
+      : ssRight ? xAcross(FIELD_WIDTH_YDS - 18) : xAcross(18);
+  const NICKEL: Pt = { x: nickelX, y: yNickel };
 
-    return { CB_L, CB_R, NICKEL, FS, SS, SAM, MIKE, WILL };
-  }
+  const SS: Pt = {
+    x: ssRight ? xAcross(FIELD_WIDTH_YDS / 2 + 8) : xAcross(FIELD_WIDTH_YDS / 2 - 8),
+    y: ySafety,
+  };
+  const FS: Pt   = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yFS };
+  const SAM: Pt  = { x: ssRight ? xAcross(20) : xAcross(FIELD_WIDTH_YDS - 20), y: yBacker };
+  const MIKE: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yBacker };
+  const WILL: Pt = { x: ssRight ? xAcross(FIELD_WIDTH_YDS - 20) : xAcross(20), y: yBacker };
+
+  return { CB_L, CB_R, NICKEL, FS, SS, SAM, MIKE, WILL };
+}
+
 
   // --- strength detector ---
   const strongIsRight = useCallback((): boolean => {
@@ -805,7 +1168,7 @@ useEffect(() => {
 
   /* --- helper: WR current position at time tt --- */
   const wrPos = (id: ReceiverID, tt: number): Pt =>
-    posOnPathLenScaled(O[id], Math.min(1, tt * recSpeed));
+    posOnPathLenScaled(O[id], Math.min(1, tt * recSpeed * receiverSpeedMult(id)));
 
   // TE/RB pass-pro spots
   function passProPathTE(A: AlignMap): Pt[] {
@@ -865,7 +1228,8 @@ useEffect(() => {
     blockerStart: Pt,
     defenderStart: Pt
   ): Pt {
-    const losY = yUp(who === "TE" ? 16.5 + Math.random() * 0.8 : 15.5 + Math.random() * 0.6);
+    const r = rngRef.current.nextFloat();
+    const losY = yUp(who === "TE" ? 16.5 + r * 0.8 : 15.5 + r * 0.6);
     const t = who === "TE" ? 0.6 : 0.35;
     const x = blockerStart.x + (defenderStart.x - blockerStart.x) * t;
     return { x, y: losY };
@@ -920,14 +1284,43 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
   /* --- defender controller --- */
   function defenderPos(cover: CoverageID, id: DefenderID, tt: number): Pt {
     const start = Dstart[id] ?? D_ALIGN[id];
-    const effT = Math.max(0, Math.min(1, tt));
-    const spd = Math.max(0.5, Math.min(1.6, defSpeed));
+    const effT = Math.max(0, Math.min(1, tt));  // time remaining
+    const spd = Math.max(0.5, Math.min(1.6, defSpeed * defenderSpeedMult(id)));
     const sr = strongIsRight();
-
     const approach = (from: Pt, to: Pt, base = 0, gain = 1) => {
       const pct = Math.min(1, base + effT * (gain * spd));
       return { x: from.x + (to.x - from.x) * pct, y: from.y + (to.y - from.y) * pct };
     };
+    // --- press gating for corners (works for C0 / C1 because we only roll there) ---
+    const pressInfo = id === "CB_L" ? cbPress.CB_L : id === "CB_R" ? cbPress.CB_R : undefined;
+  if (pressInfo && pressInfo.outcome !== "NONE" && pressInfo.rid) {
+  // how long the press effect lasts, by outcome
+  const pressUntil =
+    pressInfo.outcome === "JAM_LOCK"        ? 1
+    : pressInfo.outcome === "JAM_AND_RELEASE" ? PRESS_DELAY_FRAC
+    : pressInfo.outcome === "WHIFF"           ? WHIFF_DELAY_FRAC
+    : 0;
+
+  if (effT < pressUntil) {
+    // Hold at a shallow press point near the LOS on the WR’s side
+    const wr0 = align[pressInfo.rid] ?? QB;
+    const pressPoint: Pt = { x: (start.x + wr0.x) / 2, y: yUp(16.5) };
+
+    if (pressInfo.outcome === "JAM_LOCK") {
+      // stay engaged at the line the whole play
+      return approach(start, pressPoint, 0.35, 1.2);
+    }
+
+    if (pressInfo.outcome === "WHIFF") {
+      // CB hesitates briefly (frozen) before recovering
+      return start;
+    }
+
+    // JAM_AND_RELEASE: hold briefly at press point, then release
+    return approach(start, pressPoint, 0.30, 0.8);
+  }
+  // after the press window, fall through to normal man/match pursuit
+} 
 
     if (blockedDefenders.has(id)) {
       const ep = blockEngage[id] ?? start;
@@ -938,6 +1331,12 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
 
     /* ================= MAN: C1 / C0 ================= */
     if (MAN_COVERAGES.has(cover)) {
+        const info = id === "CB_L" ? cbPress.CB_L : id === "CB_R" ? cbPress.CB_R : undefined;
+        if (info && info.outcome !== "NONE") {
+            if (info.outcome === "JAM_LOCK") return { x: start.x, y: start.y };
+            if (info.outcome === "JAM_AND_RELEASE" && tt < PRESS_DELAY_FRAC) return { x: start.x, y: start.y };
+            if (info.outcome === "WHIFF" && tt < WHIFF_DELAY_FRAC) return { x: start.x, y: start.y };
+  }
     // who is in man on whom
     const manMap: Partial<Record<DefenderID, ReceiverID>> = {
         CB_L:   "X",
@@ -981,10 +1380,10 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
 
         // lag when the WR cuts: scale down pursuit gain up to ~70%
         const lag = cutSeverityFor(key, tt);         // 0..1
-        const lagScale = 1 - 0.7 * lag;              // 1.0 -> no lag, 0.3 -> strong lag
+        const lagScale = 1 - .2 * lag;              // 1.0 -> no lag, 0.3 -> strong lag
 
         // a little initial cushion so they don't instantly glue to the WR
-        const base = 0.5;
+        const base = .18;  // 0.1..0.2
 
         return {
         x: start.x + (target.x - start.x) * Math.min(1, base + effT * (0.95 * spd * lagScale)),
@@ -1038,6 +1437,12 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
 
     /* MATCH */
     if (MATCH_COVERAGES.has(cover)) {
+        const info = id === "CB_L" ? cbPress.CB_L : id === "CB_R" ? cbPress.CB_R : undefined;
+        if (info && info.outcome !== "NONE") {
+            if (info.outcome === "JAM_LOCK") return { x: start.x, y: start.y };
+            if (info.outcome === "JAM_AND_RELEASE" && tt < PRESS_DELAY_FRAC) return { x: start.x, y: start.y };
+            if (info.outcome === "WHIFF" && tt < WHIFF_DELAY_FRAC) return { x: start.x, y: start.y };
+  }
       let p = approach(start, anchor, 0.35, 0.6);
       const twoStrong = wrPos(sr ? (right2() ?? "SLOT") : (left2() ?? "SLOT"), tt);
       const oneStrong = wrPos(sr ? (right1() ?? "Z") : (left1() ?? "X"), tt);
@@ -1105,7 +1510,11 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conceptId, coverage, target: to, time: t,
-          numbering, formation, assignments: manualAssignments
+          numbering, formation, assignments: manualAssignments,
+          windowScore: lastWindow?.info.score ?? undefined,
+          nearestSepYds: lastWindow?.info.sepYds ?? undefined,
+          nearestDefender: lastWindow?.info.nearest ?? undefined,
+          playId,
         })
       });
       const data: { grade?: string; rationale?: string; coachingTip?: string } = await res.json();
@@ -1177,6 +1586,11 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     setCatchAt(null);
     setCaught(false);
     setThrowMeta(null);
+    // New deterministic roll for this play
+    setPlayId((p) => p + 1);
+    setRngSeed((s) => mixSeed(s, Date.now() >>> 0));
+    // Log leverage context for AI
+    setAiLog((log) => log.concat([{ playId: playId + 1, coverage, formation, leverage: levInfo, adjustments: levAdjust }]));
     setPhase("pre");
     queueMicrotask(() => setPhase("post"));
   }
@@ -1193,7 +1607,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     setCaught(false);
     setThrowMeta(null);
   }
-function startThrow(to: ReceiverID) {
+  function startThrow(to: ReceiverID) {
   // Blocked targets can’t receive throws
   if ((to === "TE" && teBlock) || (to === "RB" && rbBlock)) return;
 
@@ -1203,7 +1617,7 @@ function startThrow(to: ReceiverID) {
   const path = O[to];
   if (!path || path.length === 0) return;
 
-  const p2 = posOnPathLenScaled(path, Math.min(1, t * recSpeed));
+  const p2 = posOnPathLenScaled(path, Math.min(1, t * recSpeed * receiverSpeedMult(to)));
   const p0 = { ...QB };
   const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
   const arc = Math.min(80, Math.max(40, dist(p0, p2) * 0.15));
@@ -1215,6 +1629,9 @@ function startThrow(to: ReceiverID) {
   setBallP0(p0); setBallP1(p1); setBallP2(p2);
   setBallT(0);
   setCatchAt(null);
+  // capture window at throw time
+  const win = computeReceiverOpenness(to, t);
+  setLastWindow({ rid: to, info: win });
   setDecision(to);            // keep single-throw-per-play behavior
   setBallFlying(true);
   setThrowMeta({ p0, p1, p2, tStart: t, frac });
@@ -1399,7 +1816,7 @@ function startThrow(to: ReceiverID) {
             <option value="DOUBLES">Doubles (2x2)</option>
             <option value="BUNCH_LEFT">Bunch Left</option>
           </select>
-          <button onClick={applyAudible} className="px-2 py-1 text-xs rounded-md bg-fuchsia-600/80 text-white">
+          <button onClick={aiAudible} className="px-2 py-1 text-xs rounded-md bg-fuchsia-600/80 text-white">
             AI Audible
           </button>
         </div>
@@ -1472,31 +1889,57 @@ function startThrow(to: ReceiverID) {
                     PRO
                   </text>
                 )}
+                {phase === 'pre' && (
+                  <text
+                    x={p.x}
+                    y={p.y + 14}
+                    className="text-[8px]"
+                    fill="rgba(255,255,255,0.9)"
+                    stroke="rgba(0,0,0,0.6)"
+                    strokeWidth={2}
+                    style={{ paintOrder: 'stroke' }}
+                    textAnchor="middle"
+                  >
+                    Lev: {levInfo[rid]?.side === 'outside' ? 'OUT' : levInfo[rid]?.side === 'inside' ? 'IN' : 'EVEN'}
+                  </text>
+                )}
               </g>
             );
           })}
 
-          {/* Defense */}
-          {(["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"] as DefenderID[]).map((id) => {
+          {/* Defense (computed live) */}
+          {DEFENDER_IDS.map(id => {
             const p = defenderPos(coverage, id, t);
             const { dx, dy } = labelOffsetFor(id, p);
+
             return (
-              <g key={id}>
-                <rect x={p.x - 6} y={p.y - 6} width={12} height={12} fill="#ef4444" opacity={0.95} />
-                <text
-                  x={p.x + dx}
-                  y={p.y + dy}
-                  className="text-[9px]"
-                  fill="rgba(255,255,255,0.95)"
-                  stroke="rgba(0,0,0,0.7)"
-                  strokeWidth={2}
-                  style={{ paintOrder: "stroke" }}
-                >
-                  {id}
+                <g key={id}>
+                <rect x={p.x - 6} y={p.y - 6} width={12} height={12} fill="#ef4444" opacity={0.95}/>
+                <text x={p.x + dx} y={p.y + dy}
+                        className="text-[9px]" fill="rgba(255,255,255,0.95)"
+                        stroke="rgba(0,0,0,0.7)" strokeWidth={2} style={{ paintOrder: "stroke" }}>
+                    {id}
                 </text>
-              </g>
+
+                {/* Press badge on corners that are pressing */}
+                {((id === "CB_L" && cbPress.CB_L.outcome !== "NONE") ||
+                    (id === "CB_R" && cbPress.CB_R.outcome !== "NONE")) && (
+                    <text
+                    x={p.x}
+                    y={p.y - 10}
+                    className="text-[8px]"
+                    fill="rgba(255,255,255,0.95)"
+                    stroke="rgba(0,0,0,0.7)"
+                    strokeWidth={2}
+                    style={{ paintOrder: "stroke" }}
+                    textAnchor="middle"
+                    >
+                    press
+                    </text>
+                )}
+                </g>
             );
-          })}
+            })}
 
           {/* Ball path & ball */}
           {ballFlying && (
@@ -1542,7 +1985,7 @@ function startThrow(to: ReceiverID) {
               min={0}
               max={100}
               value={Math.floor(t * 100)}
-              onChange={(e) => setT(Number(e.target.value) / 100)}
+              onChange={(e) => seek(Number(e.target.value) / 100)}
               disabled={ballFlying || phase !== "post"}
             />
           </div>
@@ -1576,47 +2019,7 @@ function startThrow(to: ReceiverID) {
           </label>
         </div>
 
-        {/* Audible controls quick row */}
-        <div className="flex items-center gap-2 ml-2">
-          {audibleOn && (
-            <>
-              <select
-                className="bg-white/10 text-white text-xs rounded-md px-2 py-1"
-                value={audTarget}
-                onChange={(e) => setAudTarget(e.target.value as ReceiverID)}
-              >
-                <option value="">Receiver…</option>
-                {selectableReceivers.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                className="bg-white/10 text-white text-xs rounded-md px-2 py-1"
-                value={audRoute}
-                onChange={(e) => setAudRoute(e.target.value as RouteKeyword)}
-              >
-                <option value="">Route…</option>
-                {["GO", "SPEED_OUT", "CURL", "DIG", "POST", "CORNER", "SLANT", "WHEEL", "CHECK"].map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={applyAudible}
-                className="px-2 py-1 text-xs rounded-md bg-amber-500/90 text-black font-semibold"
-                disabled={!audTarget || !audRoute}
-                title={!audTarget || !audRoute ? "Pick receiver and route" : "Apply audible"}
-              >
-                Apply
-              </button>
-            </>
-          )}
-        </div>
+        {/* (removed duplicate audible quick row to avoid double Apply buttons) */}
 
         {/* Pass-pro toggles */}
         <div className="flex items-center gap-3 ml-2">
@@ -1691,7 +2094,7 @@ function startThrow(to: ReceiverID) {
                 onChange={(e) => setAudRoute(e.target.value as RouteKeyword)}
               >
                 <option value="">Route…</option>
-                {["GO", "SPEED_OUT", "CURL", "DIG", "POST", "CORNER", "SLANT", "WHEEL", "CHECK"].map((r) => (
+                {["GO","SPEED_OUT","CURL","OUT_LOW","OUT_MID","OUT_HIGH","CORNER_LOW","CORNER_MID","CORNER_HIGH","COMEBACK_LOW","COMEBACK_MID","COMEBACK_HIGH","DIG","POST","SLANT","WHEEL","CHECK"].map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
@@ -1726,4 +2129,3 @@ function startThrow(to: ReceiverID) {
     </div>
   );
 }
-

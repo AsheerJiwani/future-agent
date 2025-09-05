@@ -6,8 +6,8 @@ type FormationName = "TRIPS_RIGHT" | "DOUBLES" | "BUNCH_LEFT";
 type ReceiverID = "X" | "Z" | "SLOT" | "TE" | "RB";
 type RouteKeyword =
   | "GO" | "SEAM" | "BENDER"
-  | "HITCH" | "OUT" | "SPEED_OUT" | "COMEBACK" | "CURL"
-  | "DIG" | "POST" | "CORNER"
+  | "HITCH" | "OUT" | "OUT_LOW" | "OUT_MID" | "OUT_HIGH" | "SPEED_OUT" | "COMEBACK" | "COMEBACK_LOW" | "COMEBACK_MID" | "COMEBACK_HIGH" | "CURL"
+  | "DIG" | "POST" | "CORNER" | "CORNER_LOW" | "CORNER_MID" | "CORNER_HIGH"
   | "CROSS" | "OVER" | "SHALLOW" | "SLANT"
   | "FLAT" | "WHEEL"
   | "CHECK" | "STICK";
@@ -66,8 +66,9 @@ export async function POST(req: Request) {
 
     const validRoutes: RouteKeyword[] = [
         "GO","SEAM","BENDER",
-        "HITCH","OUT","SPEED_OUT","COMEBACK","CURL",
-        "DIG","POST","CORNER",
+        "HITCH","OUT","OUT_LOW","OUT_MID","OUT_HIGH","SPEED_OUT",
+        "COMEBACK","COMEBACK_LOW","COMEBACK_MID","COMEBACK_HIGH","CURL",
+        "DIG","POST","CORNER","CORNER_LOW","CORNER_MID","CORNER_HIGH",
         "CROSS","OVER","SHALLOW","SLANT",
         "FLAT","WHEEL",
         "CHECK","STICK"

@@ -27,8 +27,14 @@ export type DiagramRoute = {
 
 export type ReceiverID = "X" | "Z" | "SLOT" | "TE" | "RB";
 export type RouteKeyword =
-  | "HITCH" | "OUT" | "CORNER" | "FLAT" | "DIG"
-  | "POST" | "CROSS" | "SEAM" | "CHECK" | "STICK";
+  // Verticals / seams
+  | "GO" | "SEAM" | "BENDER"
+  // Quick / underneath
+  | "HITCH" | "OUT" | "OUT_LOW" | "OUT_MID" | "OUT_HIGH" | "SPEED_OUT" | "FLAT" | "SLANT" | "CHECK" | "STICK"
+  // Intermediate
+  | "COMEBACK" | "COMEBACK_LOW" | "COMEBACK_MID" | "COMEBACK_HIGH" | "CURL" | "DIG" | "CROSS"
+  // Deep / specials
+  | "POST" | "CORNER" | "CORNER_LOW" | "CORNER_MID" | "CORNER_HIGH" | "OVER" | "SHALLOW" | "WHEEL";
 
 export type Pt = { x: number; y: number };
 export type AlignMap = Record<ReceiverID, Pt>;
