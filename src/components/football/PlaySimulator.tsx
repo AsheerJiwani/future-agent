@@ -20,6 +20,15 @@ function getAudioCtor(): typeof AudioContext | undefined {
   return w.AudioContext ?? w.webkitAudioContext;
 }
 
+// Plausible helper (avoid explicit any casts)
+type Plausible = (event: string, opts?: { props?: Record<string, unknown> }) => void;
+interface PlausibleWindow extends Window { plausible?: Plausible }
+function safeTrack(event: string, props?: Record<string, unknown>) {
+  if (typeof window === 'undefined') return;
+  const w = window as PlausibleWindow;
+  try { w.plausible?.(event, props ? { props } : undefined); } catch {}
+}
+
 /* --------- Field geometry (vertical orientation) --------- */
 const FIELD_LENGTH_YDS = 120;
 const FIELD_WIDTH_YDS = 53.333333;
@@ -610,7 +619,6 @@ export default function PlaySimulator({
     const rb = sp.get('rb'); setRbBlock(!!rb);
     const pid = sp.get('pid'); if (pid) setPlayId(Number(pid));
     const sd = sp.get('seed'); if (sd) setRngSeed(Number(sd));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Openness metric per frame
@@ -678,7 +686,7 @@ export default function PlaySimulator({
 
   // --- CB technique: normal, press on both, press only to strength
 type CBTechnique = "normal" | "press" | "pressStrong";
-const [cbTechnique, setCbTechnique] = useState<CBTechnique>("normal");
+const [cbTechnique] = useState<CBTechnique>("normal");
 
 // Press outcomes per CB at the snap
 type CBPressOutcome = "NONE" | "JAM_LOCK" | "WHIFF" | "JAM_AND_RELEASE";
@@ -790,8 +798,8 @@ setCbPress({
       formation,
       align,
       routes: O,
-      assignments: manualAssignments as any,
-      numbering: numbering as any,
+      assignments: manualAssignments,
+      numbering: numbering as unknown as Record<string, unknown>,
       recSpeed,
       defSpeed,
       rngSeed,
@@ -836,7 +844,7 @@ setCbPress({
         coverage,
         formation,
         assignments: manualAssignments,
-        numbering: numbering as any,
+        numbering: numbering as unknown as Record<string, unknown>,
         snapshot: buildSnapshot(),
         snapMeta: buildSnapMeta(),
       };
@@ -1581,7 +1589,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
       setGrade(data.grade ?? "OK");
       const detail = [data.rationale, data.coachingTip].filter(Boolean).join("  Tip: ");
       setExplain(detail || "Good rep.");
-      try { (window as any)?.plausible?.('ai_grade', { props: { grade: data.grade ?? 'OK' } }); } catch {}
+      safeTrack('ai_grade', { grade: data.grade ?? 'OK' });
     } catch {
       setGrade("OK");
       setExplain("Grader unavailable. Try again.");
@@ -1627,7 +1635,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     setManualAssignments(prev => ({ ...prev, [audTarget]: audRoute }));
     setPhase("pre"); setT(0); setDecision(null); setGrade(null); setExplain(null);
     setBallFlying(false); setBallT(0); setCatchAt(null);
-    try { (window as any)?.plausible?.('audible_apply', { props: { target: audTarget, route: audRoute } }); } catch {}
+    safeTrack('audible_apply', { target: audTarget, route: audRoute });
   }
 
   function clearAudibles() {
@@ -1651,7 +1659,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     // New deterministic roll for this play
     setPlayId((p) => p + 1);
     setRngSeed((s) => mixSeed(s, Date.now() >>> 0));
-    try { (window as any)?.plausible?.('snap', { props: { conceptId, coverage, formation } }); } catch {}
+    safeTrack('snap', { conceptId, coverage, formation });
     // Log leverage context for AI
     setAiLog((log) => log.concat([{ playId: playId + 1, coverage, formation, leverage: levInfo, adjustments: levAdjust }]));
     setPhase("pre");
@@ -1700,7 +1708,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
   setThrowMeta({ p0, p1, p2, tStart: t, frac });
   setCaught(false);
   if (soundOn) playWhistle();
-  try { (window as any)?.plausible?.('throw', { props: { target: to, t: Number(t.toFixed(2)) } }); } catch {}
+  safeTrack('throw', { target: to, t: Number(t.toFixed(2)) });
 }
 
   // Ball follows the single play clock (no extra RAF)
@@ -1886,7 +1894,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
                 const url = `${window.location.pathname}?${sp.toString()}`;
                 void navigator.clipboard.writeText(`${window.location.origin}${url}`);
                 setAudibleNote('Copied shareable play link to clipboard.');
-                try { (window as any)?.plausible?.('share'); } catch {}
+                safeTrack('share');
               } catch {
                 setAudibleNote('Could not copy link.');
               }
