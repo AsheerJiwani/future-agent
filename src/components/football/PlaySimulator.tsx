@@ -519,6 +519,48 @@ export default function PlaySimulator({
     return () => { if (playRef.current) cancelAnimationFrame(playRef.current); };
   }, [phase]);
 
+  /** -------- MAN (C0/C1) snap-time extra roles -------- */
+type ExtraRoles = { blitzers: DefenderID[]; spy: DefenderID | null };
+const [manExtraRoles, setManExtraRoles] = useState<ExtraRoles>({ blitzers: [], spy: null });
+
+useEffect(() => {
+  // Only (re)roll roles when the snap actually starts
+  if (phase !== "post") {
+    setManExtraRoles({ blitzers: [], spy: null });
+    return;
+  }
+  if (coverage !== "C0" && coverage !== "C1") {
+    setManExtraRoles({ blitzers: [], spy: null });
+    return;
+  }
+
+  // In this sim, SAM & WILL are the "extra" LBs (CBs/Nickel/SS/MIKE are manned up)
+  const extras: DefenderID[] = ["SAM", "WILL"];
+
+  // Rule: never 2 spies. Outcomes:
+  //  - both blitz, OR
+  //  - exactly one blitz + one spy
+  let blitzers: DefenderID[] = [];
+  let spy: DefenderID | null = null;
+
+  if (extras.length === 2) {
+    if (Math.random() < 0.5) {
+      // both blitz
+      blitzers = extras.slice();
+    } else {
+      // one spies, the other blitzes
+      spy = Math.random() < 0.5 ? extras[0] : extras[1];
+      blitzers = [spy === extras[0] ? extras[1] : extras[0]];
+    }
+  } else if (extras.length === 1) {
+    // single extra: blitz 70% else spy
+    if (Math.random() < 0.7) blitzers = extras;
+    else spy = extras[0];
+  }
+
+  setManExtraRoles({ blitzers, spy });
+}, [phase, coverage]);
+
   // Rebuild alignment, numbering, routes, and defender starts whenever inputs change
   useEffect(() => {
     const A = FORMATIONS[formation];
@@ -841,6 +883,40 @@ export default function PlaySimulator({
   const left2  = () => findByNumber("left", 2)  ?? (left1()  === "X" ? "SLOT" : "TE");
   const right2 = () => findByNumber("right", 2) ?? (right1() === "Z" ? "SLOT" : "TE");
 
+  /** Cut severity for a receiver at play-time `tt` (0..1).
+ *  Returns 0..1 where 0 = straight, 1 = sharp cut right now.
+ */
+function cutSeverityFor(rid: ReceiverID, tt: number): number {
+  const path = O[rid];
+  if (!path || path.length < 2) return 0;
+
+  const dt = 0.015; // small sampling window
+  const tNow = Math.max(0, Math.min(1, tt * recSpeed));
+  const t0 = Math.max(0, tNow - dt);
+  const t1 = Math.min(1, tNow + dt);
+
+  const p0 = posOnPathLenScaled(path, t0);
+  const p1 = posOnPathLenScaled(path, tNow);
+  const p2 = posOnPathLenScaled(path, t1);
+
+  const v1x = p1.x - p0.x, v1y = p1.y - p0.y;
+  const v2x = p2.x - p1.x, v2y = p2.y - p1.y;
+
+  const n1 = Math.hypot(v1x, v1y);
+  const n2 = Math.hypot(v2x, v2y);
+  if (n1 < 1e-3 || n2 < 1e-3) return 0;
+
+  const dot = v1x * v2x + v1y * v2y;
+  const cos = Math.max(-1, Math.min(1, dot / (n1 * n2)));
+  const ang = Math.acos(cos); // radians
+
+  // map ~30°..120° into 0..1
+  const aMin = (30 * Math.PI) / 180;
+  const aMax = (120 * Math.PI) / 180;
+  const sev = (ang - aMin) / (aMax - aMin);
+  return Math.max(0, Math.min(1, sev));
+}
+
   /* --- defender controller --- */
   function defenderPos(cover: CoverageID, id: DefenderID, tt: number): Pt {
     const start = Dstart[id] ?? D_ALIGN[id];
@@ -860,65 +936,82 @@ export default function PlaySimulator({
 
     const anchor = zoneAnchor(cover, id);
 
-    /* MAN */
+    /* ================= MAN: C1 / C0 ================= */
     if (MAN_COVERAGES.has(cover)) {
-      if (cover === "C0") {
-        const blitzLB: DefenderID = sr ? "SAM" : "WILL";
-        const spyLB: DefenderID   = sr ? "WILL" : "SAM";
-
-        if (id === blitzLB) {
-          const gapX = QB.x + (sr ? xAcross(2) : -xAcross(2));
-          const blitzPoint: Pt = { x: gapX, y: QB.y };
-          return approach(start, blitzPoint, 0.15, 1.35);
-        }
-        if (id === spyLB) {
-          const spyPoint: Pt = { x: QB.x, y: yUp(20) };
-          const rbP = wrPos("RB", tt);
-          const rbInMOF = Math.abs(rbP.x - QB.x) < xAcross(8) && rbP.y < yUp(26);
-          const target = rbInMOF ? rbP : spyPoint;
-          return approach(start, target, 0.20, 0.70);
-        }
-      }
-
-      const manMap: Partial<Record<DefenderID, ReceiverID>> = {
+    // who is in man on whom
+    const manMap: Partial<Record<DefenderID, ReceiverID>> = {
         CB_L:   "X",
         CB_R:   "Z",
         NICKEL: "SLOT",
         SS:     "TE",
         MIKE:   "RB",
-      };
-      const key = manMap[id];
-      if (key) {
+        // FS free in C1; in C0 we treat FS as free unless you choose to man him elsewhere.
+    };
+
+    // Extra-LB roles from snap-time draw (never 2 spies)
+    const iBlitz = manExtraRoles.blitzers.includes(id);
+    const iSpy   = manExtraRoles.spy === id;
+
+    // --- C0/C1: blitz & spy behaviors for *extras* (SAM/WILL in this sim) ---
+    if (iBlitz) {
+        // attack a guard gap to avoid centerline overlaps
+        const gapX = QB.x + (id === "SAM" ? -xAcross(2.0) : xAcross(2.0));
+        const blitzPoint: Pt = { x: gapX, y: QB.y };
+        return {
+        x: start.x + (blitzPoint.x - start.x) * Math.min(1, 0.15 + effT * (1.45 * spd)),
+        y: start.y + (blitzPoint.y - start.y) * Math.min(1, 0.15 + effT * (1.45 * spd)),
+        };
+    }
+    if (iSpy) {
+        // shallow spy ~8–10 yds, mirror RB if through MOF (green-dog feel)
+        const spyPoint: Pt = { x: QB.x, y: yUp(20) };
+        const rbP = wrPos("RB", tt);
+        const rbInMOF = Math.abs(rbP.x - QB.x) < xAcross(8) && rbP.y < yUp(26);
+        const target = rbInMOF ? rbP : spyPoint;
+        return {
+        x: start.x + (target.x - start.x) * Math.min(1, 0.20 + effT * (0.75 * spd)),
+        y: start.y + (target.y - start.y) * Math.min(1, 0.20 + effT * (0.75 * spd)),
+        };
+    }
+
+    // --- Man trail with "cut lag" for the assigned matchup ---
+    const key = manMap[id];
+    if (key) {
         const target = wrPos(key, tt);
-        return approach(start, target, 0.20, 0.90);
-      }
 
-      if (cover === "C1") {
-        if (id === "FS") {
-          const twoL = left2();
-          const twoR = right2();
-          const pL = wrPos(twoL ?? "SLOT", tt);
-          const pR = wrPos(twoR ?? "SLOT", tt);
-          const mid = { x: (pL.x + pR.x) / 2, y: Math.min(pL.y, pR.y, yUp(36)) };
-          return approach(start, mid, 0.25, 0.65);
-        }
-        if (id === "WILL" || id === "SAM") {
-          const mySide: "left" | "right" =
-            id === "SAM" ? (sr ? "left" : "right") : (sr ? "right" : "left");
-          const sideFilter = (p: Pt) => (mySide === "left" ? p.x < QB.x : p.x >= QB.x);
-          const threats = (["X","Z","SLOT","TE","RB"] as ReceiverID[])
-            .map(r => ({ id: r, p: wrPos(r, tt) }))
-            .filter(w => sideFilter(w.p));
-          const nearest = threats.sort((a,b) =>
-            (a.p.x - anchor.x)**2 + (a.p.y - anchor.y)**2 - ((b.p.x - anchor.x)**2 + (b.p.y - anchor.y)**2)
-          )[0]?.p ?? anchor;
+        // lag when the WR cuts: scale down pursuit gain up to ~70%
+        const lag = cutSeverityFor(key, tt);         // 0..1
+        const lagScale = 1 - 0.7 * lag;              // 1.0 -> no lag, 0.3 -> strong lag
 
-          const toHook = approach(start, anchor, 0.20, 0.55);
-          return approach(toHook, nearest, 0.0, 0.25);
-        }
-      }
+        // a little initial cushion so they don't instantly glue to the WR
+        const base = 0.5;
 
-      return approach(start, anchor, 0.2, 0.5);
+        return {
+        x: start.x + (target.x - start.x) * Math.min(1, base + effT * (0.95 * spd * lagScale)),
+        y: start.y + (target.y - start.y) * Math.min(1, base + effT * (0.95 * spd * lagScale)),
+        };
+    }
+
+    // --- Free players (e.g., FS in C1) play MOF lean rather than sitting idle ---
+    if (cover === "C1" && id === "FS") {
+        // midpoint the #2s and stay over the top
+        const twoL = left2();
+        const twoR = right2();
+        const pL = wrPos(twoL ?? "SLOT", tt);
+        const pR = wrPos(twoR ?? "SLOT", tt);
+        const mid = { x: (pL.x + pR.x) / 2, y: Math.min(pL.y, pR.y, yUp(36)) };
+        return {
+        x: start.x + (mid.x - start.x) * Math.min(1, 0.22 + effT * (0.65 * spd)),
+        y: start.y + (mid.y - start.y) * Math.min(1, 0.22 + effT * (0.65 * spd)),
+        };
+    }
+
+    // Fallback: slide toward a nearby zone anchor (keeps motion plausible)
+    const anchor = zoneAnchor(cover === "C0" ? "C3" : "C1", id);
+    return {
+        x: start.x + (anchor.x - start.x) * Math.min(1, 0.2 + effT * (0.55 * spd)),
+        y: start.y + (anchor.y - start.y) * Math.min(1, 0.2 + effT * (0.55 * spd)),
+    };
     }
 
     /* ZONE */
