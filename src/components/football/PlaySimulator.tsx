@@ -1039,7 +1039,7 @@ function defenderPos(cover: CoverageID, id: DefenderID, tt: number): Pt {
 
   /* ================= PURE ZONE ================= */
   if (ZONE_COVERAGES.has(cover)) {
-    let p = approach(start, anchor, 0.35, 0.6);
+    const p = approach(start, anchor, 0.35, 0.6);
 
     const threats = (["X","Z","SLOT","TE","RB"] as ReceiverID[]).map(r => ({ id: r, p: wrPos(r, tt) }));
     const nearest = threats.reduce((best, cur) =>
