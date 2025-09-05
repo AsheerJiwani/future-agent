@@ -31,8 +31,7 @@ export class XorShift32 {
 
 export function mixSeed(a: number, b: number): number {
   // Simple 32-bit mix of two seeds
-  let x = (a ^ (b + 0x9e3779b9 + (a << 6) + (a >>> 2))) >>> 0;
+  const x = (a ^ (b + 0x9e3779b9 + (a << 6) + (a >>> 2))) >>> 0;
   // Ensure non-zero
   return x || 0x85ebca6b;
 }
-

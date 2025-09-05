@@ -551,7 +551,7 @@ export default function PlaySimulator({
   const [teBlock, setTeBlock] = useState(false);
   const [rbBlock, setRbBlock] = useState(false);
 
-  const [blockAssignments, setBlockAssignments] = useState<BlockMap>({});
+  const [, setBlockAssignments] = useState<BlockMap>({});
   const [blockedDefenders, setBlockedDefenders] = useState<Set<DefenderID>>(new Set());
   const [blockEngage, setBlockEngage] = useState<Partial<Record<DefenderID, Pt>>>({});
 
@@ -616,7 +616,7 @@ export default function PlaySimulator({
     X: { dxYds: 0, dDepthYds: 0 }, Z: { dxYds: 0, dDepthYds: 0 }, SLOT: { dxYds: 0, dDepthYds: 0 }, TE: { dxYds: 0, dDepthYds: 0 }, RB: { dxYds: 0, dDepthYds: 0 }
   });
   // Minimal AI log (append per snap)
-  const [aiLog, setAiLog] = useState<Array<{ playId: number; coverage: CoverageID; formation: FormationName; leverage: typeof levInfo; adjustments: typeof levAdjust }>>([]);
+  const [, setAiLog] = useState<Array<{ playId: number; coverage: CoverageID; formation: FormationName; leverage: typeof levInfo; adjustments: typeof levAdjust }>>([]);
 
   const PLAY_MS = 3000; // play clock duration (matches Snap timer)
   
@@ -706,11 +706,6 @@ useEffect(() => {
   // - "pressStrong": force strong CB to press in man
   // - "normal": use the auto 70/20 above
   // (Remove/adjust this block if you don’t have `cbTechnique`.)
-  if (typeof cbTechnique !== "undefined") {
-    if (cbTechnique === "press") {
-      if (isMan) { (cbTechnique as string); }
-    }
-  }
   const forceBoth   = (typeof cbTechnique !== "undefined") && cbTechnique === "press";
   const forceStrong = (typeof cbTechnique !== "undefined") && cbTechnique === "pressStrong";
 
@@ -927,15 +922,6 @@ useEffect(() => {
   }, [phase, teBlock, rbBlock, coverage, align, Dstart, O]);
 
   const DEFENDER_IDS: DefenderID[] = ["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"];
-
-  // Offense actors: simple array of {id, color, path} derived from the current routes O
-  const offenseActors = useMemo<Actor[]>(() => ([
-    { id: "X",    color: "#60a5fa", path: O.X },
-    { id: "Z",    color: "#22d3ee", path: O.Z },
-    { id: "SLOT", color: "#34d399", path: O.SLOT },
-    { id: "TE",   color: "#f472b6", path: O.TE },
-    { id: "RB",   color: "#a78bfa", path: O.RB },
-  ]), [O]);
 
   function wrPosSafe(id: ReceiverID, tt: number): Pt {
   const path = O[id];
@@ -2094,7 +2080,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
                 onChange={(e) => setAudRoute(e.target.value as RouteKeyword)}
               >
                 <option value="">Route…</option>
-                {["GO","SPEED_OUT","CURL","OUT_LOW","OUT_MID","OUT_HIGH","CORNER_LOW","CORNER_MID","CORNER_HIGH","COMEBACK_LOW","COMEBACK_MID","COMEBACK_HIGH","DIG","POST","SLANT","WHEEL","CHECK"].map((r) => (
+                {ROUTE_MENU.map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
