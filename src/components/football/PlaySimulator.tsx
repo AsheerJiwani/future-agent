@@ -2,11 +2,68 @@
 
 import { JSX, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { FootballConceptId } from "../../data/football/catalog";
-import type { CoverageID, Concept } from "../../data/football/types";
-import { loadConcept } from "../../data/football/loadConcept";
+import type { CoverageID } from "../../data/football/types";
 
+// ---- Ball animation helpers (no let, no local fns in effects) ----
+type BallAnimRefs = {
+  rafId: React.MutableRefObject<number | null>;
+  alive: React.MutableRefObject<boolean>;
+  t0: React.MutableRefObject<number>;
+  dur: React.MutableRefObject<number>;
+};
+
+type BallAnimDeps = {
+  setBallT: (v: number) => void;
+  setBallFlying: (v: boolean) => void;
+  setCatchAt: (p: Pt | null) => void;
+  setPhase: (p: "pre" | "post" | "decided") => void;
+  playCatchPop: () => void;
+  soundOn: boolean;
+  ballP2: Pt;
+};
+
+const BALL_STATE: { refs?: BallAnimRefs; deps?: BallAnimDeps } = {};
+
+function ballStep(now: number) {
+  const state = BALL_STATE;
+  if (!state.refs || !state.deps) return;
+
+  const elapsed = now - state.refs.t0.current;
+  const uRaw = elapsed / state.refs.dur.current;
+  const u = uRaw < 1 ? (uRaw < 0 ? 0 : uRaw) : 1;
+  const eased = u < 0.5 ? 2 * u * u : -1 + (4 - 2 * u) * u;
+
+  state.deps.setBallT(eased);
+
+  if (u < 1 && state.refs.alive.current) {
+    state.refs.rafId.current = requestAnimationFrame(ballStep);
+    return;
+  }
+
+  // finalize if alive finished or reached 1
+  state.deps.setBallFlying(false);
+  state.deps.setCatchAt(state.deps.ballP2);
+  if (state.deps.soundOn) state.deps.playCatchPop();
+  state.deps.setPhase("decided");
+}
+
+export function startBallAnimation(refs: BallAnimRefs, deps: BallAnimDeps) {
+  BALL_STATE.refs = refs;
+  BALL_STATE.deps = deps;
+  refs.alive.current = true;
+  refs.rafId.current = requestAnimationFrame(ballStep);
+}
+
+export function cancelBallAnimation(refs: BallAnimRefs) {
+  if (refs.rafId.current) cancelAnimationFrame(refs.rafId.current);
+  refs.alive.current = false;
+}
+
+/* --------- Audio helpers --------- */
 interface AudioWindow extends Window {
-  AudioContext: { new(contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext; } | undefined;
+  AudioContext:
+    | { new (contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext }
+    | undefined;
   webkitAudioContext?: typeof AudioContext;
 }
 function getAudioCtor(): typeof AudioContext | undefined {
@@ -15,8 +72,7 @@ function getAudioCtor(): typeof AudioContext | undefined {
   return w.AudioContext ?? w.webkitAudioContext;
 }
 
-
-/** ---------- Field geometry (vertical orientation) ---------- */
+/* --------- Field geometry (vertical orientation) --------- */
 const FIELD_LENGTH_YDS = 120;
 const FIELD_WIDTH_YDS = 53.333333;
 const HASH_FROM_SIDELINE_YDS = 70.75 / 3;
@@ -32,20 +88,41 @@ const yUp = (ydsUp: number) => PX_H - ydsUp * YPX;
 
 const DECISION_POINTS = [0.35, 0.6];
 
-// QB: bottom-middle, ~12 yds from GL
+// QB at bottom-middle, ~12 yds from GL
 const QB = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(12) };
 
-/** ---------- Types ---------- */
+/* --------- Types --------- */
 export type ReceiverID = "X" | "Z" | "SLOT" | "TE" | "RB";
-type DefenderID = "CB_L" | "CB_R" | "NICKEL" | "FS" | "SS" | "SAM" | "MIKE" | "WILL";
+type DefenderID =
+  | "CB_L"
+  | "CB_R"
+  | "NICKEL"
+  | "FS"
+  | "SS"
+  | "SAM"
+  | "MIKE"
+  | "WILL";
 
 export type RouteKeyword =
-  | "GO" | "SEAM" | "BENDER"
-  | "HITCH" | "OUT" | "SPEED_OUT" | "COMEBACK" | "CURL"
-  | "DIG" | "POST" | "CORNER"
-  | "CROSS" | "OVER" | "SHALLOW" | "SLANT"
-  | "FLAT" | "WHEEL"
-  | "CHECK" | "STICK";
+  | "GO"
+  | "SEAM"
+  | "BENDER"
+  | "HITCH"
+  | "OUT"
+  | "SPEED_OUT"
+  | "COMEBACK"
+  | "CURL"
+  | "DIG"
+  | "POST"
+  | "CORNER"
+  | "CROSS"
+  | "OVER"
+  | "SHALLOW"
+  | "SLANT"
+  | "FLAT"
+  | "WHEEL"
+  | "CHECK"
+  | "STICK";
 
 type Pt = { x: number; y: number };
 type Actor = { id: string; color: string; path: Pt[] };
@@ -53,13 +130,6 @@ type Actor = { id: string; color: string; path: Pt[] };
 type RouteMap = Record<ReceiverID, Pt[]>;
 type AssignMap = Partial<Record<ReceiverID, RouteKeyword>>;
 type AlignMap = Record<ReceiverID, Pt>;
-
-interface DiagramSpec {
-  routes?: Partial<Record<ReceiverID, Pt[]>>;
-  defense?: Partial<Record<CoverageID, Record<string, Pt[]>>>;
-  assignments?: AssignMap;
-  align?: Partial<AlignMap>;
-}
 
 type FormationName = "TRIPS_RIGHT" | "DOUBLES" | "BUNCH_LEFT";
 
@@ -69,369 +139,346 @@ interface AudibleSuggestion {
   rationale?: string;
 }
 
-/** ---------- Math helpers ---------- */
-const lerp = (a: Pt, b: Pt, t: number): Pt => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+/* --------- Math + sampling --------- */
 const qBezier = (p0: Pt, p1: Pt, p2: Pt, t: number): Pt => {
   const u = 1 - t;
-  return { x: u*u*p0.x + 2*u*t*p1.x + t*t*p2.x, y: u*u*p0.y + 2*u*t*p1.y + t*t*p2.y };
+  return {
+    x: u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x,
+    y: u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y,
+  };
 };
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+const d2 = (a: Pt, b: Pt) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+const lerp = (a: Pt, b: Pt, t: number): Pt => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+const segLen = (a: Pt, b: Pt) => Math.hypot(b.x - a.x, b.y - a.y);
 
-/** ✅ Hoisted helper — safe to call anywhere below this line */
-function posOnPath(path: Pt[], tt: number, fallback: Pt = QB): Pt {
-  if (!path || path.length === 0) return fallback;
+/** Sample along a multi-segment path by arc length (t in [0,1]) */
+function posOnPathLenScaled(path: Pt[], t: number): Pt {
+  if (!path || path.length === 0) return { x: QB.x, y: QB.y };
   if (path.length === 1) return path[0];
-  const tClamped = Math.max(0, Math.min(1, tt));
-  return lerp(path[0], path[path.length - 1], tClamped);
+  const tt = Math.max(0, Math.min(1, t));
+  let total = 0;
+  const lens: number[] = [];
+  for (let i = 0; i < path.length - 1; i++) {
+    const L = segLen(path[i], path[i + 1]);
+    lens.push(L);
+    total += L;
+  }
+  const target = tt * total;
+  let acc = 0;
+  for (let i = 0; i < lens.length; i++) {
+    const L = lens[i];
+    if (acc + L >= target) {
+      const u = L === 0 ? 0 : (target - acc) / L;
+      return lerp(path[i], path[i + 1], u);
+    }
+    acc += L;
+  }
+  return path[path.length - 1];
 }
 
-// Slightly different offsets per id + away from the player based on side
-function labelOffsetFor(id: string, p: {x:number; y:number}): { dx: number; dy: number } {
-    const isLeftOfQB = p.x < QB.x;
-    const baseDx = isLeftOfQB ? 12 : -12;
-
-    // per-id vertical spread to reduce stacking
-    const dyMap: Record<string, number> = {
-        X: -10, Z: -10, SLOT: 10, TE: 12, RB: 18,
-        CB_L: -12, CB_R: -12, NICKEL: 10, FS: -14, SS: -6, SAM: 10, MIKE: 14, WILL: 16
-    };
-    const dy = dyMap[id] ?? 10;
-    return { dx: baseDx, dy };
+/* --------- Label offset to avoid overlaps --------- */
+function labelOffsetFor(id: string, p: Pt): { dx: number; dy: number } {
+  const leftOfQB = p.x < QB.x;
+  const baseDx = leftOfQB ? 12 : -12;
+  const dyMap: Record<string, number> = {
+    X: -10,
+    Z: -10,
+    SLOT: 10,
+    TE: 12,
+    RB: 18,
+    CB_L: -12,
+    CB_R: -12,
+    NICKEL: 10,
+    FS: -14,
+    SS: -6,
+    SAM: 10,
+    MIKE: 14,
+    WILL: 16,
+  };
+  const dy = dyMap[id] ?? 10;
+  return { dx: baseDx, dy };
 }
 
-/** ---------- Route library ---------- */
-/** ---------- Route library (depths in yards via yUp) ---------- */
-// helper: +1 to right, -1 to left of QB
-const sideSign = (start: Pt) => (start.x < QB.x ? +1 : -1);
-// clamp toward sideline for outside landmark
-const sidelineX = (start: Pt, off = 4) =>
-  start.x < QB.x ? xAcross(4 + off) : xAcross(FIELD_WIDTH_YDS - (4 + off));
-// hash marks
+/* --------- Route library (depths in yards via yUp) --------- */
+const isLeftOfQB = (p: Pt) => p.x < QB.x;
+const outSign = (p: Pt) => (isLeftOfQB(p) ? -1 : +1);
+const inSign = (p: Pt) => (isLeftOfQB(p) ? +1 : -1);
+
+const SIDELINE_MARGIN = 4;
 const HASH_L = xAcross(HASH_FROM_SIDELINE_YDS);
 const HASH_R = xAcross(FIELD_WIDTH_YDS - HASH_FROM_SIDELINE_YDS);
-// opposite hash for crosses
-const oppositeHashX = (start: Pt) => (start.x < QB.x ? HASH_R : HASH_L);
+const oppositeHashX = (s: Pt) => (isLeftOfQB(s) ? HASH_R : HASH_L);
+const sidelineX = (s: Pt, off = SIDELINE_MARGIN) =>
+  isLeftOfQB(s) ? xAcross(off) : xAcross(FIELD_WIDTH_YDS - off);
 
-const R = {
-  // Verticals
-  GO:     (s: Pt): Pt[] => [s, { x: s.x, y: yUp(42) }],
-  SEAM:   (s: Pt): Pt[] => [s, { x: s.x, y: yUp(40) }],
-  BENDER: (s: Pt, twoHigh: boolean): Pt[] => {
-    // bend into/open away from MOF based on shell
-    if (twoHigh) return [s, { x: QB.x, y: yUp(42) }];           // split safeties
-    return [s, { x: s.x, y: yUp(38) }];                          // stay on seam vs MOFC
-  },
+const DEPTH = {
+  quick: 21,
+  short: 22,
+  mid: 26,
+  curl: 24,
+  dig: 30,
+  deep: 36,
+  shot: 40,
+};
 
-  // Quick / intermediate
-  HITCH:     (s: Pt): Pt[] => [s, { x: s.x, y: yUp(21) }],       // ~5 yds
-  SPEED_OUT: (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(10), y: yUp(20) }], // 4–6
-  OUT:       (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(14), y: yUp(26) }], // 10–12
-  COMEBACK:  (s: Pt): Pt[] => [s, { x: sidelineX(s, 6), y: yUp(24) }],                 // 14–16 back to sideline
-  CURL:      (s: Pt): Pt[] => [s, { x: s.x, y: yUp(24) }],       // 10–12 settle
-  STICK:     (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(4), y: yUp(22) }],  // 6–8 turn out/in
+const H = {
+  outQuick: 8,
+  outDeep: 14,
+  flat: 8,
+  meshSpan: 18,
+};
 
-  // Intermediate crossers / deep breaks
-  DIG:       (s: Pt): Pt[] => [s, { x: QB.x + sideSign(s) * xAcross(10), y: yUp(30) }],  // 12–15 in
-  POST:      (s: Pt): Pt[] => [s, { x: QB.x, y: yUp(40) }],                               // 18–22 to MOF
-  CORNER:    (s: Pt): Pt[] => [s, { x: sidelineX(s, 10), y: yUp(36) }],                   // 18–22 to corner
-  OVER:      (s: Pt): Pt[] => [s, { x: oppositeHashX(s), y: yUp(28) }],                   // 12–18 over LB
-  CROSS:     (s: Pt): Pt[] => [s, { x: oppositeHashX(s), y: yUp(26) }],                   // mid cross
-  SHALLOW:   (s: Pt): Pt[] => [s, { x: oppositeHashX(s), y: yUp(18) }],                   // 3–5 across
-
-  // Back
-  FLAT:      (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(8), y: yUp(18) }],
-  WHEEL:     (s: Pt): Pt[] => [s, { x: sidelineX(s, 6), y: yUp(34) }],  // flat→up the sideline (approximated)
-  CHECK:     (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(4), y: yUp(17) }]
-} as const;
-
-// Factory that can react to coverage (for benders, etc.)
-function routeFromKeyword(name: RouteKeyword, start: Pt, coverage: CoverageID): Pt[] {
+function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[] {
   const twoHigh = ["C2", "TAMPA2", "C4", "QUARTERS", "C6", "PALMS"].includes(coverage);
   switch (name) {
-    case "BENDER":   return R.BENDER(start, twoHigh);
-    case "GO":       return R.GO(start);
-    case "SEAM":     return R.SEAM(start);
-    case "HITCH":    return R.HITCH(start);
-    case "SPEED_OUT":return R.SPEED_OUT(start);
-    case "OUT":      return R.OUT(start);
-    case "COMEBACK": return R.COMEBACK(start);
-    case "CURL":     return R.CURL(start);
-    case "STICK":    return R.STICK(start);
-    case "DIG":      return R.DIG(start);
-    case "POST":     return R.POST(start);
-    case "CORNER":   return R.CORNER(start);
-    case "OVER":     return R.OVER(start);
-    case "CROSS":    return R.CROSS(start);
-    case "SHALLOW":  return R.SHALLOW(start);
-    case "FLAT":     return R.FLAT(start);
-    case "WHEEL":    return R.WHEEL(start);
-    case "CHECK":    return R.CHECK(start);
-    case "SLANT":    return [start, { x: QB.x - sideSign(start) * xAcross(6), y: yUp(20) }];
-    default:         return [start, start];
+    /* Verticals */
+    case "GO": {
+      const rel = { x: s.x + outSign(s) * xAcross(2), y: yUp(DEPTH.short) };
+      return [s, rel, { x: rel.x, y: yUp(DEPTH.shot) }];
+    }
+    case "SEAM": {
+      return [s, { x: s.x, y: yUp(DEPTH.shot) }];
+    }
+    case "BENDER": {
+      if (twoHigh) {
+        const stem = { x: s.x, y: yUp(DEPTH.deep - 2) };
+        return [s, stem, { x: QB.x, y: yUp(DEPTH.shot) }];
+      }
+      return [s, { x: s.x, y: yUp(DEPTH.shot) }];
+    }
+
+    /* Underneath / quick */
+    case "HITCH": {
+      const stem = { x: s.x, y: yUp(DEPTH.quick) };
+      const work = { x: stem.x, y: yUp(DEPTH.quick - 2) };
+      return [s, stem, work];
+    }
+    case "STICK": {
+      const stem = { x: s.x, y: yUp(DEPTH.short) };
+      const breakPt = { x: s.x + outSign(s) * xAcross(4), y: stem.y };
+      return [s, stem, breakPt];
+    }
+    case "SLANT": {
+      const breakPt = { x: s.x + inSign(s) * xAcross(6), y: yUp(DEPTH.quick) };
+      return [s, breakPt, { x: breakPt.x + inSign(s) * xAcross(4), y: yUp(DEPTH.mid) }];
+    }
+    case "SPEED_OUT": {
+      const stem = { x: s.x, y: yUp(DEPTH.quick) };
+      const out = { x: s.x + outSign(s) * xAcross(H.outQuick), y: stem.y };
+      return [s, stem, out];
+    }
+    case "FLAT": {
+      const out = { x: s.x + outSign(s) * xAcross(H.flat), y: yUp(DEPTH.quick) };
+      return [s, out];
+    }
+    case "CHECK": {
+      return [s, { x: s.x + inSign(s) * xAcross(3), y: yUp(DEPTH.quick - 1) }];
+    }
+
+    /* Intermediate */
+    case "OUT": {
+      const stem = { x: s.x, y: yUp(DEPTH.mid) };
+      const breakPt = { x: s.x + outSign(s) * xAcross(H.outDeep), y: stem.y };
+      return [s, stem, breakPt];
+    }
+    case "CURL": {
+      const stem = { x: s.x, y: yUp(DEPTH.curl) };
+      const work = { x: stem.x, y: yUp(DEPTH.curl - 2) };
+      return [s, stem, work];
+    }
+    case "COMEBACK": {
+      const stem = { x: s.x, y: yUp(DEPTH.dig) };
+      const back = { x: sidelineX(s, 6), y: yUp(DEPTH.curl) };
+      return [s, stem, back];
+    }
+    case "DIG": {
+      const stem = { x: s.x, y: yUp(DEPTH.dig) };
+      const inCut = { x: QB.x + inSign(s) * xAcross(10), y: stem.y };
+      return [s, stem, inCut];
+    }
+
+    /* Deep */
+    case "POST": {
+      const stem = { x: s.x, y: yUp(DEPTH.deep) };
+      const bend = { x: QB.x, y: yUp(DEPTH.shot) };
+      return [s, stem, bend];
+    }
+    case "CORNER": {
+      const stem = { x: s.x, y: yUp(DEPTH.deep) };
+      const flag = { x: sidelineX(s, 8), y: yUp(DEPTH.shot) };
+      return [s, stem, flag];
+    }
+
+    /* Crossers */
+    case "OVER": {
+      const stem = { x: s.x, y: yUp(DEPTH.deep - 2) };
+      const cross = { x: oppositeHashX(s), y: yUp(DEPTH.deep) };
+      return [s, stem, cross];
+    }
+    case "CROSS": {
+      const stem = { x: s.x, y: yUp(DEPTH.mid - 1) };
+      const cross = { x: oppositeHashX(s), y: yUp(DEPTH.mid) };
+      return [s, stem, cross];
+    }
+    case "SHALLOW": {
+      const under = { x: oppositeHashX(s), y: yUp(18) };
+      return [s, under];
+    }
+
+    /* RB */
+    case "WHEEL": {
+      const flat = { x: sidelineX(s, 8), y: yUp(DEPTH.quick) };
+      const up = { x: flat.x, y: yUp(DEPTH.deep) };
+      return [s, flat, up];
+    }
+
+    default:
+      return [s];
   }
 }
 
-/** ---------- Formation presets (fixed align) ---------- */
+/* --------- Formations (fixed align) --------- */
 const FORMATIONS: Record<FormationName, AlignMap> = {
   TRIPS_RIGHT: {
-    X:   { x: xAcross(10),                    y: yUp(15) },
-    Z:   { x: xAcross(FIELD_WIDTH_YDS - 6),   y: yUp(15) },
-    SLOT:{ x: xAcross(FIELD_WIDTH_YDS - 16),  y: yUp(15) },
-    TE:  { x: xAcross(FIELD_WIDTH_YDS - 22),  y: yUp(15) },
-    RB:  { x: xAcross(FIELD_WIDTH_YDS / 2 - 2), y: yUp(12) }
+    X: { x: xAcross(10), y: yUp(15) },
+    Z: { x: xAcross(FIELD_WIDTH_YDS - 6), y: yUp(15) },
+    SLOT: { x: xAcross(FIELD_WIDTH_YDS - 16), y: yUp(15) },
+    TE: { x: xAcross(FIELD_WIDTH_YDS - 22), y: yUp(15) },
+    RB: { x: xAcross(FIELD_WIDTH_YDS / 2 - 2), y: yUp(12) },
   },
   DOUBLES: {
-    X:   { x: xAcross(10),                    y: yUp(15) },
-    Z:   { x: xAcross(FIELD_WIDTH_YDS - 10),  y: yUp(15) },
-    SLOT:{ x: xAcross(FIELD_WIDTH_YDS - 20),  y: yUp(15) },
-    TE:  { x: xAcross(20),                    y: yUp(15) },
-    RB:  { x: xAcross(FIELD_WIDTH_YDS / 2 - 2), y: yUp(12) }
+    X: { x: xAcross(10), y: yUp(15) },
+    Z: { x: xAcross(FIELD_WIDTH_YDS - 10), y: yUp(15) },
+    SLOT: { x: xAcross(FIELD_WIDTH_YDS - 20), y: yUp(15) },
+    TE: { x: xAcross(20), y: yUp(15) },
+    RB: { x: xAcross(FIELD_WIDTH_YDS / 2 - 2), y: yUp(12) },
   },
   BUNCH_LEFT: {
-    X:   { x: xAcross(12),                    y: yUp(15) },
-    SLOT:{ x: xAcross(16),                    y: yUp(17) },
-    TE:  { x: xAcross(18.5),                  y: yUp(13.5) },
-    Z:   { x: xAcross(FIELD_WIDTH_YDS - 10),  y: yUp(15) },
-    RB:  { x: xAcross(FIELD_WIDTH_YDS / 2 - 2), y: yUp(12) }
-  }
+    X: { x: xAcross(12), y: yUp(15) },
+    SLOT: { x: xAcross(16), y: yUp(17) },
+    TE: { x: xAcross(18.5), y: yUp(13.5) },
+    Z: { x: xAcross(FIELD_WIDTH_YDS - 10), y: yUp(15) },
+    RB: { x: xAcross(FIELD_WIDTH_YDS / 2 - 2), y: yUp(12) },
+  },
 };
 
 function strongSide(receivers: AlignMap): "left" | "right" {
-  let left = 0, right = 0;
+  let left = 0,
+    right = 0;
   (Object.keys(receivers) as ReceiverID[]).forEach((id) => {
-    if (receivers[id].x < QB.x) left++; else right++;
+    if (receivers[id].x < QB.x) left++;
+    else right++;
   });
   return right >= left ? "right" : "left";
 }
 
-type Numbering = Record<ReceiverID, { side: "left" | "right"; number: 1 | 2 | 3; band: "strong" | "weak" }>;
+type Numbering = Record<
+  ReceiverID,
+  { side: "left" | "right"; number: 1 | 2 | 3; band: "strong" | "weak" }
+>;
 
 function computeNumbering(align: AlignMap): Numbering {
   const ss = strongSide(align);
-  const ids: ReceiverID[] = ["X","Z","SLOT","TE","RB"];
-  const leftIds  = ids.filter(id => align[id].x < QB.x).sort((a,b)=> align[a].x - align[b].x);
-  const rightIds = ids.filter(id => align[id].x >= QB.x).sort((a,b)=> align[b].x - align[a].x);
+  const ids: ReceiverID[] = ["X", "Z", "SLOT", "TE", "RB"];
+  const leftIds = ids.filter((id) => align[id].x < QB.x).sort((a, b) => align[a].x - align[b].x);
+  const rightIds = ids.filter((id) => align[id].x >= QB.x).sort((a, b) => align[b].x - align[a].x);
 
-  const tag = (lst: ReceiverID[], side: "left"|"right", band: "strong"|"weak") => {
+  const tag = (lst: ReceiverID[], side: "left" | "right", band: "strong" | "weak") => {
     const out = {} as Numbering;
-    lst.forEach((id, i) => { out[id] = { side, number: (i+1) as 1|2|3, band }; });
+    lst.forEach((id, i) => {
+      out[id] = { side, number: (i + 1) as 1 | 2 | 3, band };
+    });
     return out;
   };
-  const leftBand: "strong"|"weak"  = ss === "left" ? "strong" : "weak";
-  const rightBand: "strong"|"weak" = ss === "right" ? "strong" : "weak";
-
+  const leftBand: "strong" | "weak" = ss === "left" ? "strong" : "weak";
+  const rightBand: "strong" | "weak" = ss === "right" ? "strong" : "weak";
   return { ...tag(leftIds, "left", leftBand), ...tag(rightIds, "right", rightBand) } as Numbering;
 }
 
-/** Defaults by concept family (when no assignments provided) */
-/** ---------- Concept defaults (used when JSON lacks assignments) ---------- */
-function buildConceptRoutes(conceptId: FootballConceptId, A: AlignMap, coverage: CoverageID): RouteMap {
+/* --------- Concept defaults (used if JSON lacks assignments) --------- */
+function buildConceptRoutes(
+  conceptId: FootballConceptId,
+  A: AlignMap,
+  coverage: CoverageID
+): RouteMap {
   const ID = (conceptId as string).toUpperCase();
-
-  // helper to build w/ coverage-aware routes
   const mk = (m: Partial<Record<ReceiverID, RouteKeyword>>): RouteMap => ({
-    X:    routeFromKeyword(m.X    ?? "HITCH",  A.X,    coverage),
-    Z:    routeFromKeyword(m.Z    ?? "HITCH",  A.Z,    coverage),
-    SLOT: routeFromKeyword(m.SLOT ?? "FLAT",   A.SLOT, coverage),
-    TE:   routeFromKeyword(m.TE   ?? "STICK",  A.TE,   coverage),
-    RB:   routeFromKeyword(m.RB   ?? "CHECK",  A.RB,   coverage)
+    X: routeFromKeyword(m.X ?? "HITCH", A.X, coverage),
+    Z: routeFromKeyword(m.Z ?? "HITCH", A.Z, coverage),
+    SLOT: routeFromKeyword(m.SLOT ?? "FLAT", A.SLOT, coverage),
+    TE: routeFromKeyword(m.TE ?? "STICK", A.TE, coverage),
+    RB: routeFromKeyword(m.RB ?? "CHECK", A.RB, coverage),
   });
 
   switch (ID) {
     case "FOUR_VERTS":
-      return mk({ X:"GO", Z:"GO", SLOT:"BENDER", TE:"SEAM", RB:"CHECK" });
-
+      return mk({ X: "GO", Z: "GO", SLOT: "BENDER", TE: "SEAM", RB: "CHECK" });
     case "SAIL":
     case "BOOT_FLOOD":
-      // #1 clear (GO), #2 deep OUT ~12–15 (sail), #3 FLAT
-      return mk({ X:"GO", SLOT:"OUT", TE:"FLAT", Z:"COMEBACK", RB:"CHECK" });
-
+      return mk({ X: "GO", SLOT: "OUT", TE: "FLAT", Z: "COMEBACK", RB: "CHECK" });
     case "MESH":
-      // shallow crossers + dig + corner/seam
-      return mk({ X:"SHALLOW", SLOT:"SHALLOW", Z:"DIG", TE:"CORNER", RB:"CHECK" });
-
+      return mk({ X: "SHALLOW", SLOT: "SHALLOW", Z: "DIG", TE: "CORNER", RB: "CHECK" });
     case "STICK":
     case "SPACING":
     case "CURL_FLAT":
-      return mk({ X:"CURL", Z:"CURL", SLOT:"FLAT", TE:"STICK", RB:"FLAT" });
-
+      return mk({ X: "CURL", Z: "CURL", SLOT: "FLAT", TE: "STICK", RB: "FLAT" });
     case "DAGGER":
-      // #2 seam clear, #1 15yd dig
-      return mk({ SLOT:"SEAM", X:"DIG", Z:"GO", TE:"CHECK", RB:"CHECK" });
-
+      return mk({ SLOT: "SEAM", X: "DIG", Z: "GO", TE: "CHECK", RB: "CHECK" });
     case "Y_CROSS":
-      // Y over, frontside post, backside curl/flat
-      return mk({ TE:"OVER", X:"POST", Z:"CURL", SLOT:"FLAT", RB:"CHECK" });
-
+      return mk({ TE: "OVER", X: "POST", Z: "CURL", SLOT: "FLAT", RB: "CHECK" });
     case "SHALLOW":
-      // drive: shallow + dig + post clear
-      return mk({ SLOT:"SHALLOW", X:"DIG", Z:"POST", TE:"SEAM", RB:"CHECK" });
-
+      return mk({ SLOT: "SHALLOW", X: "DIG", Z: "POST", TE: "SEAM", RB: "CHECK" });
     case "LEVELS":
-      // shallow + intermediate dig with sit/curl backside
-      return mk({ SLOT:"SHALLOW", X:"DIG", Z:"CURL", TE:"SEAM", RB:"CHECK" });
-
+      return mk({ SLOT: "SHALLOW", X: "DIG", Z: "CURL", TE: "SEAM", RB: "CHECK" });
     case "MILLS":
-      // post-dig shot
-      return mk({ X:"POST", SLOT:"DIG", Z:"GO", TE:"SEAM", RB:"CHECK" });
-
+      return mk({ X: "POST", SLOT: "DIG", Z: "GO", TE: "SEAM", RB: "CHECK" });
     case "POST_WHEEL":
-      return mk({ SLOT:"WHEEL", X:"POST", Z:"COMEBACK", TE:"CURL", RB:"FLAT" });
-
+      return mk({ SLOT: "WHEEL", X: "POST", Z: "COMEBACK", TE: "CURL", RB: "FLAT" });
     case "SLANT_FLAT":
-      return mk({ X:"SLANT", SLOT:"FLAT", Z:"HITCH", TE:"STICK", RB:"CHECK" });
-
+      return mk({ X: "SLANT", SLOT: "FLAT", Z: "HITCH", TE: "STICK", RB: "CHECK" });
     case "DRIVE":
-      return mk({ SLOT:"SHALLOW", X:"DIG", Z:"COMEBACK", TE:"SEAM", RB:"CHECK" });
-
+      return mk({ SLOT: "SHALLOW", X: "DIG", Z: "COMEBACK", TE: "SEAM", RB: "CHECK" });
     default:
-      // vanilla balanced
-      return mk({ X:"COMEBACK", Z:"CURL", SLOT:"FLAT", TE:"DIG", RB:"CHECK" });
+      return mk({ X: "COMEBACK", Z: "CURL", SLOT: "FLAT", TE: "DIG", RB: "CHECK" });
   }
 }
 
-/** ---------- Defense (nickel) ---------- */
+/* --------- Zone landmarks --------- */
 const D_ALIGN: Record<DefenderID, Pt> = {
-  CB_L:   { x: xAcross(8),                      y: yUp(16.5) },
-  CB_R:   { x: xAcross(FIELD_WIDTH_YDS - 8),    y: yUp(16.5) },
-  NICKEL: { x: xAcross(FIELD_WIDTH_YDS - 18),   y: yUp(17)   },
-  SAM:    { x: xAcross(20),                     y: yUp(22)   },
-  MIKE:   { x: xAcross(FIELD_WIDTH_YDS/2),      y: yUp(22)   },
-  WILL:   { x: xAcross(FIELD_WIDTH_YDS-20),     y: yUp(22)   },
-  FS:     { x: xAcross(FIELD_WIDTH_YDS/2),      y: yUp(35)   },
-  SS:     { x: xAcross(FIELD_WIDTH_YDS/2 - 12), y: yUp(32)   }
+  CB_L: { x: xAcross(8), y: yUp(16.5) },
+  CB_R: { x: xAcross(FIELD_WIDTH_YDS - 8), y: yUp(16.5) },
+  NICKEL: { x: xAcross(FIELD_WIDTH_YDS - 18), y: yUp(17) },
+  SAM: { x: xAcross(20), y: yUp(22) },
+  MIKE: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(22) },
+  WILL: { x: xAcross(FIELD_WIDTH_YDS - 20), y: yUp(22) },
+  FS: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(35) },
+  SS: { x: xAcross(FIELD_WIDTH_YDS / 2 - 12), y: yUp(32) },
 };
 
 const ZONES = {
-  DEEP_LEFT:    { x: xAcross(12), y: yUp(40) },
-  DEEP_MIDDLE:  { x: xAcross(FIELD_WIDTH_YDS/2), y: yUp(42) },
-  DEEP_RIGHT:   { x: xAcross(FIELD_WIDTH_YDS-12), y: yUp(40) },
-  CURL_LEFT:    { x: xAcross(18), y: yUp(26) },
-  HOOK_MID:     { x: xAcross(FIELD_WIDTH_YDS/2), y: yUp(24) },
-  CURL_RIGHT:   { x: xAcross(FIELD_WIDTH_YDS-18), y: yUp(26) },
-  FLAT_LEFT:    { x: xAcross(8), y: yUp(20) },
-  FLAT_RIGHT:   { x: xAcross(FIELD_WIDTH_YDS-8), y: yUp(20) }
+  DEEP_LEFT: { x: xAcross(12), y: yUp(40) },
+  DEEP_MIDDLE: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(42) },
+  DEEP_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 12), y: yUp(40) },
+  CURL_LEFT: { x: xAcross(18), y: yUp(26) },
+  HOOK_MID: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(24) },
+  CURL_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 18), y: yUp(26) },
+  FLAT_LEFT: { x: xAcross(8), y: yUp(20) },
+  FLAT_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 8), y: yUp(20) },
 };
 
-function buildDefensePaths(coverage: CoverageID, O: RouteMap): Record<string, Pt[]> {
-  const manTrail = (start: Pt, targetPath: Pt[]): Pt[] => {
-    const end = targetPath[targetPath.length - 1];
-    const mid = lerp(start, end, 0.6);
-    return [start, mid, end];
-  };
+/* --------- Coverage families --------- */
+const MAN_COVERAGES   = new Set<CoverageID>(["C0","C1"]);
+const MATCH_COVERAGES = new Set<CoverageID>(["PALMS","C6","QUARTERS","C9"]);
+const ZONE_COVERAGES  = new Set<CoverageID>(["C2","TAMPA2","C3","C4"]);
 
-  switch (coverage) {
-    case "C3":
-      return {
-        CB_L: [D_ALIGN.CB_L, ZONES.DEEP_LEFT],
-        CB_R: [D_ALIGN.CB_R, ZONES.DEEP_RIGHT],
-        FS:   [D_ALIGN.FS,   ZONES.DEEP_MIDDLE],
-        SS:   [D_ALIGN.SS,   ZONES.CURL_LEFT],
-        NICKEL:[D_ALIGN.NICKEL, ZONES.CURL_RIGHT],
-        SAM:  [D_ALIGN.SAM,  ZONES.CURL_LEFT],
-        MIKE: [D_ALIGN.MIKE, ZONES.HOOK_MID],
-        WILL: [D_ALIGN.WILL, ZONES.CURL_RIGHT]
-      };
-    case "C2":
-      return {
-        CB_L: [D_ALIGN.CB_L, ZONES.FLAT_LEFT],
-        CB_R: [D_ALIGN.CB_R, ZONES.FLAT_RIGHT],
-        FS:   [D_ALIGN.FS,   ZONES.DEEP_RIGHT],
-        SS:   [D_ALIGN.SS,   ZONES.DEEP_LEFT],
-        NICKEL:[D_ALIGN.NICKEL, ZONES.CURL_RIGHT],
-        SAM:  [D_ALIGN.SAM,  ZONES.CURL_LEFT],
-        MIKE: [D_ALIGN.MIKE, ZONES.HOOK_MID],
-        WILL: [D_ALIGN.WILL, ZONES.CURL_RIGHT]
-      };
-    case "TAMPA2":
-      return {
-        CB_L: [D_ALIGN.CB_L, ZONES.FLAT_LEFT],
-        CB_R: [D_ALIGN.CB_R, ZONES.FLAT_RIGHT],
-        FS:   [D_ALIGN.FS,   ZONES.DEEP_RIGHT],
-        SS:   [D_ALIGN.SS,   ZONES.DEEP_LEFT],
-        MIKE: [D_ALIGN.MIKE, { x: ZONES.DEEP_MIDDLE.x, y: yUp(34) }],
-        SAM:  [D_ALIGN.SAM,  ZONES.CURL_LEFT],
-        WILL: [D_ALIGN.WILL, ZONES.CURL_RIGHT],
-        NICKEL:[D_ALIGN.NICKEL, ZONES.CURL_RIGHT]
-      };
-    case "QUARTERS":
-    case "C4":
-      return {
-        CB_L: [D_ALIGN.CB_L, { x: xAcross(16), y: yUp(36) }],
-        CB_R: [D_ALIGN.CB_R, { x: xAcross(FIELD_WIDTH_YDS-16), y: yUp(36) }],
-        FS:   [D_ALIGN.FS,   { x: xAcross(FIELD_WIDTH_YDS/2 + 8), y: yUp(38) }],
-        SS:   [D_ALIGN.SS,   { x: xAcross(FIELD_WIDTH_YDS/2 - 8), y: yUp(38) }],
-        SAM:  [D_ALIGN.SAM,  ZONES.CURL_LEFT],
-        MIKE: [D_ALIGN.MIKE, ZONES.HOOK_MID],
-        WILL: [D_ALIGN.WILL, ZONES.CURL_RIGHT],
-        NICKEL:[D_ALIGN.NICKEL, ZONES.CURL_RIGHT]
-      };
-    case "PALMS": {
-      const slotVert = O.SLOT[O.SLOT.length - 1];
-      return {
-        CB_L: [D_ALIGN.CB_L, ZONES.FLAT_LEFT],
-        CB_R: [D_ALIGN.CB_R, ZONES.FLAT_RIGHT],
-        SS:   [D_ALIGN.SS,   { x: slotVert.x - xAcross(8), y: Math.min(slotVert.y, yUp(36)) }],
-        FS:   [D_ALIGN.FS,   { x: xAcross(FIELD_WIDTH_YDS/2 + 10), y: yUp(38) }],
-        SAM:  [D_ALIGN.SAM,  ZONES.CURL_LEFT],
-        MIKE: [D_ALIGN.MIKE, ZONES.HOOK_MID],
-        WILL: [D_ALIGN.WILL, ZONES.CURL_RIGHT],
-        NICKEL:[D_ALIGN.NICKEL, ZONES.CURL_RIGHT]
-      };
-    }
-    case "C1":
-      return {
-        CB_L:   manTrail(D_ALIGN.CB_L, O.X),
-        CB_R:   manTrail(D_ALIGN.CB_R, O.Z),
-        NICKEL: manTrail(D_ALIGN.NICKEL, O.SLOT),
-        SS:     manTrail(D_ALIGN.SS, O.TE),
-        MIKE:   manTrail(D_ALIGN.MIKE, O.RB),
-        FS:     [D_ALIGN.FS, ZONES.DEEP_MIDDLE],
-        SAM:    [D_ALIGN.SAM, ZONES.CURL_LEFT],
-        WILL:   [D_ALIGN.WILL, ZONES.CURL_RIGHT]
-      };
-    case "C0":
-      return {
-        CB_L:   manTrail(D_ALIGN.CB_L, O.X),
-        CB_R:   manTrail(D_ALIGN.CB_R, O.Z),
-        NICKEL: manTrail(D_ALIGN.NICKEL, O.SLOT),
-        SS:     manTrail(D_ALIGN.SS, O.TE),
-        MIKE:   manTrail(D_ALIGN.MIKE, O.RB),
-        FS:     manTrail(D_ALIGN.FS, O.TE),
-        SAM:    [D_ALIGN.SAM, ZONES.HOOK_MID],
-        WILL:   [D_ALIGN.WILL, ZONES.HOOK_MID]
-      };
-    case "C6":
-      return {
-        CB_L: [D_ALIGN.CB_L, { x: xAcross(16), y: yUp(36) }],
-        SS:   [D_ALIGN.SS,   { x: xAcross(FIELD_WIDTH_YDS/2 - 8), y: yUp(38) }],
-        CB_R: [D_ALIGN.CB_R, ZONES.FLAT_RIGHT],
-        FS:   [D_ALIGN.FS,   ZONES.DEEP_RIGHT],
-        SAM:  [D_ALIGN.SAM,  ZONES.CURL_LEFT],
-        MIKE: [D_ALIGN.MIKE, ZONES.HOOK_MID],
-        WILL: [D_ALIGN.WILL, ZONES.CURL_RIGHT],
-        NICKEL:[D_ALIGN.NICKEL, ZONES.CURL_RIGHT]
-      };
-    case "C9":
-      return {
-        CB_L: [D_ALIGN.CB_L, ZONES.DEEP_LEFT],
-        CB_R: [D_ALIGN.CB_R, ZONES.CURL_RIGHT],
-        FS:   [D_ALIGN.FS,   ZONES.DEEP_MIDDLE],
-        SS:   [D_ALIGN.SS,   ZONES.FLAT_LEFT],
-        SAM:  [D_ALIGN.SAM,  ZONES.CURL_LEFT],
-        MIKE: [D_ALIGN.MIKE, ZONES.HOOK_MID],
-        WILL: [D_ALIGN.WILL, ZONES.CURL_RIGHT],
-        NICKEL:[D_ALIGN.NICKEL, ZONES.CURL_RIGHT]
-      };
-    default:
-      return buildDefensePaths("C3", O);
-  }
-}
+/* =========================================
+   COMPONENT
+   ========================================= */
 
-/** ---------- Component ---------- */
 export default function PlaySimulator({
   conceptId,
-  coverage
+  coverage,
 }: {
   conceptId: FootballConceptId;
   coverage: CoverageID;
@@ -443,14 +490,20 @@ export default function PlaySimulator({
   const [explain, setExplain] = useState<string | null>(null);
 
   const [formation, setFormation] = useState<FormationName>("TRIPS_RIGHT");
-  const [manualAssignments, setManualAssignments] = useState<AssignMap>({}); // AI audible can override
+  const [manualAssignments, setManualAssignments] = useState<AssignMap>({});
 
-  const [O, setO] = useState<RouteMap>({ X: [], Z: [], SLOT: [], TE: [], RB: [] });
-  const [numbering, setNumbering] = useState<ReturnType<typeof computeNumbering>>(
-    () => computeNumbering(FORMATIONS[formation])
-  );
-  const [D, setD] = useState<Record<string, Pt[]>>({});
+  const [align, setAlign] = useState<AlignMap>(FORMATIONS[formation]);
+  const [O, setO] = useState<RouteMap>(() =>
+  buildConceptRoutes(conceptId, FORMATIONS[formation], coverage));
+  const [numbering, setNumbering] = useState<Numbering>(() => computeNumbering(FORMATIONS[formation]));
 
+  // Defender starts (dynamic, strength-aware)
+  const [Dstart, setDstart] = useState<Record<DefenderID, Pt>>(D_ALIGN);
+  // Speeds
+  const [recSpeed, setRecSpeed] = useState(1.0); // 0.7–1.5
+  const [defSpeed, setDefSpeed] = useState(.95); // 0.7–1.5
+
+  // Sounds + notes
   const [soundOn, setSoundOn] = useState(true);
   const [audibleNote, setAudibleNote] = useState<string>("");
 
@@ -462,87 +515,615 @@ export default function PlaySimulator({
   const [ballP2, setBallP2] = useState<Pt>(QB);
   const [catchAt, setCatchAt] = useState<Pt | null>(null);
 
+  // --- Blocking state (success odds: TE 90%, RB 70%)
+type Blocker = "TE" | "RB";
+type BlockMap = Partial<Record<Blocker, DefenderID | null>>;
+
+const [teBlock, setTeBlock] = useState(false); // UI toggle later
+const [rbBlock, setRbBlock] = useState(false); // UI toggle later
+
+const [blockAssignments, setBlockAssignments] = useState<BlockMap>({});
+const [blockedDefenders, setBlockedDefenders] = useState<Set<DefenderID>>(new Set());
+const [blockEngage, setBlockEngage] = useState<Partial<Record<DefenderID, Pt>>>({});
+
+// --- Audible UI ---
+const [audibleOn, setAudibleOn] = useState(false);
+const [audTarget, setAudTarget] = useState<ReceiverID | "">("");
+const [audRoute, setAudRoute]   = useState<RouteKeyword | "">("");
+
+const [caught, setCaught] = useState(false);
+
+const PLAY_MS = 3000; // your play clock duration (matches the Snap timer)
+
+type ThrowMeta = { p0: Pt; p1: Pt; p2: Pt; tStart: number; frac: number };
+const [throwMeta, setThrowMeta] = useState<ThrowMeta | null>(null);
+
+
+// Generous menu of routes (9 key routes)
+const ROUTE_MENU: RouteKeyword[] = [
+  "GO","SPEED_OUT","CURL",
+  "DIG","POST","CORNER",
+  "SLANT","WHEEL","CHECK",
+];
+
+// Receivers available to audible (exclude blockers)
+const selectableReceivers = useMemo<ReceiverID[]>(
+  () => (["X","Z","SLOT","TE","RB"] as ReceiverID[])
+        .filter(id => !(id === "TE" && teBlock) && !(id === "RB" && rbBlock)),
+  [teBlock, rbBlock]
+);
+
+const hasAudibles = useMemo(() => Object.keys(manualAssignments).length > 0, [manualAssignments]);
+
+  // Animate the play after "Snap"
+const playRef = useRef<number | null>(null);
+useEffect(() => {
+  if (phase !== "post") return;
+
+  const BASE_MS = 3200; // total play time; sliders still affect speed via sampling
+  const t0 = performance.now();
+
+  const tick = (now: number) => {
+    const u = Math.min(1, (now - t0) / BASE_MS);
+    setT(u);
+    if (u < 1) {
+      playRef.current = requestAnimationFrame(tick);
+    } else {
+      if (playRef.current) cancelAnimationFrame(playRef.current);
+    }
+  };
+
+  playRef.current = requestAnimationFrame(tick);
+  return () => { if (playRef.current) cancelAnimationFrame(playRef.current); };
+}, [phase]);
+
+
+  // Rebuild alignment, numbering, routes, and defender starts whenever inputs change
+    useEffect(() => {
+    const A = FORMATIONS[formation];
+    setAlign(A);
+    setNumbering(computeNumbering(A));
+
+    const routes = buildConceptRoutes(conceptId, A, coverage);
+
+    if (teBlock) routes.TE = passProPathTE(A);
+    if (rbBlock) routes.RB = passProPathRB(A);
+
+    // Apply manual audible overrides (skip if that player is blocking)
+    (Object.entries(manualAssignments) as [ReceiverID, RouteKeyword][])
+        .forEach(([rid, kw]) => {
+        if ((rid === "TE" && teBlock) || (rid === "RB" && rbBlock)) return;
+        routes[rid] = routeFromKeyword(kw, A[rid], coverage);
+        });
+
+    setO(routes);
+
+    // strength-aware defensive starting spots
+    setDstart(computeDefenderStarts(A));
+
+    // reset the play to pre-snap for consistency
+    setPhase("pre");
+    setT(0);
+    setDecision(null);
+    setGrade(null);
+    setExplain(null);
+    setBallFlying(false);
+    setBallT(0);
+    setCatchAt(null);
+    }, [formation, conceptId, coverage, teBlock, rbBlock, manualAssignments]);
+
+    useEffect(() => {
+        if (phase !== "post") {
+            setBlockAssignments({});
+            setBlockedDefenders(new Set());
+            setBlockEngage({});
+            return;
+        }
+
+        const sr = strongIsRight(); // your existing helper that reads `numbering`
+        const assigns: BlockMap = {};
+        const engages: Partial<Record<DefenderID, Pt>> = {};
+        const blocked = new Set<DefenderID>();
+
+        if (teBlock) {
+            const tgt = computeBlockTarget("TE", coverage, align, Dstart, sr);
+            assigns.TE = tgt ?? null;
+            const ok = Math.random() < 0.90; // TE success 90%
+            if (tgt && ok) {
+            blocked.add(tgt);
+            engages[tgt] = computeEngagePoint("TE", (O.TE[0] ?? align.TE), Dstart[tgt]);
+            }
+        }
+
+        if (rbBlock) {
+            const tgt = computeBlockTarget("RB", coverage, align, Dstart, sr);
+            assigns.RB = tgt ?? null;
+            const ok = Math.random() < 0.70; // RB success 70%
+            if (tgt && ok) {
+            blocked.add(tgt);
+            engages[tgt] = computeEngagePoint("RB", (O.RB[0] ?? align.RB), Dstart[tgt]);
+            }
+        }
+
+        setBlockAssignments(assigns);
+        setBlockedDefenders(blocked);
+        setBlockEngage(engages);
+        }, [phase, teBlock, rbBlock, coverage, align, Dstart, O]);
+
+
+  const DEFENDER_IDS: DefenderID[] = ["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"];
+
   const throwEnabled = useMemo(
-    () => DECISION_POINTS.some(dp => Math.abs(t - dp) < 0.08) && phase === "post" && !ballFlying && !decision,
+    () => DECISION_POINTS.some((dp) => Math.abs(t - dp) < 0.08) && phase === "post" && !ballFlying && !decision,
     [t, phase, ballFlying, decision]
   );
 
-  // Load concept + build routes from (manual > diagram > defaults), then defense
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const concept: Concept = await loadConcept(conceptId);
-      const diag = (concept.diagram ?? {}) as DiagramSpec;
+  // Offense actors: simple array of {id, color, path} derived from the current routes O
+  const offenseActors = useMemo<Actor[]>(() => ([
+  { id: "X",    color: "#60a5fa", path: O.X },
+  { id: "Z",    color: "#22d3ee", path: O.Z },
+  { id: "SLOT", color: "#34d399", path: O.SLOT },
+  { id: "TE",   color: "#f472b6", path: O.TE },
+  { id: "RB",   color: "#a78bfa", path: O.RB },
+]), [O]);
 
-      // Choose base alignment: formation preset -> override with diagram.align (if present)
-      const F = FORMATIONS[formation];
-      const A: AlignMap = {
-        X:   diag.align?.X   ?? F.X,
-        Z:   diag.align?.Z   ?? F.Z,
-        SLOT:diag.align?.SLOT?? F.SLOT,
-        TE:  diag.align?.TE  ?? F.TE,
-        RB:  diag.align?.RB  ?? F.RB
-      };
+function wrPosSafe(id: ReceiverID, tt: number): Pt {
+  const path = O[id];
+  if (path && path.length > 0) return posOnPathLenScaled(path, Math.min(1, tt * recSpeed));
+  // fallback to alignment spot
+  return align[id] ?? QB;
+}
 
-      const defaults = buildConceptRoutes(conceptId, A, coverage);
+  /* --------- Dynamic pre-snap defender starts --------- */
+function computeDefenderStarts(A: AlignMap): Record<DefenderID, Pt> {
+    // Find outside receivers left/right for CB alignment
+    const outsideLeft: ReceiverID = A.X.x < A.Z.x ? "X" : "Z";
+    const outsideRight: ReceiverID = outsideLeft === "X" ? ("Z" as ReceiverID) : ("X" as ReceiverID);
+    const slot = A.SLOT;
 
-      const resolvedAssignments: AssignMap = {
-        ...diag.assignments,
-        ...manualAssignments // manual (AI) wins
-      };
+    const ssRight = strongSide(A) === "right";
+    const yPressCB = yUp(16.5);
+    const yNickel = yUp(17); // ~5 yds
+    const ySafety = yUp(32);
+    const yFS = yUp(35);
+    const yBacker = yUp(22);
 
-      const routes: RouteMap = {
-        X:    diag.routes?.X    ?? (resolvedAssignments.X    ? routeFromKeyword(resolvedAssignments.X,    A.X,    coverage) : defaults.X),
-        Z:    diag.routes?.Z    ?? (resolvedAssignments.Z    ? routeFromKeyword(resolvedAssignments.Z,    A.Z,    coverage) : defaults.Z),
-        SLOT: diag.routes?.SLOT ?? (resolvedAssignments.SLOT ? routeFromKeyword(resolvedAssignments.SLOT, A.SLOT, coverage) : defaults.SLOT),
-        TE:   diag.routes?.TE   ?? (resolvedAssignments.TE   ? routeFromKeyword(resolvedAssignments.TE,   A.TE,   coverage) : defaults.TE),
-        RB:   diag.routes?.RB   ?? (resolvedAssignments.RB   ? routeFromKeyword(resolvedAssignments.RB,   A.RB,   coverage) : defaults.RB),
-      };
+    // CBs across from outside WRs
+    const CB_L: Pt = { x: A[outsideLeft].x, y: yPressCB };
+    const CB_R: Pt = { x: A[outsideRight].x, y: yPressCB };
 
-      const def = buildDefensePaths(coverage, routes);
-      const nums = computeNumbering(A);
+    // Nickel: biased over #2 (Slot) with slight inside leverage (~2 yds toward MOF)
+    const insideBias = xAcross(2);
+    const nickelX =
+      slot?.x !== undefined
+        ? (slot.x > QB.x ? slot.x - insideBias : slot.x + insideBias)
+        : ssRight
+        ? xAcross(FIELD_WIDTH_YDS - 18)
+        : xAcross(18);
+    const NICKEL: Pt = { x: nickelX, y: yNickel };
 
-      if (!cancelled) {
-        setNumbering(nums);
-        setO(routes);
-        setD(def);
-        // reset play
-        setPhase("pre"); setT(0);
-        setDecision(null); setGrade(null); setExplain(null);
-        setBallFlying(false); setBallT(0); setCatchAt(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [conceptId, coverage, formation, manualAssignments]);
-
-  // Play clock
-  const playRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (phase !== "post") return;
-    const t0 = performance.now();
-    const tick = (now: number) => {
-      const u = Math.min(1, (now - t0) / 3000);
-      setT(u);
-      if (u < 1) playRef.current = requestAnimationFrame(tick);
-      else cancelAnimationFrame(playRef.current!);
+    // Safeties: SS starts strong hash-ish; FS deep middle
+    const SS: Pt = {
+      x: ssRight ? xAcross(FIELD_WIDTH_YDS / 2 + 8) : xAcross(FIELD_WIDTH_YDS / 2 - 8),
+      y: ySafety,
     };
-    playRef.current = requestAnimationFrame(tick);
-    return () => { if (playRef.current) cancelAnimationFrame(playRef.current); };
-  }, [phase]);
+    const FS: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yFS };
 
-  const offenseActors: Actor[] = useMemo(() => ([
-    { id: "X",    color: "#60a5fa", path: O.X },
-    { id: "Z",    color: "#22d3ee", path: O.Z },
-    { id: "SLOT", color: "#34d399", path: O.SLOT },
-    { id: "TE",   color: "#f472b6", path: O.TE },
-    { id: "RB",   color: "#a78bfa", path: O.RB }
-  ]), [O]);
+    // Backers split weak/strong pre-snap to mirror structure
+    const SAM: Pt = { x: ssRight ? xAcross(20) : xAcross(FIELD_WIDTH_YDS - 20), y: yBacker };
+    const MIKE: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yBacker };
+    const WILL: Pt = { x: ssRight ? xAcross(FIELD_WIDTH_YDS - 20) : xAcross(20), y: yBacker };
 
-  const defenseActors: Actor[] = useMemo(() =>
-    Object.entries(D).map(([id, path]) => ({ id, color: "#f87171", path })),
-  [D]);
+    return { CB_L, CB_R, NICKEL, FS, SS, SAM, MIKE, WILL };
+  }
+// --- strength detector (must sit inside the component so it can read `numbering`) ---
+const strongIsRight = useCallback((): boolean => {
+  return Object.values(numbering).some((n) => n.band === "strong" && n.side === "right");
+}, [numbering]);
 
-  // ---------- AI grader ----------
+// --- strength-aware zone anchor selection ---
+function zoneAnchor(cover: CoverageID, id: DefenderID): Pt {
+  const sr = strongIsRight(); // strong side to QB's right?
+  const L = { DEEP: ZONES.DEEP_LEFT, FLAT: ZONES.FLAT_LEFT, CURL: ZONES.CURL_LEFT };
+  const R = { DEEP: ZONES.DEEP_RIGHT, FLAT: ZONES.FLAT_RIGHT, CURL: ZONES.CURL_RIGHT };
+  const MID = ZONES.DEEP_MIDDLE;
+  const HOOK = ZONES.HOOK_MID;
+
+  // tiny x offsets so two players don't sit on the *exact* same pixel
+  const off = (pt: Pt, dx: number) => ({ x: pt.x + xAcross(dx), y: pt.y });
+
+  switch (cover) {
+    /* -------- Pure zone families -------- */
+    case "C3": {
+      if (id === "CB_L") return L.DEEP;
+      if (id === "CB_R") return R.DEEP;
+      if (id === "FS")   return MID;
+      // SS rolls to strong curl; Nickel opposite curl
+      if (id === "SS")     return sr ? off(R.CURL, -1) : off(L.CURL, +1);
+      if (id === "NICKEL") return sr ? off(L.CURL, +1) : off(R.CURL, -1);
+      if (id === "MIKE") return HOOK;
+      if (id === "SAM")  return sr ? off(L.CURL, +0.5) : off(R.CURL, -0.5);
+      if (id === "WILL") return sr ? off(R.CURL, -0.5) : off(L.CURL, +0.5);
+      return D_ALIGN[id];
+    }
+
+    case "C2": {
+      // Corners squat flats, safeties deep halves; Nickel strong curl/flat; SAM/WILL hook/curl
+      if (id === "CB_L") return L.FLAT;
+      if (id === "CB_R") return R.FLAT;
+      if (id === "SS")   return sr ? R.DEEP : L.DEEP;
+      if (id === "FS")   return sr ? L.DEEP : R.DEEP;
+      if (id === "MIKE") return HOOK;
+      if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5); // **strong curl/flat**
+      if (id === "SAM")    return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0); // strong hook/curl
+      if (id === "WILL")   return sr ? off(L.CURL, +3.0) : off(R.CURL, -3.0); // **weak hook** (distinct)
+      return D_ALIGN[id];
+    }
+
+    case "TAMPA2": {
+      // Same as C2 but MIKE carries deep middle
+      if (id === "CB_L") return L.FLAT;
+      if (id === "CB_R") return R.FLAT;
+      if (id === "SS")   return sr ? R.DEEP : L.DEEP;
+      if (id === "FS")   return sr ? L.DEEP : R.DEEP;
+      if (id === "MIKE") return { x: HOOK.x, y: yUp(34) }; // Tampa runner
+      if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5); // **strong curl/flat**
+      if (id === "SAM")    return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0); // strong hook/curl
+      if (id === "WILL")   return sr ? off(L.CURL, +3.0) : off(R.CURL, -3.0); // **weak hook** (distinct)
+      return D_ALIGN[id];
+    }
+
+    case "C4":
+    case "QUARTERS": {
+      // 4 deep quarters (corners outside), Nickel to strong curl, LBs hook/curl
+      if (id === "CB_L") return { x: xAcross(14), y: yUp(36) }; // outside-ish quarter
+      if (id === "CB_R") return { x: xAcross(FIELD_WIDTH_YDS - 14), y: yUp(36) };
+      if (id === "FS")   return { x: xAcross(FIELD_WIDTH_YDS/2 + 8), y: yUp(38) };
+      if (id === "SS")   return { x: xAcross(FIELD_WIDTH_YDS/2 - 8), y: yUp(38) };
+      if (id === "MIKE") return HOOK;
+      if (id === "SAM")  return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
+      if (id === "WILL") return sr ? off(R.CURL, -1.0) : off(L.CURL, +1.0);
+      if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+      return D_ALIGN[id];
+    }
+
+    /* -------- Match/Combo families -------- */
+    case "PALMS": {
+      // base like C2 on anchors (match logic happens in controller)
+      if (id === "CB_L") return L.FLAT;
+      if (id === "CB_R") return R.FLAT;
+      if (id === "SS")   return sr ? R.DEEP : L.DEEP;
+      if (id === "FS")   return sr ? L.DEEP : R.DEEP;
+      if (id === "MIKE") return HOOK;
+      if (id === "SAM")  return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
+      if (id === "WILL") return sr ? off(R.CURL, -1.0) : off(L.CURL, +1.0);
+      if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+      return D_ALIGN[id];
+    }
+
+    case "C6": {
+      // Quarters to strong, half to weak
+      const halfOnRight = !sr;
+      if (id === "CB_L") return halfOnRight ? L.DEEP : { x: xAcross(14), y: yUp(36) };
+      if (id === "CB_R") return halfOnRight ? { x: xAcross(FIELD_WIDTH_YDS - 14), y: yUp(36) } : R.DEEP;
+      if (id === "SS")   return halfOnRight ? R.DEEP : { x: xAcross(FIELD_WIDTH_YDS/2 - 8), y: yUp(38) };
+      if (id === "FS")   return halfOnRight ? { x: xAcross(FIELD_WIDTH_YDS/2 + 8), y: yUp(38) } : L.DEEP;
+      if (id === "MIKE") return HOOK;
+      if (id === "SAM")  return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
+      if (id === "WILL") return sr ? off(R.CURL, -1.0) : off(L.CURL, +1.0);
+      if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+      return D_ALIGN[id];
+    }
+
+    case "C9": {
+      // trap/cloud to strong
+      if (sr) {
+        if (id === "CB_R") return off(R.CURL, -1.5); // trap side
+        if (id === "SS")   return R.FLAT;
+        if (id === "CB_L") return L.DEEP;
+      } else {
+        if (id === "CB_L") return off(L.CURL, +1.5);
+        if (id === "SS")   return L.FLAT;
+        if (id === "CB_R") return R.DEEP;
+      }
+      if (id === "FS")   return MID;
+      if (id === "MIKE") return HOOK;
+      if (id === "SAM")  return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
+      if (id === "WILL") return sr ? off(R.CURL, -1.0) : off(L.CURL, +1.0);
+      if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+      return D_ALIGN[id];
+    }
+
+    default: {
+      // fallback: C3-ish spacing
+      if (id === "CB_L") return L.DEEP;
+      if (id === "CB_R") return R.DEEP;
+      if (id === "FS")   return MID;
+      if (id === "SS")   return sr ? off(R.CURL, -1) : off(L.CURL, +1);
+      if (id === "SAM")  return sr ? off(L.CURL, +0.5) : off(R.CURL, -0.5);
+      if (id === "WILL") return sr ? off(R.CURL, -0.5) : off(L.CURL, +0.5);
+      if (id === "MIKE") return HOOK;
+      if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+      return D_ALIGN[id];
+    }
+  }
+}
+
+/* --- helper: WR current position at time tt --- */
+const wrPos = (id: ReceiverID, tt: number): Pt =>
+  posOnPathLenScaled(O[id], Math.min(1, tt * recSpeed));
+
+// Which side of QB is a point on?
+const sideOf = (p: Pt) => (p.x < QB.x ? "left" : "right");
+
+// TE/RB pass-pro spots (short sets near LOS)
+function passProPathTE(A: AlignMap): Pt[] {
+  const spot: Pt = { x: A.TE.x, y: yUp(16.5) };   // outside protect on TE's side
+  return [A.TE, spot];
+}
+function passProPathRB(A: AlignMap): Pt[] {
+  const offset = A.RB.x >= QB.x ? xAcross(3) : -xAcross(3); // inside help to QB's arm side
+  const spot: Pt = { x: QB.x + offset, y: yUp(15.5) };
+  return [A.RB, spot];
+}
+
+// Choose the defender a blocker will target
+function computeBlockTarget(
+  who: Blocker,
+  cover: CoverageID,
+  A: AlignMap,
+  starts: Record<DefenderID, Pt>,
+  strongRight: boolean
+): DefenderID | null {
+  // Candidate rush threats (no DL in sim, so we use edges/backers)
+  const CANDIDATES: DefenderID[] = ["SAM", "WILL", "NICKEL", "CB_L", "CB_R", "MIKE"];
+
+  // Cover 0: prefer blitz LB
+  if (cover === "C0") {
+    const blitzLB: DefenderID = strongRight ? "SAM" : "WILL";
+    if (who === "RB") return blitzLB;
+    // TE will take edge on his side if available, else fall back to blitz LB
+  }
+
+  const bx = (who === "TE" ? A.TE.x : A.RB.x);
+  const mySide: "left" | "right" = bx < QB.x ? "left" : "right";
+
+  const isOnMySide = (id: DefenderID) =>
+    mySide === "left" ? starts[id].x < QB.x : starts[id].x >= QB.x;
+
+  // distance bias to QB (threat), with role-based weighting
+  const weight = (id: DefenderID) => {
+    let w = dist(starts[id], QB);
+    if (who === "TE") {
+      // favor edges on TE side
+      if ((mySide === "left" && id === "CB_L") || (mySide === "right" && id === "CB_R")) w *= 0.7;
+      if (id === "NICKEL") w *= 0.8;
+    } else {
+      // RB: favor MIKE / inside pressure
+      if (id === "MIKE") w *= 0.6;
+      if ((mySide === "left" && id === "SAM") || (mySide === "right" && id === "WILL")) w *= 0.85;
+    }
+    // same-side bonus
+    w *= isOnMySide(id) ? 0.8 : 1.2;
+    return w;
+  };
+
+  let best: { id: DefenderID; w: number } | null = null;
+  for (const id of CANDIDATES) {
+    const w = weight(id);
+    if (!best || w < best.w) best = { id, w };
+  }
+  return best?.id ?? null;
+}
+
+// Where the block “locks in”
+function computeEngagePoint(
+  who: Blocker,
+  blockerStart: Pt,
+  defenderStart: Pt
+): Pt {
+  const losY = yUp(who === "TE" ? 16.5 + Math.random() * 0.8 : 15.5 + Math.random() * 0.6);
+  const t = who === "TE" ? 0.6 : 0.35; // TE meets further outside; RB more inside
+  const x = blockerStart.x + (defenderStart.x - blockerStart.x) * t;
+  return { x, y: losY };
+}
+
+
+// --- numbered receiver helpers (by side) ---
+function findByNumber(side: "left" | "right", num: 1 | 2 | 3): ReceiverID | null {
+  for (const [id, info] of Object.entries(numbering) as [ReceiverID, Numbering[ReceiverID]][]) {
+    if (info.side === side && info.number === num) return id;
+  }
+  return null;
+}
+const left1  = () => findByNumber("left", 1)  ?? "X";
+const right1 = () => findByNumber("right", 1) ?? "Z";
+const left2  = () => findByNumber("left", 2)  ?? (left1()  === "X" ? "SLOT" : "TE");
+const right2 = () => findByNumber("right", 2) ?? (right1() === "Z" ? "SLOT" : "TE");
+
+/* --- defender controller: returns the *current* position for a defender at time tt --- */
+function defenderPos(cover: CoverageID, id: DefenderID, tt: number): Pt {
+  const start = Dstart[id] ?? D_ALIGN[id];
+  const effT = Math.max(0, Math.min(1, tt));
+  const spd = Math.max(0.5, Math.min(1.6, defSpeed)); // clamp to avoid warp
+  const sr = strongIsRight();
+
+  const approach = (from: Pt, to: Pt, base = 0, gain = 1) => {
+    const pct = Math.min(1, base + effT * (gain * spd));
+    return { x: from.x + (to.x - from.x) * pct, y: from.y + (to.y - from.y) * pct };
+  };
+
+  // stay blocked
+  if (blockedDefenders.has(id)) {
+    const ep = blockEngage[id] ?? start;
+    return approach(start, ep, 0.35, 1.35); // run up to the engage point quickly, then hold
+  }
+
+  const anchor = zoneAnchor(cover, id);
+
+  /* ================= MAN: C1 / C0 ================= */
+  if (MAN_COVERAGES.has(cover)) {
+    // --- Cover 0: one LB blitzes, the other spies the QB ---
+    if (cover === "C0") {
+      // choose which LB blitzes by formation strength (SAM = strong; WILL = weak)
+      const blitzLB: DefenderID = sr ? "SAM" : "WILL";
+      const spyLB: DefenderID   = sr ? "WILL" : "SAM";
+
+      if (id === blitzLB) {
+        // aim slightly to a guard gap so the path isn't perfectly centerline
+        const gapX = QB.x + (sr ? xAcross(2) : -xAcross(2));
+        const blitzPoint: Pt = { x: gapX, y: QB.y };
+        // get downhill fast (more aggressive gain)
+        return approach(start, blitzPoint, 0.15, 1.35);
+      }
+      if (id === spyLB) {
+        // hold a shallow spy landmark ~8 yds depth, centered on QB
+        const spyPoint: Pt = { x: QB.x, y: yUp(20) };
+        // softly mirror RB if he runs through the MOF (green-dog feel)
+        const rbP = wrPos("RB", tt);
+        const rbInMOF = Math.abs(rbP.x - QB.x) < xAcross(8) && rbP.y < yUp(26);
+        const target = rbInMOF ? rbP : spyPoint;
+        return approach(start, target, 0.20, 0.70);
+      }
+    }
+
+    // normal man assignments (used in both C1 and C0 for non-blitz/spy players)
+    const manMap: Partial<Record<DefenderID, ReceiverID>> = {
+      CB_L:   "X",
+      CB_R:   "Z",
+      NICKEL: "SLOT",
+      SS:     "TE",
+      MIKE:   "RB",
+      // FS remains free in C1 (MOF lean below). In C0 he’s typically in man or pressure;
+      // we keep him "free" only if not already covering TE above (adjust if your rules differ).
+    };
+    const key = manMap[id];
+    if (key) {
+      const target = wrPos(key, tt);
+      return approach(start, target, 0.20, 0.90);
+    }
+
+    // Free player behaviors in C1 (MOF safety + hook rats). In C0 this path
+    // only runs for FS if you keep him free; otherwise remove FS from here.
+    if (cover === "C1") {
+      if (id === "FS") {
+        // midpoint #2s, stay high (classic MOF lean on Four Verts)
+        const twoL = left2();
+        const twoR = right2();
+        const pL = wrPos(twoL ?? "SLOT", tt);
+        const pR = wrPos(twoR ?? "SLOT", tt);
+        const mid = { x: (pL.x + pR.x) / 2, y: Math.min(pL.y, pR.y, yUp(36)) };
+        return approach(start, mid, 0.25, 0.65);
+      }
+      if (id === "WILL" || id === "SAM") {
+        // hook/cut—relate to nearest underneath on your side
+        const mySide: "left" | "right" =
+          id === "SAM" ? (sr ? "left" : "right") : (sr ? "right" : "left");
+
+        const sideFilter = (p: Pt) => (mySide === "left" ? p.x < QB.x : p.x >= QB.x);
+        const threats = (["X","Z","SLOT","TE","RB"] as ReceiverID[])
+          .map(r => ({ id: r, p: wrPos(r, tt) }))
+          .filter(w => sideFilter(w.p));
+        const nearest = threats.sort((a,b) =>
+          (a.p.x - anchor.x)**2 + (a.p.y - anchor.y)**2 - ((b.p.x - anchor.x)**2 + (b.p.y - anchor.y)**2)
+        )[0]?.p ?? anchor;
+
+        const toHook = approach(start, anchor, 0.20, 0.55);
+        return approach(toHook, nearest, 0.0, 0.25);
+      }
+    }
+
+    // fallback: settle toward anchor
+    return approach(start, anchor, 0.2, 0.5);
+  }
+
+  /* ================= PURE ZONE ================= */
+  if (ZONE_COVERAGES.has(cover)) {
+    let p = approach(start, anchor, 0.35, 0.6);
+
+    const threats = (["X","Z","SLOT","TE","RB"] as ReceiverID[]).map(r => ({ id: r, p: wrPos(r, tt) }));
+    const nearest = threats.reduce((best, cur) =>
+      ((cur.p.x - anchor.x)**2 + (cur.p.y - anchor.y)**2) <
+      ((best.p.x - anchor.x)**2 + (best.p.y - anchor.y)**2) ? cur : best, threats[0]);
+    const near = Math.hypot(nearest.p.x - anchor.x, nearest.p.y - anchor.y) < xAcross(18);
+
+    // SS in C3: cap depth ~28
+    if (cover === "C3" && id === "SS") {
+      const s = near ? approach(p, nearest.p, 0.0, 0.45) : p;
+      return { x: s.x, y: Math.max(s.y, yUp(28)) };
+    }
+
+    // keep outside 1/3 or 1/4 players high
+    if ((cover === "C3" || cover === "C4") && (id === "CB_L" || id === "CB_R")) {
+      return p;
+    }
+
+    return near ? approach(p, nearest.p, 0.0, 0.45) : p;
+  }
+
+  /* ================= MATCH / PATTERN-READ ================= */
+  if (MATCH_COVERAGES.has(cover)) {
+    let p = approach(start, anchor, 0.35, 0.6);
+    const twoStrong = wrPos(sr ? (right2() ?? "SLOT") : (left2() ?? "SLOT"), tt);
+    const oneStrong = wrPos(sr ? (right1() ?? "Z") : (left1() ?? "X"), tt);
+    const twoWeak   = wrPos(!sr ? (right2() ?? "SLOT") : (left2() ?? "SLOT"), tt);
+    const oneWeak   = wrPos(!sr ? (right1() ?? "Z") : (left1() ?? "X"), tt);
+
+    const isVert = (pt: Pt) => pt.y < yUp(30);
+
+    if (cover === "QUARTERS") {
+      if (id === "CB_L") return approach(p, wrPos(left1() ?? "X", tt), 0.10, 0.55);
+      if (id === "CB_R") return approach(p, wrPos(right1() ?? "Z", tt), 0.10, 0.55);
+
+      if (id === "SS" || id === "FS") {
+        const tgt2 = id === "SS" ? (sr ? twoStrong : twoWeak) : (sr ? twoWeak : twoStrong);
+        if (isVert(tgt2)) return approach(p, tgt2, 0.05, 0.45);
+        const tgt1 = id === "SS" ? (sr ? oneStrong : oneWeak) : (sr ? oneWeak : oneStrong);
+        const mid = { x: (tgt1.x + tgt2.x)/2, y: (tgt1.y + tgt2.y)/2 };
+        return approach(p, mid, 0.05, 0.30);
+      }
+
+      if (id === "NICKEL" || id === "MIKE" || id === "SAM" || id === "WILL") {
+        const three = wrPos("RB", tt);
+        const myTwo = (id === "NICKEL" || (id === "SAM" && !sr) || (id === "WILL" && sr)) ? twoStrong : twoWeak;
+        const mid = { x: (myTwo.x + three.x)/2, y: (myTwo.y + three.y)/2 };
+        return approach(p, mid, 0.05, 0.35);
+      }
+      return p;
+    }
+
+    if (cover === "PALMS") {
+      if ((id === "SS" && sr) || (id === "FS" && !sr)) {
+        if (isVert(twoStrong)) p = approach(p, twoStrong, 0.0, 0.40);
+      }
+      if ((id === "CB_R" && sr) || (id === "CB_L" && !sr)) {
+        if (!isVert(twoStrong)) p = approach(p, oneStrong, 0.0, 0.35);
+      }
+      return p;
+    }
+
+    if (cover === "C6") {
+      if ((id === "SS" && sr) || (id === "FS" && !sr)) {
+        if (isVert(twoStrong)) p = approach(p, twoStrong, 0.0, 0.35);
+      }
+      return p;
+    }
+
+    if (cover === "C9") {
+      if ((id === "CB_R" && sr) || (id === "CB_L" && !sr)) {
+        p = approach(p, oneStrong, 0.0, 0.38);
+      }
+      return p;
+    }
+
+    return p;
+  }
+
+  // Fallback
+  return approach(start, anchor, 0.3, 0.5);
+}
+
+  /** ---------- AI grader ---------- */
   async function gradeDecision(to: ReceiverID) {
     try {
       const res = await fetch("/api/football-grade", {
@@ -563,79 +1144,138 @@ export default function PlaySimulator({
     }
   }
 
-  // ---------- Ball flight + sounds (typed; no `any`) ----------
+  // ---------- Ball flight + sounds ----------
+  const playWhistle = useCallback((volume = 0.12) => {
+    const Ctx = getAudioCtor();
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(2000, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.6);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.65);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.66);
+  }, []);
 
-const playWhistle = useCallback((volume = 0.12) => {
-  const Ctx = getAudioCtor();
-  if (!Ctx) return;
-  const ctx = new Ctx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(2000, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.6);
-  gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.65);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.66);
-}, []);
+  const playCatchPop = useCallback((volume = 0.12) => {
+    const Ctx = getAudioCtor();
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(300, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.09);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  }, []);
 
-const playCatchPop = useCallback((volume = 0.12) => {
-  const Ctx = getAudioCtor();
-  if (!Ctx) return;
-  const ctx = new Ctx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "square";
-  osc.frequency.setValueAtTime(300, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.08);
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.09);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.1);
-}, []);
+  function applyAudible() {
+    if (!audibleOn || !audTarget || !audRoute) return;
+    setManualAssignments(prev => ({ ...prev, [audTarget]: audRoute }));
+    // Reset the rep to pre-snap so the change takes effect
+    setPhase("pre"); setT(0); setDecision(null); setGrade(null); setExplain(null);
+    setBallFlying(false); setBallT(0); setCatchAt(null);
+}
+
+    function clearAudibles() {
+        if (!hasAudibles && !audTarget && !audRoute) return;
+        setManualAssignments({});
+        setAudTarget(""); setAudRoute(""); setAudibleOn(false);
+        // Reset to pre-snap
+        setPhase("pre"); setT(0); setDecision(null); setGrade(null); setExplain(null);
+        setBallFlying(false); setBallT(0); setCatchAt(null);
+}
+
+function startSnap() {
+  // fully reset the rep to pre-snap, then start the clock
+  setT(0);
+  setDecision(null);
+  setGrade(null);
+  setExplain(null);
+  setBallFlying(false);
+  setBallT(0);
+  setCatchAt(null);
+  setCaught(false);
+  setCatchAt(null);
+  setBallT(0);
+  setThrowMeta(null);
+
+  // ensure defenders render from Dstart at t=0 before motion
+  setPhase("pre");
+  // next microtask -> enter "post" so the RAF timer effect starts fresh
+  queueMicrotask(() => setPhase("post"));
+}
+
+function hardReset() {
+  // go back to pre-snap and leave it there
+  setPhase("pre");
+  setT(0);
+  setDecision(null);
+  setGrade(null);
+  setExplain(null);
+  setBallFlying(false);
+  setBallT(0);
+  setCatchAt(null);
+  setCaught(false);
+  setCatchAt(null);
+  setBallT(0);
+  setThrowMeta(null);
+
+}
 
   function startThrow(to: ReceiverID) {
-    const tgt = offenseActors.find(a => a.id === to)!;
-    const p2 = posOnPath(tgt.path, t);
+    const path = O[to];
+    if (!path || path.length === 0 || ballFlying) return;
+
+    const p2 = posOnPathLenScaled(path, Math.min(1, t * recSpeed));
     const p0 = { ...QB };
     const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
     const arc = Math.min(80, Math.max(40, dist(p0, p2) * 0.15));
-    const p1 = { x: mid.x, y: mid.y - arc }; // arc upward
+    const p1 = { x: mid.x, y: mid.y - arc };
+
+    // Estimate a realistic flight time and convert to play-time fraction
+    const flightMs = Math.min(1400, Math.max(600, dist(p0, p2) * 2.2));
+    const frac = Math.min(0.6, Math.max(0.2, flightMs / PLAY_MS));
 
     setBallP0(p0); setBallP1(p1); setBallP2(p2);
-    setBallT(0); setCatchAt(null);
-    setBallFlying(true);
+    setBallT(0);
+    setCatchAt(null);
     setDecision(to);
+    setBallFlying(true);
+    setThrowMeta({ p0, p1, p2, tStart: t, frac });
+    setCaught(false);
     if (soundOn) playWhistle();
-    void gradeDecision(to);
-  }
+    }
 
-  const ballRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!ballFlying) return;
-    const d = dist(ballP0, ballP2);
-    const dur = Math.min(1400, Math.max(600, d * 2.2));
-    const t0 = performance.now();
-    const tick = (now: number) => {
-        const u = Math.min(1, (now - t0) / dur);
-        const eased = u < 0.5 ? 2*u*u : -1 + (4 - 2*u)*u;
+    useEffect(() => {
+        if (!ballFlying || !throwMeta) return;
+
+        // progress along the throw based on play-time, not another RAF
+        const rel = Math.max(0, Math.min(1, (t - throwMeta.tStart) / throwMeta.frac));
+        const eased = rel < 0.5 ? 2 * rel * rel : -1 + (4 - 2 * rel) * rel;
         setBallT(eased);
-        if (u < 1) ballRef.current = requestAnimationFrame(tick);
-        else {
-        setBallFlying(false);
-        setCatchAt(ballP2);
-        if (soundOn) playCatchPop(); // 👍 stable callback
-        setPhase("decided");
-        }
-    };
-    ballRef.current = requestAnimationFrame(tick);
-    return () => { if (ballRef.current) cancelAnimationFrame(ballRef.current); };
-    }, [ballFlying, ballP0, ballP2, soundOn, playCatchPop]);
 
+        if (rel >= 1 && ballFlying) {
+            // Finish the throw; DO NOT change the play phase here
+            setBallFlying(false);
+            setCatchAt(throwMeta.p2);
+            setThrowMeta(null);
+            setCaught(true);
+            if (soundOn) playCatchPop();
+
+            // Optional: grade on catch (avoids any throw-start jank)
+            if (decision) void gradeDecision(decision);
+        }
+        }, [t, ballFlying, throwMeta, soundOn, playCatchPop, decision]);
 
   /** ---------- Field drawing ---------- */
   const drawField = () => {
@@ -663,50 +1303,29 @@ const playCatchPop = useCallback((volume = 0.12) => {
       }
       return <>{marks}</>;
     };
-    // inside drawField()
     const YardNumbers = () => {
-    const nums: JSX.Element[] = [];
-    const leftX = xAcross(6.5);
-    const rightX = PX_W - xAcross(6.5);
-
-    // One label per 10 yards on each sideline
-    for (let y = 20; y <= 100; y += 10) {
+      const nums: JSX.Element[] = [];
+      const leftX = xAcross(6.5);
+      const rightX = PX_W - xAcross(6.5);
+      for (let y = 20; y <= 100; y += 10) {
         const yy = yUp(y);
         const label = y <= 60 ? y - 10 : 110 - y;
         nums.push(
-        <text
-            key={`nL-${y}`}
-            x={leftX}
-            y={yy + 6}
-            fill="rgba(255,255,255,0.9)"
-            stroke="rgba(0,0,0,0.6)"
-            strokeWidth={2}
-            style={{ paintOrder: "stroke" }}
-            fontSize={18}
-            textAnchor="middle"
-            dominantBaseline="middle"
-        >
+          <text key={`nL-${y}`} x={leftX} y={yy + 6} fill="rgba(255,255,255,0.9)"
+                stroke="rgba(0,0,0,0.6)" strokeWidth={2} style={{ paintOrder: "stroke" }}
+                fontSize={18} textAnchor="middle" dominantBaseline="middle">
             {label}
-        </text>
+          </text>
         );
         nums.push(
-        <text
-            key={`nR-${y}`}
-            x={rightX}
-            y={yy + 6}
-            fill="rgba(255,255,255,0.9)"
-            stroke="rgba(0,0,0,0.6)"
-            strokeWidth={2}
-            style={{ paintOrder: "stroke" }}
-            fontSize={18}
-            textAnchor="middle"
-            dominantBaseline="middle"
-        >
+          <text key={`nR-${y}`} x={rightX} y={yy + 6} fill="rgba(255,255,255,0.9)"
+                stroke="rgba(0,0,0,0.6)" strokeWidth={2} style={{ paintOrder: "stroke" }}
+                fontSize={18} textAnchor="middle" dominantBaseline="middle">
             {label}
-        </text>
+          </text>
         );
-    }
-    return <>{nums}</>;
+      }
+      return <>{nums}</>;
     };
 
     return (
@@ -724,7 +1343,11 @@ const playCatchPop = useCallback((volume = 0.12) => {
         <rect x={0} y={0} width={PX_W} height={PX_H} fill="url(#turfV)" rx={12}/>
         {Array.from({ length: FIELD_LENGTH_YDS / 5 }, (_, i) => {
           const y = yUp(i * 5);
-          return <rect key={`stripe-${i}`} x={0} y={yUp((i+1)*5)} width={PX_W} height={y - yUp((i+1)*5)} fill={i % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent"}/>;
+          return (
+            <rect key={`stripe-${i}`}
+                  x={0} y={yUp((i+1)*5)} width={PX_W} height={y - yUp((i+1)*5)}
+                  fill={i % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent"}/>
+          );
         })}
         <rect x={0} y={yUp(10)} width={PX_W} height={PX_H - yUp(10)} fill="rgba(255,255,255,0.03)" />
         <rect x={0} y={yUp(120)} width={PX_W} height={yUp(110) - yUp(120)} fill="rgba(255,255,255,0.03)" />
@@ -763,7 +1386,11 @@ const playCatchPop = useCallback((volume = 0.12) => {
     }
   }
 
-  const throwButtons: ReceiverID[] = ["X","Z","SLOT","TE","RB"];
+  const throwButtons = useMemo<ReceiverID[]>(() => {
+  const base: ReceiverID[] = ["X","Z","SLOT","TE","RB"];
+  return base.filter(id => !(id === "TE" && teBlock) && !(id === "RB" && rbBlock));
+}, [teBlock, rbBlock]);
+
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-3 md:p-4 backdrop-blur-lg">
@@ -792,62 +1419,72 @@ const playCatchPop = useCallback((volume = 0.12) => {
         <svg viewBox={`0 0 ${PX_W} ${PX_H}`} className="w-full rounded-xl">
           {drawField()}
 
+          {/* Route paths (offense) */}
+          <g fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={2}>
+            {offenseActors.map(a => (
+              <polyline key={`rp-${a.id}`} points={a.path.map(pt => `${pt.x},${pt.y}`).join(" ")} />
+            ))}
+          </g>
+
           {/* QB */}
           <circle cx={QB.x} cy={QB.y} r={7} fill="#fbbf24"/>
           <text x={QB.x + 10} y={QB.y + 4} className="fill-white/85 text-[10px]">QB</text>
 
           {/* Offense with (#n strong/weak) labels */}
           {offenseActors.map(a => {
-            const p = posOnPath(a.path, t);
+            const p = wrPosSafe(a.id as ReceiverID, t);
             const nr = numbering[a.id as ReceiverID];
             const badge = nr ? ` (#${nr.number} ${nr.band})` : "";
             const { dx, dy } = labelOffsetFor(a.id, p);
-
             return (
-                <g key={a.id}>
+              <g key={a.id}>
                 <circle cx={p.x} cy={p.y} r={6} fill={a.color}/>
-                <text
-                    x={p.x + dx}
-                    y={p.y + dy}
-                    className="text-[9px]"
-                    fill="rgba(255,255,255,0.95)"
-                    stroke="rgba(0,0,0,0.7)"
-                    strokeWidth={2}
-                    style={{ paintOrder: "stroke" }}
-                >
-                    {a.id}{badge}
+                <text x={p.x + dx} y={p.y + dy}
+                      className="text-[9px]" fill="rgba(255,255,255,0.95)"
+                      stroke="rgba(0,0,0,0.7)" strokeWidth={2} style={{ paintOrder: "stroke" }}>
+                  {a.id}{badge}
                 </text>
-                </g>
+    {/* Show a small pass-pro badge when TE/RB are blocking */}
+        {((a.id === "TE" && teBlock) || (a.id === "RB" && rbBlock)) && (
+            <text
+            x={p.x}
+            y={p.y - 12}
+            className="text-[8px]"
+            fill="rgba(255,255,255,0.95)"
+            stroke="rgba(0,0,0,0.7)"
+            strokeWidth={2}
+            style={{ paintOrder: "stroke" }}
+            textAnchor="middle"
+            >
+            PRO
+            </text>
+        )}
+
+              </g>
             );
-            })}
+          })}
 
-          {/* Defense */}
-          {defenseActors.map(d => {
-            const p = posOnPath(d.path, t);
-            const { dx, dy } = labelOffsetFor(d.id, p);
-
+          {/* Defense (computed live) */}
+          {DEFENDER_IDS.map(id => {
+            const p = defenderPos(coverage, id, t);
+            const { dx, dy } = labelOffsetFor(id, p);
             return (
-                <g key={d.id}>
+              <g key={id}>
                 <rect x={p.x - 6} y={p.y - 6} width={12} height={12} fill="#ef4444" opacity={0.95}/>
-                <text
-                    x={p.x + dx}
-                    y={p.y + dy}
-                    className="text-[9px]"
-                    fill="rgba(255,255,255,0.95)"
-                    stroke="rgba(0,0,0,0.7)"
-                    strokeWidth={2}
-                    style={{ paintOrder: "stroke" }}
-                >
-                    {d.id}
+                <text x={p.x + dx} y={p.y + dy}
+                      className="text-[9px]" fill="rgba(255,255,255,0.95)"
+                      stroke="rgba(0,0,0,0.7)" strokeWidth={2} style={{ paintOrder: "stroke" }}>
+                  {id}
                 </text>
-                </g>
+              </g>
             );
-            })}
+          })}
 
           {/* Ball path & ball */}
           {ballFlying && (
             <>
-              <path d={`M ${ballP0.x} ${ballP0.y} Q ${ballP1.x} ${ballP1.y} ${ballP2.x} ${ballP2.y}`} stroke="rgba(255,255,255,0.6)" strokeDasharray="6 6" fill="none"/>
+              <path d={`M ${ballP0.x} ${ballP0.y} Q ${ballP1.x} ${ballP1.y} ${ballP2.x} ${ballP2.y}`}
+                    stroke="rgba(255,255,255,0.6)" strokeDasharray="6 6" fill="none"/>
               {(() => {
                 const bp = qBezier(ballP0, ballP1, ballP2, ballT);
                 return <circle cx={bp.x} cy={bp.y} r={5} fill="#f59e0b" stroke="white" strokeWidth={1}/>;
@@ -865,44 +1502,193 @@ const playCatchPop = useCallback((volume = 0.12) => {
         </svg>
 
         {/* Controls */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {phase !== "post" ? (
-            <button onClick={() => setPhase("post")} className="px-3 py-2 rounded-xl bg-emerald-500/90 text-white">Snap</button>
-          ) : (
-            <button
-              onClick={() => {
-                setPhase("pre"); setT(0); setDecision(null);
-                setGrade(null); setExplain(null);
-                setBallFlying(false); setBallT(0); setCatchAt(null);
-              }}
-              className="px-3 py-2 rounded-xl bg-white/10 text-white"
-            >
-              Reset
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+        {phase === "pre" ? (
+            <button onClick={startSnap}
+            className="px-3 py-2 rounded-xl bg-emerald-500/90 text-white">
+            Snap
             </button>
-          )}
-          <div className="flex items-center gap-2 ml-2">
+        ) : (
+            <button onClick={hardReset}
+            className="px-3 py-2 rounded-xl bg-white/10 text-white">
+            Reset
+            </button>
+        )}
+
+          <div className="flex items-center gap-2 ml-1">
             <span className="text-white/60 text-xs">Time</span>
-            <input type="range" min={0} max={100} value={Math.floor(t*100)} onChange={(e)=>setT(Number(e.target.value)/100)} disabled={ballFlying || phase!=="post"}/>
+            <input
+              type="range" min={0} max={100} value={Math.floor(t*100)}
+              onChange={(e)=>setT(Number(e.target.value)/100)}
+              disabled={ballFlying || phase!=="post"}
+            />
           </div>
+
+          {/* Speed sliders */}
+          <div className="flex items-center gap-2 ml-2">
+            <span className="text-white/60 text-xs">WR Speed</span>
+            <input
+              type="range" min={60} max={140} value={Math.round(recSpeed*100)}
+              onChange={(e)=>setRecSpeed(Number(e.target.value)/100)}
+              title={`${(recSpeed*100).toFixed(0)}%`}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-white/60 text-xs">DEF Speed</span>
+            <input
+              type="range" min={60} max={140} value={Math.round(defSpeed*100)}
+              onChange={(e)=>setDefSpeed(Number(e.target.value)/100)}
+              title={`${(defSpeed*100).toFixed(0)}%`}
+            />
+          </div>
+
           <label className="ml-auto flex items-center gap-2 text-white/70 text-xs">
             <input type="checkbox" checked={soundOn} onChange={()=>setSoundOn(s=>!s)}/> Sound
           </label>
         </div>
 
-        {/* Throw targets */}
-        <div className="mt-2 flex flex-wrap gap-2">
-          {throwButtons.map(to => (
-            <button
-              key={to}
-              disabled={!throwEnabled}
-              onClick={() => startThrow(to)}
-              className={`px-3 py-2 rounded-xl ${throwEnabled ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500" : "bg-white/10"} text-white disabled:opacity-50`}
-              title={throwEnabled ? "Make your read & throw" : "Wait for window"}
-            >
-              Throw: {to}
-            </button>
-          ))}
+        {/* Audible controls */}
+<div className="flex items-center gap-2 ml-2">
+  {audibleOn && (
+    <>
+      <select
+        className="bg-white/10 text-white text-xs rounded-md px-2 py-1"
+        value={audTarget}
+        onChange={e => setAudTarget(e.target.value as ReceiverID)}
+      >
+        <option value="">Receiver…</option>
+        {selectableReceivers.map(r => (
+          <option key={r} value={r}>{r}</option>
+        ))}
+      </select>
+
+      <select
+        className="bg-white/10 text-white text-xs rounded-md px-2 py-1"
+        value={audRoute}
+        onChange={e => setAudRoute(e.target.value as RouteKeyword)}
+      >
+        <option value="">Route…</option>
+        {ROUTE_MENU.map(r => (
+          <option key={r} value={r}>{r}</option>
+        ))}
+      </select>
+
+      <button
+        onClick={applyAudible}
+        className="px-2 py-1 text-xs rounded-md bg-amber-500/90 text-black font-semibold"
+        disabled={!audTarget || !audRoute}
+        title={!audTarget || !audRoute ? "Pick receiver and route" : "Apply audible"}
+      >
+        Apply
+      </button>
+    </>
+  )}
+</div>
+
+
+        {/* Pass-pro toggles */}
+        <div className="flex items-center gap-3 ml-2">
+        <label className="flex items-center gap-2 text-white/70 text-xs">
+            <input
+            type="checkbox"
+            checked={teBlock}
+            onChange={() => setTeBlock(v => !v)}
+            />
+            TE pass-pro
+        </label>
+        <label className="flex items-center gap-2 text-white/70 text-xs">
+            <input
+            type="checkbox"
+            checked={rbBlock}
+            onChange={() => setRbBlock(v => !v)}
+            />
+            RB pass-pro
+        </label>
         </div>
+
+
+        {/* Throw targets + Audible */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+        {/* Throw buttons */}
+        {throwButtons.map(to => {
+            const throwEnabled =
+            DECISION_POINTS.some(dp => Math.abs(t - dp) < 0.08) &&
+            phase === "post" && !ballFlying && !decision;
+            return (
+            <button
+                key={to}
+                disabled={!throwEnabled}
+                onClick={() => startThrow(to)}
+                className={`px-3 py-2 rounded-xl ${
+                throwEnabled
+                    ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500"
+                    : "bg-white/10"
+                } text-white disabled:opacity-50`}
+                title={throwEnabled ? "Make your read & throw" : "Wait for window"}
+            >
+                Throw: {to}
+            </button>
+            );
+        })}
+
+        {/* Big Audible toggle button */}
+        <button
+            onClick={() => setAudibleOn(v => !v)}
+            className={`ml-1 px-4 py-3 rounded-xl text-white font-semibold shadow
+                    ${audibleOn
+                        ? "bg-gradient-to-r from-amber-500 to-pink-500"
+                        : "bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:opacity-90"}`}
+            title="Toggle audible mode"
+        >
+            {audibleOn ? "Audible: ON" : "Audible"}
+        </button>
+
+        {/* Clear Audibles */}
+        <button
+            onClick={clearAudibles}
+            disabled={!hasAudibles && !audTarget && !audRoute}
+            className="px-4 py-3 rounded-xl text-white font-semibold bg-white/10 disabled:opacity-50"
+            title={hasAudibles ? "Clear all audibles" : "No audibles set"}
+        >
+            Clear Audibles
+        </button>
+
+        {/* Inline audible controls when enabled */}
+        {audibleOn && (
+            <div className="flex flex-wrap items-center gap-2 pl-1">
+            <select
+                className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
+                value={audTarget}
+                onChange={e => setAudTarget(e.target.value as ReceiverID)}
+            >
+                <option value="">Receiver…</option>
+                {selectableReceivers.map(r => (
+                <option key={r} value={r}>{r}</option>
+                ))}
+            </select>
+
+            <select
+                className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
+                value={audRoute}
+                onChange={e => setAudRoute(e.target.value as RouteKeyword)}
+            >
+                <option value="">Route…</option>
+                {ROUTE_MENU.map(r => (
+                <option key={r} value={r}>{r}</option>
+                ))}
+            </select>
+
+            <button
+                onClick={applyAudible}
+                disabled={!audTarget || !audRoute}
+                className="px-3 py-2 rounded-xl bg-amber-400 text-black font-semibold disabled:opacity-60"
+            >
+                Apply
+            </button>
+            </div>
+        )}
+        </div>
+
 
         {/* Result + audible note */}
         {(decision || grade || explain || audibleNote) && (
@@ -921,3 +1707,4 @@ const playCatchPop = useCallback((volume = 0.12) => {
     </div>
   );
 }
+
