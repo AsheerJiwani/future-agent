@@ -58,4 +58,5 @@ export type Concept = {
   commonMistakes?: string[];
   sources?: { title: string; url: string }[];
   diagram?: Diagram;
+  coachingPoints?: string[];
 };

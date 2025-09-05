@@ -2,6 +2,7 @@
   "id": "Y_CROSS",
   "name": "Y-Cross",
   "family": "Dropback",
+  "diagram": { "assignments": { "TE":"OVER", "X":"POST", "Z":"CURL", "SLOT":"FLAT", "RB":"CHECK" } },
   "bestInto": ["C3", "C1", "QUARTERS"],
   "weakInto": ["C2"],
   "personnel": ["11", "12"],

@@ -2,6 +2,7 @@
   "id": "FOUR_VERTS",
   "name": "Four Verticals (Seam Read)",
   "family": "Dropback",
+  "diagram": { "assignments": { "X":"GO", "Z":"GO", "SLOT":"BENDER", "TE":"SEAM", "RB":"CHECK" } },
   "bestInto": ["C3", "C1", "C2"],
   "weakInto": ["QUARTERS"],
   "personnel": ["10", "11"],

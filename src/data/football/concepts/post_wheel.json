@@ -2,6 +2,7 @@
   "id": "POST_WHEEL",
   "name": "Post-Wheel",
   "family": "Dropback",
+  "diagram": { "assignments": { "SLOT":"WHEEL", "X":"POST", "Z":"COMEBACK", "TE":"CURL", "RB":"FLAT" } },
   "bestInto": ["C3", "C1"],
   "weakInto": ["C2", "PALMS"],
   "personnel": ["10", "11"],

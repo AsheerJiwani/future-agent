@@ -2,15 +2,7 @@
   "id": "MESH",
   "name": "Mesh",
   "family": "Dropback",
-  "diagram": {
-  "assignments": {
-    "X": "CROSS",
-    "Z": "DIG",
-    "SLOT": "CROSS",
-    "TE": "SEAM",
-    "RB": "CHECK"
-  }
-},
+  "diagram": { "assignments": { "X":"SHALLOW", "SLOT":"SHALLOW", "Z":"DIG", "TE":"CORNER", "RB":"CHECK" } },
   "bestInto": ["C1", "C0", "C3"],
   "weakInto": ["C2"],
   "personnel": ["10", "11"],

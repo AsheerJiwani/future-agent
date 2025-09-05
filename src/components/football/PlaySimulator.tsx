@@ -5,6 +5,17 @@ import type { FootballConceptId } from "../../data/football/catalog";
 import type { CoverageID, Concept } from "../../data/football/types";
 import { loadConcept } from "../../data/football/loadConcept";
 
+interface AudioWindow extends Window {
+  AudioContext: { new(contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext; } | undefined;
+  webkitAudioContext?: typeof AudioContext;
+}
+function getAudioCtor(): typeof AudioContext | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as AudioWindow;
+  return w.AudioContext ?? w.webkitAudioContext;
+}
+
+
 /** ---------- Field geometry (vertical orientation) ---------- */
 const FIELD_LENGTH_YDS = 120;
 const FIELD_WIDTH_YDS = 53.333333;
@@ -29,8 +40,12 @@ export type ReceiverID = "X" | "Z" | "SLOT" | "TE" | "RB";
 type DefenderID = "CB_L" | "CB_R" | "NICKEL" | "FS" | "SS" | "SAM" | "MIKE" | "WILL";
 
 export type RouteKeyword =
-  | "HITCH" | "OUT" | "CORNER" | "FLAT" | "DIG"
-  | "POST" | "CROSS" | "SEAM" | "CHECK" | "STICK";
+  | "GO" | "SEAM" | "BENDER"
+  | "HITCH" | "OUT" | "SPEED_OUT" | "COMEBACK" | "CURL"
+  | "DIG" | "POST" | "CORNER"
+  | "CROSS" | "OVER" | "SHALLOW" | "SLANT"
+  | "FLAT" | "WHEEL"
+  | "CHECK" | "STICK";
 
 type Pt = { x: number; y: number };
 type Actor = { id: string; color: string; path: Pt[] };
@@ -85,21 +100,75 @@ function labelOffsetFor(id: string, p: {x:number; y:number}): { dx: number; dy: 
 }
 
 /** ---------- Route library ---------- */
+/** ---------- Route library (depths in yards via yUp) ---------- */
+// helper: +1 to right, -1 to left of QB
+const sideSign = (start: Pt) => (start.x < QB.x ? +1 : -1);
+// clamp toward sideline for outside landmark
+const sidelineX = (start: Pt, off = 4) =>
+  start.x < QB.x ? xAcross(4 + off) : xAcross(FIELD_WIDTH_YDS - (4 + off));
+// hash marks
+const HASH_L = xAcross(HASH_FROM_SIDELINE_YDS);
+const HASH_R = xAcross(FIELD_WIDTH_YDS - HASH_FROM_SIDELINE_YDS);
+// opposite hash for crosses
+const oppositeHashX = (start: Pt) => (start.x < QB.x ? HASH_R : HASH_L);
+
 const R = {
-  HITCH: (start: Pt): Pt[] => [start, { x: start.x, y: yUp(21) }],
-  OUT:   (start: Pt): Pt[] => [start, { x: start.x + (start.x < QB.x ? xAcross(6) : -xAcross(6)), y: yUp(22) }],
-  CORNER:(start: Pt): Pt[] => [start, { x: start.x + (start.x < QB.x ? xAcross(18) : -xAcross(18)), y: yUp(35) }],
-  FLAT:  (start: Pt): Pt[] => [start, { x: start.x + (start.x < QB.x ? xAcross(8) : -xAcross(8)),  y: yUp(18) }],
-  DIG:   (start: Pt): Pt[] => [start, { x: QB.x + (start.x < QB.x ? xAcross(8) : -xAcross(8)),    y: yUp(28) }],
-  POST:  (start: Pt): Pt[] => [start, { x: QB.x, y: yUp(40) }],
-  CROSS: (start: Pt): Pt[] => [start, { x: QB.x + (start.x < QB.x ? xAcross(15) : -xAcross(15)),  y: yUp(26) }],
-  SEAM:  (start: Pt): Pt[] => [start, { x: start.x, y: yUp(36) }],
-  CHECK: (start: Pt): Pt[] => [start, { x: start.x + (start.x < QB.x ? xAcross(4) : -xAcross(4)), y: yUp(17) }],
-  STICK: (start: Pt): Pt[] => [start, { x: start.x + (start.x < QB.x ? xAcross(3.5) : -xAcross(3.5)), y: yUp(21) }]
+  // Verticals
+  GO:     (s: Pt): Pt[] => [s, { x: s.x, y: yUp(42) }],
+  SEAM:   (s: Pt): Pt[] => [s, { x: s.x, y: yUp(40) }],
+  BENDER: (s: Pt, twoHigh: boolean): Pt[] => {
+    // bend into/open away from MOF based on shell
+    if (twoHigh) return [s, { x: QB.x, y: yUp(42) }];           // split safeties
+    return [s, { x: s.x, y: yUp(38) }];                          // stay on seam vs MOFC
+  },
+
+  // Quick / intermediate
+  HITCH:     (s: Pt): Pt[] => [s, { x: s.x, y: yUp(21) }],       // ~5 yds
+  SPEED_OUT: (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(10), y: yUp(20) }], // 4–6
+  OUT:       (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(14), y: yUp(26) }], // 10–12
+  COMEBACK:  (s: Pt): Pt[] => [s, { x: sidelineX(s, 6), y: yUp(24) }],                 // 14–16 back to sideline
+  CURL:      (s: Pt): Pt[] => [s, { x: s.x, y: yUp(24) }],       // 10–12 settle
+  STICK:     (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(4), y: yUp(22) }],  // 6–8 turn out/in
+
+  // Intermediate crossers / deep breaks
+  DIG:       (s: Pt): Pt[] => [s, { x: QB.x + sideSign(s) * xAcross(10), y: yUp(30) }],  // 12–15 in
+  POST:      (s: Pt): Pt[] => [s, { x: QB.x, y: yUp(40) }],                               // 18–22 to MOF
+  CORNER:    (s: Pt): Pt[] => [s, { x: sidelineX(s, 10), y: yUp(36) }],                   // 18–22 to corner
+  OVER:      (s: Pt): Pt[] => [s, { x: oppositeHashX(s), y: yUp(28) }],                   // 12–18 over LB
+  CROSS:     (s: Pt): Pt[] => [s, { x: oppositeHashX(s), y: yUp(26) }],                   // mid cross
+  SHALLOW:   (s: Pt): Pt[] => [s, { x: oppositeHashX(s), y: yUp(18) }],                   // 3–5 across
+
+  // Back
+  FLAT:      (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(8), y: yUp(18) }],
+  WHEEL:     (s: Pt): Pt[] => [s, { x: sidelineX(s, 6), y: yUp(34) }],  // flat→up the sideline (approximated)
+  CHECK:     (s: Pt): Pt[] => [s, { x: s.x + sideSign(s) * xAcross(4), y: yUp(17) }]
 } as const;
 
-function routeFromKeyword(name: RouteKeyword, start: Pt): Pt[] {
-  return R[name](start);
+// Factory that can react to coverage (for benders, etc.)
+function routeFromKeyword(name: RouteKeyword, start: Pt, coverage: CoverageID): Pt[] {
+  const twoHigh = ["C2", "TAMPA2", "C4", "QUARTERS", "C6", "PALMS"].includes(coverage);
+  switch (name) {
+    case "BENDER":   return R.BENDER(start, twoHigh);
+    case "GO":       return R.GO(start);
+    case "SEAM":     return R.SEAM(start);
+    case "HITCH":    return R.HITCH(start);
+    case "SPEED_OUT":return R.SPEED_OUT(start);
+    case "OUT":      return R.OUT(start);
+    case "COMEBACK": return R.COMEBACK(start);
+    case "CURL":     return R.CURL(start);
+    case "STICK":    return R.STICK(start);
+    case "DIG":      return R.DIG(start);
+    case "POST":     return R.POST(start);
+    case "CORNER":   return R.CORNER(start);
+    case "OVER":     return R.OVER(start);
+    case "CROSS":    return R.CROSS(start);
+    case "SHALLOW":  return R.SHALLOW(start);
+    case "FLAT":     return R.FLAT(start);
+    case "WHEEL":    return R.WHEEL(start);
+    case "CHECK":    return R.CHECK(start);
+    case "SLANT":    return [start, { x: QB.x - sideSign(start) * xAcross(6), y: yUp(20) }];
+    default:         return [start, start];
+  }
 }
 
 /** ---------- Formation presets (fixed align) ---------- */
@@ -155,21 +224,70 @@ function computeNumbering(align: AlignMap): Numbering {
 }
 
 /** Defaults by concept family (when no assignments provided) */
-function buildOffenseRoutes(conceptId: FootballConceptId, A: AlignMap): RouteMap {
-  const id = (conceptId as string).toUpperCase();
-  if (["SAIL", "BOOT_FLOOD", "POST_WHEEL"].includes(id)) {
-    return { X: R.CORNER(A.X), Z: R.HITCH(A.Z), SLOT: R.FLAT(A.SLOT), TE: R.DIG(A.TE), RB: R.CHECK(A.RB) };
+/** ---------- Concept defaults (used when JSON lacks assignments) ---------- */
+function buildConceptRoutes(conceptId: FootballConceptId, A: AlignMap, coverage: CoverageID): RouteMap {
+  const ID = (conceptId as string).toUpperCase();
+
+  // helper to build w/ coverage-aware routes
+  const mk = (m: Partial<Record<ReceiverID, RouteKeyword>>): RouteMap => ({
+    X:    routeFromKeyword(m.X    ?? "HITCH",  A.X,    coverage),
+    Z:    routeFromKeyword(m.Z    ?? "HITCH",  A.Z,    coverage),
+    SLOT: routeFromKeyword(m.SLOT ?? "FLAT",   A.SLOT, coverage),
+    TE:   routeFromKeyword(m.TE   ?? "STICK",  A.TE,   coverage),
+    RB:   routeFromKeyword(m.RB   ?? "CHECK",  A.RB,   coverage)
+  });
+
+  switch (ID) {
+    case "FOUR_VERTS":
+      return mk({ X:"GO", Z:"GO", SLOT:"BENDER", TE:"SEAM", RB:"CHECK" });
+
+    case "SAIL":
+    case "BOOT_FLOOD":
+      // #1 clear (GO), #2 deep OUT ~12–15 (sail), #3 FLAT
+      return mk({ X:"GO", SLOT:"OUT", TE:"FLAT", Z:"COMEBACK", RB:"CHECK" });
+
+    case "MESH":
+      // shallow crossers + dig + corner/seam
+      return mk({ X:"SHALLOW", SLOT:"SHALLOW", Z:"DIG", TE:"CORNER", RB:"CHECK" });
+
+    case "STICK":
+    case "SPACING":
+    case "CURL_FLAT":
+      return mk({ X:"CURL", Z:"CURL", SLOT:"FLAT", TE:"STICK", RB:"FLAT" });
+
+    case "DAGGER":
+      // #2 seam clear, #1 15yd dig
+      return mk({ SLOT:"SEAM", X:"DIG", Z:"GO", TE:"CHECK", RB:"CHECK" });
+
+    case "Y_CROSS":
+      // Y over, frontside post, backside curl/flat
+      return mk({ TE:"OVER", X:"POST", Z:"CURL", SLOT:"FLAT", RB:"CHECK" });
+
+    case "SHALLOW":
+      // drive: shallow + dig + post clear
+      return mk({ SLOT:"SHALLOW", X:"DIG", Z:"POST", TE:"SEAM", RB:"CHECK" });
+
+    case "LEVELS":
+      // shallow + intermediate dig with sit/curl backside
+      return mk({ SLOT:"SHALLOW", X:"DIG", Z:"CURL", TE:"SEAM", RB:"CHECK" });
+
+    case "MILLS":
+      // post-dig shot
+      return mk({ X:"POST", SLOT:"DIG", Z:"GO", TE:"SEAM", RB:"CHECK" });
+
+    case "POST_WHEEL":
+      return mk({ SLOT:"WHEEL", X:"POST", Z:"COMEBACK", TE:"CURL", RB:"FLAT" });
+
+    case "SLANT_FLAT":
+      return mk({ X:"SLANT", SLOT:"FLAT", Z:"HITCH", TE:"STICK", RB:"CHECK" });
+
+    case "DRIVE":
+      return mk({ SLOT:"SHALLOW", X:"DIG", Z:"COMEBACK", TE:"SEAM", RB:"CHECK" });
+
+    default:
+      // vanilla balanced
+      return mk({ X:"COMEBACK", Z:"CURL", SLOT:"FLAT", TE:"DIG", RB:"CHECK" });
   }
-  if (["MESH", "SHALLOW", "Y_CROSS", "LEVELS"].includes(id)) {
-    return { X: R.CROSS(A.X), Z: R.DIG(A.Z), SLOT: R.CROSS(A.SLOT), TE: R.SEAM(A.TE), RB: R.CHECK(A.RB) };
-  }
-  if (["FOUR_VERTS", "MILLS"].includes(id)) {
-    return { X: R.POST(A.X), Z: R.SEAM(A.Z), SLOT: R.SEAM(A.SLOT), TE: R.DIG(A.TE), RB: R.CHECK(A.RB) };
-  }
-  if (["SPACING", "STICK", "CURL_FLAT", "SLANT_FLAT"].includes(id)) {
-    return { X: R.HITCH(A.X), Z: R.HITCH(A.Z), SLOT: R.FLAT(A.SLOT), TE: R.STICK(A.TE), RB: R.FLAT(A.RB) };
-  }
-  return { X: R.HITCH(A.X), Z: R.HITCH(A.Z), SLOT: R.FLAT(A.SLOT), TE: R.DIG(A.TE), RB: R.CHECK(A.RB) };
 }
 
 /** ---------- Defense (nickel) ---------- */
@@ -366,7 +484,7 @@ export default function PlaySimulator({
         RB:  diag.align?.RB  ?? F.RB
       };
 
-      const defaults = buildOffenseRoutes(conceptId, A);
+      const defaults = buildConceptRoutes(conceptId, A, coverage);
 
       const resolvedAssignments: AssignMap = {
         ...diag.assignments,
@@ -374,11 +492,11 @@ export default function PlaySimulator({
       };
 
       const routes: RouteMap = {
-        X:    diag.routes?.X    ?? (resolvedAssignments.X    ? routeFromKeyword(resolvedAssignments.X,    A.X)    : defaults.X),
-        Z:    diag.routes?.Z    ?? (resolvedAssignments.Z    ? routeFromKeyword(resolvedAssignments.Z,    A.Z)    : defaults.Z),
-        SLOT: diag.routes?.SLOT ?? (resolvedAssignments.SLOT ? routeFromKeyword(resolvedAssignments.SLOT, A.SLOT) : defaults.SLOT),
-        TE:   diag.routes?.TE   ?? (resolvedAssignments.TE   ? routeFromKeyword(resolvedAssignments.TE,   A.TE)   : defaults.TE),
-        RB:   diag.routes?.RB   ?? (resolvedAssignments.RB   ? routeFromKeyword(resolvedAssignments.RB,   A.RB)   : defaults.RB)
+        X:    diag.routes?.X    ?? (resolvedAssignments.X    ? routeFromKeyword(resolvedAssignments.X,    A.X,    coverage) : defaults.X),
+        Z:    diag.routes?.Z    ?? (resolvedAssignments.Z    ? routeFromKeyword(resolvedAssignments.Z,    A.Z,    coverage) : defaults.Z),
+        SLOT: diag.routes?.SLOT ?? (resolvedAssignments.SLOT ? routeFromKeyword(resolvedAssignments.SLOT, A.SLOT, coverage) : defaults.SLOT),
+        TE:   diag.routes?.TE   ?? (resolvedAssignments.TE   ? routeFromKeyword(resolvedAssignments.TE,   A.TE,   coverage) : defaults.TE),
+        RB:   diag.routes?.RB   ?? (resolvedAssignments.RB   ? routeFromKeyword(resolvedAssignments.RB,   A.RB,   coverage) : defaults.RB),
       };
 
       const def = buildDefensePaths(coverage, routes);
@@ -446,17 +564,6 @@ export default function PlaySimulator({
   }
 
   // ---------- Ball flight + sounds (typed; no `any`) ----------
-  interface AudioWindow extends Window {
-  AudioContext: { new(contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext; } | undefined;
-  webkitAudioContext?: typeof AudioContext;
-}
-type AudioCtor = typeof AudioContext | undefined;
-
-const getAudioCtor = (): AudioCtor => {
-  if (typeof window === "undefined") return undefined;
-  const w = window as AudioWindow;
-  return w.AudioContext ?? w.webkitAudioContext;
-};
 
 const playWhistle = useCallback((volume = 0.12) => {
   const Ctx = getAudioCtor();

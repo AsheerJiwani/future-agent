@@ -5,8 +5,12 @@ import OpenAI from "openai";
 type FormationName = "TRIPS_RIGHT" | "DOUBLES" | "BUNCH_LEFT";
 type ReceiverID = "X" | "Z" | "SLOT" | "TE" | "RB";
 type RouteKeyword =
-  | "HITCH" | "OUT" | "CORNER" | "FLAT" | "DIG"
-  | "POST" | "CROSS" | "SEAM" | "CHECK" | "STICK";
+  | "GO" | "SEAM" | "BENDER"
+  | "HITCH" | "OUT" | "SPEED_OUT" | "COMEBACK" | "CURL"
+  | "DIG" | "POST" | "CORNER"
+  | "CROSS" | "OVER" | "SHALLOW" | "SLANT"
+  | "FLAT" | "WHEEL"
+  | "CHECK" | "STICK";
 
 // ✅ use a type alias (mapped types aren't valid in interfaces)
 type Numbering = {
@@ -60,7 +64,15 @@ export async function POST(req: Request) {
     const validFormations: FormationName[] = ["TRIPS_RIGHT","DOUBLES","BUNCH_LEFT"];
     if (parsed.formation && !validFormations.includes(parsed.formation)) delete parsed.formation;
 
-    const validRoutes: RouteKeyword[] = ["HITCH","OUT","CORNER","FLAT","DIG","POST","CROSS","SEAM","CHECK","STICK"];
+    const validRoutes: RouteKeyword[] = [
+        "GO","SEAM","BENDER",
+        "HITCH","OUT","SPEED_OUT","COMEBACK","CURL",
+        "DIG","POST","CORNER",
+        "CROSS","OVER","SHALLOW","SLANT",
+        "FLAT","WHEEL",
+        "CHECK","STICK"
+        ];
+
     if (parsed.assignments) {
       const clean: Partial<Record<ReceiverID, RouteKeyword>> = {};
       (Object.keys(parsed.assignments) as ReceiverID[]).forEach((k) => {
