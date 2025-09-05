@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CoachChat from "./CoachChat";
+import type { PlaySnapshot, SnapMeta } from "@/types/play";
 import PlaySimulator from "./PlaySimulator";
 import { CONCEPTS, type FootballConceptId } from "../../data/football/catalog";
 import type { CoverageID } from "../../data/football/types";
@@ -26,6 +27,18 @@ export default function FootballPanel() {
   const [conceptId, setConceptId] = useState<FootballConceptId>(CONCEPTS[0].id);
   const [coverage, setCoverage] = useState<CoverageID>("C3");
   const [mode, setMode] = useState<"teach" | "quiz">("teach");
+  const [snapshot, setSnapshot] = useState<PlaySnapshot | undefined>(undefined);
+  const [snapMeta, setSnapMeta] = useState<SnapMeta | undefined>(undefined);
+
+  // Restore concept/coverage from URL (share links)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const c = sp.get("c");
+    const cov = sp.get("cov");
+    if (c && (CONCEPTS as unknown as Array<{id:string}>).some(x => x.id === c)) setConceptId(c as FootballConceptId);
+    if (cov) setCoverage(cov as CoverageID);
+  }, []);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-xl">
@@ -86,8 +99,15 @@ export default function FootballPanel() {
 
       {/* Side-by-side: Simulator + CoachChat */}
       <div className="grid lg:grid-cols-2 gap-4 mt-4">
-        <PlaySimulator conceptId={conceptId} coverage={coverage} />
-        <CoachChat conceptId={conceptId} coverage={coverage} mode={mode} />
+        <PlaySimulator
+          conceptId={conceptId}
+          coverage={coverage}
+          onSnapshot={(snap, meta) => {
+            setSnapshot(snap);
+            setSnapMeta(meta);
+          }}
+        />
+        <CoachChat conceptId={conceptId} coverage={coverage} mode={mode} snapshot={snapshot} snapMeta={snapMeta} />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { JSX, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { FootballConceptId } from "../../data/football/catalog";
 import type { CoverageID, ReceiverID, RouteKeyword, Pt, AlignMap } from "../../data/football/types";
+import type { PlaySnapshot, SnapMeta } from "@/types/play";
 import { usePlayClock } from "./hooks/usePlayClock";
 import { XorShift32, mixSeed } from "../../lib/rng";
 
@@ -54,11 +55,7 @@ type AssignMap = Partial<Record<ReceiverID, RouteKeyword>>;
 
 type FormationName = "TRIPS_RIGHT" | "DOUBLES" | "BUNCH_LEFT";
 
-interface AudibleSuggestion {
-  formation?: FormationName;
-  assignments?: AssignMap;
-  rationale?: string;
-}
+// (AudibleSuggestion interface removed; inline types are used where needed)
 
 /* --------- Math + sampling --------- */
 const qBezier = (p0: Pt, p1: Pt, p2: Pt, t: number): Pt => {
@@ -69,7 +66,6 @@ const qBezier = (p0: Pt, p1: Pt, p2: Pt, t: number): Pt => {
   };
 };
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
-const d2 = (a: Pt, b: Pt) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 const lerp = (a: Pt, b: Pt, t: number): Pt => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 const segLen = (a: Pt, b: Pt) => Math.hypot(b.x - a.x, b.y - a.y);
 
@@ -508,9 +504,11 @@ const ZONE_COVERAGES  = new Set<CoverageID>(["C2","TAMPA2","C3","C4"]);
 export default function PlaySimulator({
   conceptId,
   coverage,
+  onSnapshot,
 }: {
   conceptId: FootballConceptId;
   coverage: CoverageID;
+  onSnapshot?: (snap: PlaySnapshot, meta: SnapMeta) => void;
 }) {
   const [phase, setPhase] = useState<"pre" | "post" | "decided">("pre");
   const { t, setT, seek, start: startClock, stop: stopClock, reset: resetClock } = usePlayClock(3000);
@@ -560,7 +558,7 @@ export default function PlaySimulator({
   const [audTarget, setAudTarget] = useState<ReceiverID | "">("");
   const [audRoute, setAudRoute]   = useState<RouteKeyword | "">("");
 
-  const [caught, setCaught] = useState(false);
+  const [, setCaught] = useState(false);
 
   // Relative speed multipliers by position (realistic-ish deltas)
   function receiverSpeedMult(id: ReceiverID): number {
@@ -597,6 +595,23 @@ export default function PlaySimulator({
   useEffect(() => {
     rngRef.current = new XorShift32(mixSeed(rngSeed, playId));
   }, [rngSeed, playId]);
+
+  // Restore from URL (formation, audibles, block flags, seed, playId)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const f = sp.get('f');
+    if (f === 'TRIPS_RIGHT' || f === 'DOUBLES' || f === 'BUNCH_LEFT') setFormation(f as FormationName);
+    const as = sp.get('as');
+    if (as) {
+      try { const parsed = JSON.parse(decodeURIComponent(as)); setManualAssignments(parsed); } catch {}
+    }
+    const tb = sp.get('tb'); setTeBlock(!!tb);
+    const rb = sp.get('rb'); setRbBlock(!!rb);
+    const pid = sp.get('pid'); if (pid) setPlayId(Number(pid));
+    const sd = sp.get('seed'); if (sd) setRngSeed(Number(sd));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Openness metric per frame
   type OpenInfo = { score: number; sepYds: number; nearest: DefenderID | null };
@@ -658,7 +673,7 @@ export default function PlaySimulator({
     } else {
       stopClock();
     }
-  }, [phase]);
+  }, [phase, resetClock, startClock, stopClock]);
 
 
   // --- CB technique: normal, press on both, press only to strength
@@ -764,12 +779,67 @@ setCbPress({
     CB_L: { x: align[leftOuter].x,  y: L.outcome !== "NONE" ? yPress : yOff },
     CB_R: { x: align[rightOuter].x, y: R.outcome !== "NONE" ? yPress : yOff },
   }));
-}, [phase, coverage, align, numbering /* reads strongIsRight() */, cbTechnique]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [phase, coverage, align, numbering, cbTechnique]);
+
+  // Build AI payload helpers
+  function buildSnapshot(): import("@/types/play").PlaySnapshot {
+    return {
+      conceptId,
+      coverage,
+      formation,
+      align,
+      routes: O,
+      assignments: manualAssignments as any,
+      numbering: numbering as any,
+      recSpeed,
+      defSpeed,
+      rngSeed,
+      playId
+    };
+  }
+
+  function buildSnapMeta(): import("@/types/play").SnapMeta {
+    return {
+      press: {
+        CB_L: cbPress.CB_L,
+        CB_R: cbPress.CB_R,
+      },
+      blocks: {
+        blockedDefenders: Array.from(blockedDefenders),
+        teBlock,
+        rbBlock,
+      },
+      roles: {
+        blitzers: manExtraRoles.blitzers,
+        spy: manExtraRoles.spy ?? null,
+      },
+      leverage: levInfo,
+      leverageAdjust: levAdjust,
+    };
+  }
+
+  // Emit snapshot/meta to parent (for CoachChat) on relevant changes
+  useEffect(() => {
+    if (!onSnapshot) return;
+    try {
+      onSnapshot(buildSnapshot(), buildSnapMeta());
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conceptId, coverage, formation, align, O, cbPress, blockedDefenders, teBlock, rbBlock, levInfo, levAdjust, recSpeed, defSpeed, rngSeed, playId]);
 
   // --- AI Audible ---
   async function aiAudible() {
     try {
-      const payload = { conceptId, coverage, formation, assignments: manualAssignments, numbering };
+      const payload = {
+        conceptId,
+        coverage,
+        formation,
+        assignments: manualAssignments,
+        numbering: numbering as any,
+        snapshot: buildSnapshot(),
+        snapMeta: buildSnapMeta(),
+      };
       const res = await fetch("/api/football-audible", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -881,7 +951,8 @@ useEffect(() => {
     // expose leverage info for UI/AI
     setLevInfo(levMeta);
     setLevAdjust(adjMeta);
-  }, [formation, conceptId, coverage, teBlock, rbBlock, manualAssignments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formation, conceptId, coverage, teBlock, rbBlock, manualAssignments, setT]);
 
   useEffect(() => {
     if (phase !== "post") {
@@ -919,6 +990,7 @@ useEffect(() => {
     setBlockAssignments(assigns);
     setBlockedDefenders(blocked);
     setBlockEngage(engages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, teBlock, rbBlock, coverage, align, Dstart, O]);
 
   const DEFENDER_IDS: DefenderID[] = ["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"];
@@ -990,6 +1062,7 @@ useEffect(() => {
     const infoT = computeReceiverOpenness("TE", t);
     const infoR = computeReceiverOpenness("RB", t);
     setOpenness({ X: infoX, Z: infoZ, SLOT: infoS, TE: infoT, RB: infoR });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, phase, coverage, recSpeed, defSpeed, O, Dstart, blockedDefenders]);
 
 
@@ -1501,12 +1574,14 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           nearestSepYds: lastWindow?.info.sepYds ?? undefined,
           nearestDefender: lastWindow?.info.nearest ?? undefined,
           playId,
+          holdMs: Math.round(t * PLAY_MS),
         })
       });
       const data: { grade?: string; rationale?: string; coachingTip?: string } = await res.json();
       setGrade(data.grade ?? "OK");
       const detail = [data.rationale, data.coachingTip].filter(Boolean).join("  Tip: ");
       setExplain(detail || "Good rep.");
+      try { (window as any)?.plausible?.('ai_grade', { props: { grade: data.grade ?? 'OK' } }); } catch {}
     } catch {
       setGrade("OK");
       setExplain("Grader unavailable. Try again.");
@@ -1552,6 +1627,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     setManualAssignments(prev => ({ ...prev, [audTarget]: audRoute }));
     setPhase("pre"); setT(0); setDecision(null); setGrade(null); setExplain(null);
     setBallFlying(false); setBallT(0); setCatchAt(null);
+    try { (window as any)?.plausible?.('audible_apply', { props: { target: audTarget, route: audRoute } }); } catch {}
   }
 
   function clearAudibles() {
@@ -1575,6 +1651,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     // New deterministic roll for this play
     setPlayId((p) => p + 1);
     setRngSeed((s) => mixSeed(s, Date.now() >>> 0));
+    try { (window as any)?.plausible?.('snap', { props: { conceptId, coverage, formation } }); } catch {}
     // Log leverage context for AI
     setAiLog((log) => log.concat([{ playId: playId + 1, coverage, formation, leverage: levInfo, adjustments: levAdjust }]));
     setPhase("pre");
@@ -1623,6 +1700,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
   setThrowMeta({ p0, p1, p2, tStart: t, frac });
   setCaught(false);
   if (soundOn) playWhistle();
+  try { (window as any)?.plausible?.('throw', { props: { target: to, t: Number(t.toFixed(2)) } }); } catch {}
 }
 
   // Ball follows the single play clock (no extra RAF)
@@ -1641,6 +1719,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
       if (soundOn) playCatchPop();
       if (decision) void gradeDecision(decision);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, ballFlying, throwMeta, soundOn, playCatchPop, decision]);
 
   /** ---------- Field drawing ---------- */
@@ -1792,6 +1871,31 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           Simulator — {conceptId} vs {coverage}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => {
+              try {
+                const sp = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+                sp.set('c', String(conceptId));
+                sp.set('cov', String(coverage));
+                sp.set('f', String(formation));
+                if (Object.keys(manualAssignments).length) sp.set('as', encodeURIComponent(JSON.stringify(manualAssignments)));
+                if (teBlock) sp.set('tb', '1'); else sp.delete('tb');
+                if (rbBlock) sp.set('rb', '1'); else sp.delete('rb');
+                sp.set('pid', String(playId));
+                sp.set('seed', String(rngSeed >>> 0));
+                const url = `${window.location.pathname}?${sp.toString()}`;
+                void navigator.clipboard.writeText(`${window.location.origin}${url}`);
+                setAudibleNote('Copied shareable play link to clipboard.');
+                try { (window as any)?.plausible?.('share'); } catch {}
+              } catch {
+                setAudibleNote('Could not copy link.');
+              }
+            }}
+            className="px-2 py-1 text-xs rounded-md bg-indigo-600/80 text-white"
+            title="Copy a shareable link of this play"
+          >
+            Copy Play
+          </button>
           <label className="text-white/70 text-xs">Formation</label>
           <select
             value={formation}
@@ -1831,6 +1935,8 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
             const nr = numbering[rid];
             const badge = nr ? ` (#${nr.number} ${nr.band})` : "";
             const { dx, dy } = labelOffsetFor(rid, p);
+            const open = openness[rid]?.score ?? 0;
+            const hue = Math.round(120 * open); // 0=red, 120=green
             return (
               <g key={rid}>
                 <circle
@@ -1888,6 +1994,20 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
                   >
                     Lev: {levInfo[rid]?.side === 'outside' ? 'OUT' : levInfo[rid]?.side === 'inside' ? 'IN' : 'EVEN'}
                   </text>
+                )}
+                {phase === 'post' && (
+                  <circle
+                    cx={p.x}
+                    cy={p.y - 12}
+                    r={4}
+                    fill={`hsl(${hue} 80% 45%)`}
+                    stroke="rgba(255,255,255,0.8)"
+                    strokeWidth={1}
+                  >
+                    <title>
+                      {`Openness: ${(open*100).toFixed(0)}%  (nearest: ${openness[rid]?.nearest ?? '-'} @ ${(openness[rid]?.sepYds ?? 0).toFixed(1)} yds)`}
+                    </title>
+                  </circle>
                 )}
               </g>
             );

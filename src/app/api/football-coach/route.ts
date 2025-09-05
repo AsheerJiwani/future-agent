@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { loadConcept } from "@data/football/loadConcept";
 import type { FootballConceptId } from "@data/football/catalog";
 import type { CoverageID, Concept, ReadPlan, ProgressionStep } from "@data/football/types";
+import type { PlaySnapshot, SnapMeta } from "@/types/play";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -16,12 +17,14 @@ type Body = {
   mode?: "teach" | "quiz";
   history?: ChatMsg[];
   userState?: Record<string, unknown>;
+  snapshot?: PlaySnapshot;
+  snapMeta?: SnapMeta;
 };
 
 export async function POST(req: NextRequest) {
   try {
     const body: Body = await req.json();
-    const { conceptId, coverage, mode = "teach", history = [], userState } = body;
+    const { conceptId, coverage, mode = "teach", history = [], userState, snapshot, snapMeta } = body;
 
     const concept: Concept = await loadConcept(conceptId);
     const rp: ReadPlan | undefined = (concept.readPlans ?? []).find(
@@ -58,7 +61,24 @@ export async function POST(req: NextRequest) {
       `READ PLAN (focus on ${coverage}):\n${planText}\n` +
       `NOTES: ${rp?.notes ?? "(none)"}\n` +
       `HOT RULES: ${(rp?.hotRules ?? []).join("; ") || "(none)"}\n\n` +
-      `User State: ${JSON.stringify(userState ?? {})}`;
+      `User State: ${JSON.stringify(userState ?? {})}\n\n` +
+      (snapshot
+        ? `SNAPSHOT: ${JSON.stringify({
+            conceptId: snapshot.conceptId,
+            coverage: snapshot.coverage,
+            formation: snapshot.formation,
+            hasAssignments: !!snapshot.assignments,
+            playId: snapshot.playId,
+            rngSeed: snapshot.rngSeed
+          })}\n`
+        : "") +
+      (snapMeta
+        ? `SNAP META: ${JSON.stringify({
+            press: snapMeta.press,
+            roles: snapMeta.roles,
+            leverage: snapMeta.leverage
+          })}\n`
+        : "");
 
     const messages: ChatMsg[] = [system, { role: "user", content }, ...history];
 

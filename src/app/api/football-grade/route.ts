@@ -14,6 +14,16 @@ type Body = {
   coverage: CoverageID;
   target: string;
   time: number; // 0..1
+  // Optional richer context from the simulator
+  formation?: string;
+  assignments?: Partial<Record<string, string>>;
+  numbering?: Record<string, unknown>;
+  // Throw window metadata
+  windowScore?: number;
+  nearestSepYds?: number;
+  nearestDefender?: string;
+  playId?: number;
+  holdMs?: number;
 };
 
 type GradeJSON = {
@@ -25,7 +35,7 @@ type GradeJSON = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { conceptId, coverage, target, time }: Body = await req.json();
+    const { conceptId, coverage, target, time, formation, assignments, numbering, windowScore, nearestSepYds, nearestDefender, playId, holdMs }: Body = await req.json();
 
     const concept: Concept = await loadConcept(conceptId);
     const rp: ReadPlan | undefined = (concept.readPlans ?? []).find((r) => r.vs === coverage);
@@ -44,6 +54,16 @@ CONCEPT: ${concept.name} (${concept.id})
 COVERAGE: ${coverage}
 PLAY TIME: ${time.toFixed(2)} (0..1)
 TARGET CHOSEN: ${target}
+PLAY ID: ${playId ?? "(n/a)"}
+FORMATION: ${formation ?? "(n/a)"}
+ASSIGNMENTS: ${assignments ? JSON.stringify(assignments) : "(n/a)"}
+NUMBERING: ${numbering ? JSON.stringify(numbering) : "(n/a)"}
+
+THROW WINDOW (if provided):
+  windowScore: ${windowScore ?? "(n/a)"}
+  nearestDefender: ${nearestDefender ?? "(n/a)"}
+  nearestSepYds: ${nearestSepYds ?? "(n/a)"}
+  holdMs: ${holdMs ?? "(n/a)"}
 
 PRE-SNAP KEYS:
 ${pre || "- none"}
@@ -91,4 +111,3 @@ Return a strict JSON object:
     );
   }
 }
-

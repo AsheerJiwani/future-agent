@@ -2,17 +2,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { FootballConceptId } from "@data/football/catalog";
 import type { CoverageID } from "@data/football/types";
+import type { PlaySnapshot, SnapMeta } from "@/types/play";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
 export default function CoachChat({
   conceptId,
   coverage,
-  mode = "teach"
+  mode = "teach",
+  snapshot,
+  snapMeta
 }: {
   conceptId: FootballConceptId;
   coverage: CoverageID;
   mode?: "teach" | "quiz";
+  snapshot?: PlaySnapshot;
+  snapMeta?: SnapMeta;
 }) {
   const [history, setHistory] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -38,7 +43,9 @@ export default function CoachChat({
       history: [
         { role: "user", content: `User: ${userMsg}` },
         ...history
-      ]
+      ],
+      snapshot,
+      snapMeta
     };
     const res = await fetch("/api/football-coach", {
       method: "POST",

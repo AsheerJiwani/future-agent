@@ -1,6 +1,7 @@
 // src/app/api/football-audible/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import type { PlaySnapshot, SnapMeta } from "@/types/play";
 
 type FormationName = "TRIPS_RIGHT" | "DOUBLES" | "BUNCH_LEFT";
 type ReceiverID = "X" | "Z" | "SLOT" | "TE" | "RB";
@@ -23,6 +24,8 @@ interface Body {
   formation: FormationName;
   assignments?: Partial<Record<ReceiverID, RouteKeyword>>;
   numbering: Numbering;
+  snapshot?: PlaySnapshot;
+  snapMeta?: SnapMeta;
 }
 
 interface AudibleSuggestion {
@@ -44,7 +47,19 @@ export async function POST(req: Request) {
       coverage: body.coverage,
       formation: body.formation,
       assignments: body.assignments ?? {},
-      numbering: body.numbering
+      numbering: body.numbering,
+      snapshot: body.snapshot ? {
+        conceptId: body.snapshot.conceptId,
+        coverage: body.snapshot.coverage,
+        formation: body.snapshot.formation,
+        playId: body.snapshot.playId,
+        rngSeed: body.snapshot.rngSeed,
+      } : undefined,
+      snapMeta: body.snapMeta ? {
+        press: body.snapMeta.press,
+        roles: body.snapMeta.roles,
+        leverage: body.snapMeta.leverage
+      } : undefined
     };
 
     const resp = await client.chat.completions.create({
