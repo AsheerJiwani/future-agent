@@ -40,7 +40,7 @@ export default function HoopsChat() {
         ? "\n\nSources:\n" + data.sources.map(s => `• ${s.title} — ${s.url}`).join("\n")
         : "";
       setHistory([...next, { role: "assistant", content: `${data.answer}\n\n${data.follow_up}${sources}` }]);
-    } catch (e) {
+    } catch {
       setHistory([...next, { role: "assistant", content: "My bad—something glitched. Try again in a sec." }]);
     } finally {
       setLoading(false);

@@ -285,12 +285,6 @@ type Diagram = {
   routes: DiagramRoute[];
   coverage?: CoverageID;
 };
-type Concept = {
-  id: string; name: string; family: "Quick"|"Dropback"|"PlayAction"|"RPO";
-  bestInto: CoverageID[]; weakInto?: CoverageID[]; personnel: Personnel[]; formations: FormationFamily[];
-  tags?: string[]; preSnapKeys?: string[]; postSnapKeys?: string[]; footwork?: string;
-  readPlans: ReadPlan[]; commonMistakes?: string[]; sources?: { title: string; url: string }[]; diagram?: Diagram;
-};
 
 /* =========================================================
    =======================  PAGE  ==========================
