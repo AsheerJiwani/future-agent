@@ -490,6 +490,11 @@ export default function PlaySimulator({
     "SLANT","WHEEL","CHECK",
   ];
 
+  const canThrowNow = useMemo(
+  () => phase === "post" && !ballFlying && !decision && t < 0.999,
+  [phase, ballFlying, decision, t]
+);
+
   // Receivers available to audible (exclude blockers)
   const selectableReceivers = useMemo<ReceiverID[]>(
     () => (["X","Z","SLOT","TE","RB"] as ReceiverID[])
@@ -587,11 +592,6 @@ export default function PlaySimulator({
   }, [phase, teBlock, rbBlock, coverage, align, Dstart, O]);
 
   const DEFENDER_IDS: DefenderID[] = ["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"];
-
-  const throwEnabled = useMemo(
-    () => DECISION_POINTS.some((dp) => Math.abs(t - dp) < 0.08) && phase === "post" && !ballFlying && !decision,
-    [t, phase, ballFlying, decision]
-  );
 
   // Offense actors: simple array of {id, color, path} derived from the current routes O
   const offenseActors = useMemo<Actor[]>(() => ([
@@ -1101,30 +1101,33 @@ export default function PlaySimulator({
     setThrowMeta(null);
   }
 function startThrow(to: ReceiverID) {
-    const path = O[to];
-    if (!path || path.length === 0 || ballFlying) return;
+  // Blocked targets can’t receive throws
+  if ((to === "TE" && teBlock) || (to === "RB" && rbBlock)) return;
 
-    const p2 = posOnPathLenScaled(path, Math.min(1, t * recSpeed));
-    const p0 = { ...QB };
-    const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
-    const arc = Math.min(80, Math.max(40, dist(p0, p2) * 0.15));
-    const p1 = { x: mid.x, y: mid.y - arc };
+  // Only during the live snap, only one ball in the air, and before timer ends
+  if (phase !== "post" || ballFlying || t >= 0.999) return;
 
-    // Estimate a realistic flight time and convert to play-time fraction
-    const flightMs = Math.min(1400, Math.max(600, dist(p0, p2) * 2.2));
-    const frac = Math.min(0.6, Math.max(0.2, flightMs / PLAY_MS));
+  const path = O[to];
+  if (!path || path.length === 0) return;
 
-    setBallP0(p0);
-    setBallP1(p1);
-    setBallP2(p2);
-    setBallT(0);
-    setCatchAt(null);
-    setDecision(to);
-    setBallFlying(true);
-    setThrowMeta({ p0, p1, p2, tStart: t, frac });
-    setCaught(false);
-    if (soundOn) playWhistle();
-  }
+  const p2 = posOnPathLenScaled(path, Math.min(1, t * recSpeed));
+  const p0 = { ...QB };
+  const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
+  const arc = Math.min(80, Math.max(40, dist(p0, p2) * 0.15));
+  const p1 = { x: mid.x, y: mid.y - arc };
+
+  const flightMs = Math.min(1400, Math.max(600, dist(p0, p2) * 2.2));
+  const frac = Math.min(0.6, Math.max(0.2, flightMs / PLAY_MS));
+
+  setBallP0(p0); setBallP1(p1); setBallP2(p2);
+  setBallT(0);
+  setCatchAt(null);
+  setDecision(to);            // keep single-throw-per-play behavior
+  setBallFlying(true);
+  setThrowMeta({ p0, p1, p2, tStart: t, frac });
+  setCaught(false);
+  if (soundOn) playWhistle();
+}
 
   // Ball follows the single play clock (no extra RAF)
   useEffect(() => {
@@ -1536,24 +1539,19 @@ function startThrow(to: ReceiverID) {
 
         {/* Throw targets + Audible */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {/* Throw buttons */}
-          {throwButtons.map((to) => {
-            const canThrow =
-              DECISION_POINTS.some((dp) => Math.abs(t - dp) < 0.08) && phase === "post" && !ballFlying && !decision;
-            return (
-              <button
-                key={to}
-                disabled={!canThrow}
-                onClick={() => startThrow(to)}
-                className={`px-3 py-2 rounded-xl ${
-                  canThrow ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500" : "bg-white/10"
-                } text-white disabled:opacity-50`}
-                title={canThrow ? "Make your read & throw" : "Wait for window"}
-              >
-                Throw: {to}
-              </button>
-            );
-          })}
+        {throwButtons.map(to => (
+            <button
+            key={to}
+            disabled={!canThrowNow}
+            onClick={() => startThrow(to)}
+            className={`px-3 py-2 rounded-xl ${
+                canThrowNow ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500" : "bg-white/10"
+            } text-white disabled:opacity-50`}
+            title={canThrowNow ? "Throw now" : "Wait (ball in air or play over)"}
+            >
+            Throw: {to}
+            </button>
+        ))}
 
           {/* Big Audible toggle button */}
           <button
