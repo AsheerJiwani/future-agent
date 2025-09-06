@@ -6,7 +6,8 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { loadConcept } from "@data/football/loadConcept";
 import type { FootballConceptId } from "@data/football/catalog";
-import type { CoverageID, Concept, ReadPlan, ProgressionStep, ReceiverID } from "@data/football/types";
+import type { CoverageID, Concept, ReadPlan, ProgressionStep } from "@data/football/types";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { PlaySnapshot, SnapMeta } from "@/types/play";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });

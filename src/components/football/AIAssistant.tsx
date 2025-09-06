@@ -4,6 +4,8 @@ import type { FootballConceptId } from "@data/football/catalog";
 import type { CoverageID } from "@data/football/types";
 import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
 
+type MetricRow = { coverage: string; concept_id: string; area_horiz: string; area_band: string; n_throws: number; avg_window_score: number; avg_nearest_sep_yds: number; avg_hold_ms: number; completion_rate: number };
+
 type AssistantResponse = {
   summary: string;
   coverage_read?: { family: string; cues: string[]; rotation?: string; mof?: "one-high" | "two-high" };
@@ -13,7 +15,8 @@ type AssistantResponse = {
   audible?: { formation?: string; assignments?: Record<string, string>; rationale?: string };
   coaching_points?: string[];
   quiz?: { question: string; expected: string };
-  stats?: Array<{ coverage: string; concept_id: string; area_horiz: string; area_band: string; n_throws: number; avg_window_score: number; avg_nearest_sep_yds: number; avg_hold_ms: number; completion_rate: number }>;
+  stats?: MetricRow[];
+  stats_user?: MetricRow[];
   sources?: { title: string; url: string }[];
 };
 
@@ -58,7 +61,7 @@ export default function AIAssistant({
         snapMeta,
         throwCtx: lastThrow,
         filters,
-        focus: Object.entries(focus).filter(([_, v]) => v).map(([k]) => k),
+        focus: Object.entries(focus).filter(([, v]) => v).map(([k]) => k),
         userId,
         mode: "analysis" as const
       };
@@ -71,16 +74,16 @@ export default function AIAssistant({
         return json2;
       }
 
-      const json = useAgent
+      const json: Promise<AssistantResponse> = useAgent
         ? (() => {
             return fetch("/api/football-assistant/agent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-              .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+              .then((r) => (r.ok ? (r.json() as Promise<AssistantResponse>) : Promise.reject(new Error(`HTTP ${r.status}`))))
               .catch(() => callClassic());
           })()
-        : callClassic();
+        : (callClassic() as Promise<AssistantResponse>);
 
       const out = await json;
-      setData(out as AssistantResponse);
+      setData(out);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -236,11 +239,11 @@ export default function AIAssistant({
               </div>
             </div>
           )}
-          {Array.isArray((data as any).stats_user) && (data as any).stats_user.length > 0 && (
+          {Array.isArray(data.stats_user) && data.stats_user.length > 0 && (
             <div>
               <div className="text-white/60 text-xs mb-1">Your Recent Stats</div>
               <div className="text-white/80 text-xs space-y-1">
-                {(data as any).stats_user.map((s: any, i: number) => (
+                {data.stats_user.map((s, i) => (
                   <div key={i} className="flex flex-wrap gap-x-2">
                     <span className="text-white/50">{s.coverage} {s.concept_id} {s.area_horiz}_{s.area_band}</span>
                     <span>n={s.n_throws}</span>

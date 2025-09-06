@@ -9,8 +9,9 @@ export function getOrCreateUserId(): string | null {
     let id: string | null = localStorage.getItem(key);
     if (!id) {
       // Prefer crypto UUID if available
-      const u: string = (typeof window.crypto !== 'undefined' && 'randomUUID' in window.crypto)
-        ? (window.crypto as any).randomUUID()
+      const hasUUID = typeof window.crypto !== 'undefined' && 'randomUUID' in window.crypto;
+      const u: string = hasUUID
+        ? (window.crypto as unknown as { randomUUID: () => string }).randomUUID()
         : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       id = u;
       localStorage.setItem(key, id);

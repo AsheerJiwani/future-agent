@@ -99,7 +99,9 @@ function applyOverrides(base: Concept, overrides?: Partial<Concept>): Concept {
   };
 }
 
-async function fetchThrowMetrics(filters?: { coverage?: string; conceptId?: string; areaHoriz?: string; areaBand?: string; limit?: number; userId?: string }) {
+type MetricRow = { coverage: string; concept_id: string; area_horiz: string; area_band: string; n_throws: number; avg_window_score: number; avg_nearest_sep_yds: number; avg_hold_ms: number; completion_rate: number };
+
+async function fetchThrowMetrics(filters?: { coverage?: string; conceptId?: string; areaHoriz?: string; areaBand?: string; limit?: number; userId?: string }): Promise<MetricRow[]> {
   // Prefer direct Supabase if configured, else try the internal API route as a fallback
   const { coverage, conceptId, areaHoriz, areaBand, limit = 12, userId } = filters || {};
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -118,7 +120,7 @@ async function fetchThrowMetrics(filters?: { coverage?: string; conceptId?: stri
       });
       if (error) throw new Error(error.message);
       return Array.isArray(data) ? data : [];
-    } catch (e) {
+    } catch {
       // fall through to HTTP fallback
     }
   }
@@ -157,7 +159,7 @@ PlaySimulator Key Semantics (condensed):
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as AssistantRequest;
-    const { conceptId, coverage, snapshot, snapMeta, filters, focus = [], mode = "analysis" } = body;
+    const { conceptId, coverage, snapshot, snapMeta, focus = [], mode = "analysis" } = body;
 
     let concept = await loadConcept(conceptId);
     concept = applyOverrides(concept, body.overrides);
@@ -238,13 +240,15 @@ export async function POST(req: Request) {
       sources: digest.sources?.slice(0, 3) ?? []
     };
 
-    const result = parsed && typeof parsed.summary === 'string' ? parsed : fallback;
-    // Ensure we attach stats if model omitted them
-    if (!(result as any).stats) (result as any).stats = statsGlobal;
-    (result as any).stats_user = statsUser;
-    if (!result.sources || result.sources.length === 0) (result as any).sources = digest.sources?.slice(0, 3) ?? [];
+    const base = parsed && typeof parsed.summary === 'string' ? parsed : fallback;
+    const finalResult: AssistantResponse & { stats_user?: MetricRow[] } = {
+      ...base,
+      stats: base.stats ?? statsGlobal,
+      sources: base.sources && base.sources.length > 0 ? base.sources : (digest.sources?.slice(0, 3) ?? []),
+      ...(statsUser.length ? { stats_user: statsUser } : {})
+    };
 
-    return new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    return new Response(JSON.stringify(finalResult), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
     return new Response(JSON.stringify({ summary: `Assistant error: ${msg}` }), { status: 200, headers: { "Content-Type": "application/json" } });
