@@ -3,11 +3,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import OpenAI from "openai";
+import type { ChatCompletionMessageParam, ChatCompletionMessageToolCall } from "openai/resources/chat/completions";
 import { createClient } from "@supabase/supabase-js";
 import { loadConcept } from "@data/football/loadConcept";
 import type { FootballConceptId } from "@data/football/catalog";
 import type { CoverageID, Concept, ReadPlan, ProgressionStep } from "@data/football/types";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { PlaySnapshot, SnapMeta } from "@/types/play";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
@@ -213,35 +213,37 @@ export async function POST(req: Request) {
 
     const sessionMemory = await getSessionMemory(userId);
 
-    const messages: Array<{ role: 'system'|'user'|'assistant'|'tool'; content: string; name?: string; tool_call_id?: string } | { role: 'user'; content: string } | any> = [
+    const messages: ChatCompletionMessageParam[] = [
       { role: 'system', content: sys },
       { role: 'user', content: JSON.stringify({ ...user, sessionMemory }) }
     ];
 
-    async function execTool(name: string, args: any): Promise<any> {
+    type ToolArgs = Record<string, unknown>;
+    type ToolResult = Record<string, unknown>;
+    async function execTool(name: string, args: ToolArgs): Promise<ToolResult> {
       if (name === 'get_concept_digest') {
-        const concept = await loadConcept(args.conceptId as FootballConceptId);
-        return { digest: conceptDigest(concept, args.coverage as CoverageID), sources: concept.sources ?? [] };
+        const concept = await loadConcept(String(args.conceptId) as FootballConceptId);
+        return { digest: conceptDigest(concept, String(args.coverage) as CoverageID), sources: concept.sources ?? [] } as ToolResult;
       }
       if (name === 'get_throw_metrics') {
-        const rows = await getMetrics({ coverage: args.coverage, conceptId: args.conceptId, areaHoriz: args.areaHoriz, areaBand: args.areaBand, limit: args.limit, userId: args.userId });
-        return { rows };
+        const rows = await getMetrics({ coverage: String(args.coverage || ''), conceptId: String(args.conceptId || ''), areaHoriz: String(args.areaHoriz || ''), areaBand: String(args.areaBand || ''), limit: Number(args.limit || 12), userId: args.userId ? String(args.userId) : undefined });
+        return { rows } as ToolResult;
       }
       if (name === 'get_session_memory') {
-        const mem = await getSessionMemory(args.userId);
-        return { data: mem };
+        const mem = await getSessionMemory(args.userId ? String(args.userId) : undefined);
+        return { data: mem } as ToolResult;
       }
       if (name === 'set_session_memory') {
-        const ok = await mergeSessionMemory(args.userId, args.patch || {});
-        return { ok };
+        const ok = await mergeSessionMemory(args.userId ? String(args.userId) : undefined, (args.patch as Record<string, unknown>) || {});
+        return { ok } as ToolResult;
       }
       if (name === 'grade_throw') {
         const res = await fetch("http://localhost/api/football-grade", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
-        try { return await res.json(); } catch { return {}; }
+        try { return (await res.json()) as ToolResult; } catch { return {}; }
       }
       if (name === 'suggest_audible') {
         const res = await fetch("http://localhost/api/football-audible", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
-        try { return await res.json(); } catch { return {}; }
+        try { return (await res.json()) as ToolResult; } catch { return {}; }
       }
       return {};
     }
@@ -249,7 +251,7 @@ export async function POST(req: Request) {
     for (let step = 0; step < 4; step++) {
       const resp = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: messages as any,
+        messages,
         tools,
         tool_choice: "auto",
         temperature: 0.2
@@ -257,12 +259,13 @@ export async function POST(req: Request) {
       const msg = resp.choices[0]?.message;
       if (!msg) break;
       if (msg.tool_calls && msg.tool_calls.length > 0) {
-        for (const tc of msg.tool_calls as any[]) {
-          const tname = tc?.function?.name || tc?.name || "";
-          const argStr = tc?.function?.arguments || tc?.arguments || "{}";
-          const args = (() => { try { return JSON.parse(argStr); } catch { return {}; } })();
+        for (const tc of (msg.tool_calls as ChatCompletionMessageToolCall[])) {
+          if (tc.type !== 'function') continue;
+          const tname = tc.function.name || "";
+          const argStr = tc.function.arguments || "{}";
+          const args: ToolArgs = (() => { try { return JSON.parse(argStr) as ToolArgs; } catch { return {}; } })();
           const out = await execTool(tname, args);
-          messages.push({ role: 'tool', content: JSON.stringify(out), tool_call_id: tc.id, name: tname });
+          messages.push({ role: 'tool', content: JSON.stringify(out), tool_call_id: tc.id } as ChatCompletionMessageParam);
         }
         continue; // iterate to give model tool outputs
       }

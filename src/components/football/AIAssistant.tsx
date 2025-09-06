@@ -20,6 +20,8 @@ type AssistantResponse = {
   sources?: { title: string; url: string }[];
 };
 
+type FocusState = { timing: boolean; leverage: boolean; rotation: boolean; hot: boolean };
+
 export default function AIAssistant({
   conceptId,
   coverage,
@@ -41,7 +43,7 @@ export default function AIAssistant({
   const [band, setBand] = useState<"" | "SHORT" | "MID" | "DEEP">("");
   const [horiz, setHoriz] = useState<"" | "L" | "M" | "R">("");
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [focus, setFocus] = useState<{ timing: boolean; leverage: boolean; rotation: boolean; hot: boolean }>({ timing: true, leverage: true, rotation: false, hot: false });
+  const [focus, setFocus] = useState<FocusState>({ timing: true, leverage: true, rotation: false, hot: false });
   const [useAgent, setUseAgent] = useState(true);
   const [usedFallback, setUsedFallback] = useState(false);
 
@@ -102,7 +104,7 @@ export default function AIAssistant({
       <div className="text-xs uppercase tracking-wide text-white/60 mb-2">AI Assistant — Per-Play Analysis</div>
       <div className="flex flex-wrap gap-2 mb-3 items-center">
         <label className="text-xs text-white/70">Band
-          <select value={band} onChange={(e) => setBand(e.target.value as any)} className="ml-2 bg-white/10 text-white rounded px-2 py-1">
+          <select value={band} onChange={(e) => setBand(e.target.value as "" | "SHORT" | "MID" | "DEEP")} className="ml-2 bg-white/10 text-white rounded px-2 py-1">
             <option value="">Any</option>
             <option value="SHORT">SHORT</option>
             <option value="MID">MID</option>
@@ -110,7 +112,7 @@ export default function AIAssistant({
           </select>
         </label>
         <label className="text-xs text-white/70">Side
-          <select value={horiz} onChange={(e) => setHoriz(e.target.value as any)} className="ml-2 bg-white/10 text-white rounded px-2 py-1">
+          <select value={horiz} onChange={(e) => setHoriz(e.target.value as "" | "L" | "M" | "R")} className="ml-2 bg-white/10 text-white rounded px-2 py-1">
             <option value="">Any</option>
             <option value="L">L</option>
             <option value="M">M</option>
@@ -126,7 +128,7 @@ export default function AIAssistant({
         ] as const).map(({ key, label }) => (
           <button
             key={key}
-            onClick={(e) => { e.preventDefault(); setFocus((f) => ({ ...f, [key]: !f[key] as any })); }}
+            onClick={(e) => { e.preventDefault(); setFocus((f) => ({ ...f, [key]: !f[key] } as FocusState)); }}
             className={`px-2 py-1 rounded-full text-xs border ${focus[key as keyof typeof focus] ? 'border-fuchsia-400 text-fuchsia-200 bg-fuchsia-500/10' : 'border-white/15 text-white/70 bg-white/5'}`}
           >
             {label}

@@ -136,7 +136,7 @@ async function fetchThrowMetrics(filters?: { coverage?: string; conceptId?: stri
     const res = await fetch(url, { method: 'GET' });
     if (!res.ok) return [];
     const json = await res.json();
-    return (json?.rows ?? []) as any[];
+    return (json?.rows ?? []) as MetricRow[];
   } catch {
     return [];
   }
