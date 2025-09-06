@@ -5,6 +5,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.throws (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
+  user_id uuid,
   concept_id text,
   coverage text,
   formation text,
@@ -27,6 +28,9 @@ create table if not exists public.throws (
 alter table public.throws enable row level security;
 -- Add flexible JSONB column for extra metadata
 alter table public.throws add column if not exists extra jsonb;
+-- Add user_id column if missing + helpful index
+alter table public.throws add column if not exists user_id uuid;
+create index if not exists throws_user_id_created_idx on public.throws(user_id, created_at desc);
 do $$ begin
   if not exists (
     select 1 from pg_policies where schemaname='public' and tablename='throws' and policyname='service_role_insert_only'

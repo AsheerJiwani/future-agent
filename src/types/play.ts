@@ -46,3 +46,16 @@ export type ThrowEvent = {
   nearestDefender?: string;
   catchPoint?: Pt;
 };
+
+export type ThrowSummary = {
+  target: ReceiverID;
+  time?: number; // 0..1
+  playId?: number;
+  holdMs?: number;
+  throwArea?: string; // e.g., "L_SHORT"
+  depthYds?: number;
+  windowScore?: number;
+  nearestSepYds?: number;
+  nearestDefender?: string | null;
+  grade?: string;
+};

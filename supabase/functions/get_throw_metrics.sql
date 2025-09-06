@@ -4,7 +4,8 @@ create or replace function public.get_throw_metrics(
   p_concept_id text default null,
   p_area_horiz text default null,
   p_area_band text default null,
-  p_limit integer default 20
+  p_limit integer default 20,
+  p_user_id uuid default null
 )
 returns table (
   coverage text,
@@ -35,10 +36,9 @@ as $$
     and (p_concept_id is null or t.concept_id = p_concept_id)
     and (p_area_horiz is null or t.area_horiz = p_area_horiz)
     and (p_area_band  is null or t.area_band  = p_area_band)
+    and (p_user_id    is null or t.user_id    = p_user_id)
   group by t.coverage, t.concept_id, t.area_horiz, t.area_band
   order by n_throws desc
   limit coalesce(p_limit, 20)
 $$;
-
-grant execute on function public.get_throw_metrics(text, text, text, text, integer) to anon, authenticated;
-
+grant execute on function public.get_throw_metrics(text, text, text, text, integer, uuid) to anon, authenticated;

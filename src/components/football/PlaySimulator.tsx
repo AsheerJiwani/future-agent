@@ -3,9 +3,10 @@
 import { JSX, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { FootballConceptId } from "../../data/football/catalog";
 import type { CoverageID, ReceiverID, RouteKeyword, Pt, AlignMap } from "../../data/football/types";
-import type { PlaySnapshot, SnapMeta } from "@/types/play";
+import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
 import { usePlayClock } from "./hooks/usePlayClock";
 import { XorShift32, mixSeed } from "../../lib/rng";
+import { getOrCreateUserId } from "../../lib/user";
 
 /* --------- Audio helpers --------- */
 interface AudioWindow extends Window {
@@ -529,10 +530,12 @@ export default function PlaySimulator({
   conceptId,
   coverage,
   onSnapshot,
+  onThrowGraded,
 }: {
   conceptId: FootballConceptId;
   coverage: CoverageID;
   onSnapshot?: (snap: PlaySnapshot, meta: SnapMeta) => void;
+  onThrowGraded?: (summary: ThrowSummary) => void;
 }) {
   const [phase, setPhase] = useState<"pre" | "post" | "decided">("pre");
   const { t, setT, seek, start: startClock, stop: stopClock, reset: resetClock } = usePlayClock(3000);
@@ -615,10 +618,14 @@ export default function PlaySimulator({
   // Deterministic RNG per play
   const [playId, setPlayId] = useState(0);
   const [rngSeed, setRngSeed] = useState<number>(() => mixSeed(Date.now() >>> 0, Math.floor(Math.random() * 0x7fffffff)));
+  const [userId, setUserId] = useState<string | null>(null);
   const rngRef = useRef<XorShift32>(new XorShift32(mixSeed(rngSeed, playId)));
   useEffect(() => {
     rngRef.current = new XorShift32(mixSeed(rngSeed, playId));
   }, [rngSeed, playId]);
+  useEffect(() => {
+    setUserId(getOrCreateUserId());
+  }, []);
 
   // Restore from URL (formation, audibles, block flags, seed, playId)
   useEffect(() => {
@@ -1740,6 +1747,22 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     setExplain(explainStr);
     safeTrack('ai_grade', { grade: gradeStr });
 
+    // Notify parent so downstream AI Assistant can refresh with this throw context
+    try {
+      onThrowGraded?.({
+        target: to,
+        time: t,
+        playId,
+        holdMs,
+        throwArea: lastThrowArea?.key,
+        depthYds: lastThrowArea?.depthYds,
+        windowScore: lastWindow?.info.score,
+        nearestSepYds: lastWindow?.info.sepYds,
+        nearestDefender: lastWindow?.info.nearest ?? null,
+        grade: gradeStr,
+      });
+    } catch {}
+
     // Server-side throw log (for future analytics) — log regardless of grader success
     try {
       const meta = buildSnapMeta();
@@ -1756,6 +1779,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
         windowScore: lastWindow?.info.score,
         nearestSepYds: lastWindow?.info.sepYds,
         grade: gradeStr,
+        userId: userId ?? undefined,
         extra: {
           c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
           coverageInsights: meta.coverageInsights,
@@ -1765,7 +1789,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           firstOpenMs
         }
       };
-      void fetch('/api/throw-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      void fetch('/api/throw-log', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': userId ?? '' }, body: JSON.stringify(payload) });
     } catch {}
   }
 

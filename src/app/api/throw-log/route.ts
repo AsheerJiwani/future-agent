@@ -35,10 +35,14 @@ export async function POST(req: NextRequest) {
           area_band = b ?? null;
         }
 
+        const uidHeader = req.headers.get('x-user-id');
+        const userId = body.userId || uidHeader || null;
+
         const row = {
           concept_id: body.conceptId ?? null,
           coverage: body.coverage ?? null,
           formation: body.formation ?? null,
+          user_id: userId,
           target: body.target ?? null,
           time_frac: typeof body.time === 'number' ? body.time : null,
           play_id: body.playId ?? null,
@@ -58,11 +62,13 @@ export async function POST(req: NextRequest) {
         if (error) {
           console.warn('supabase insert error:', error.message);
           // Fallback: some projects may not have the optional `extra` column yet or schema cache not reloaded
-          if (String(error.message).toLowerCase().includes('extra')) {
+          const lower = String(error.message).toLowerCase();
+          if (lower.includes('extra') || lower.includes('user_id')) {
             try {
               // retry without `extra`
               const rowNoExtra: Record<string, unknown> = { ...(row as Record<string, unknown>) };
               delete rowNoExtra.extra;
+              delete rowNoExtra.user_id;
               const retry = await supabase.from('throws').insert([rowNoExtra]);
               if (retry.error) console.warn('supabase retry insert error:', retry.error.message);
             } catch (e) {

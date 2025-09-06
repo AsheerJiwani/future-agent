@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     const areaHoriz = url.searchParams.get('areaHoriz'); // 'L' | 'M' | 'R'
     const areaBand  = url.searchParams.get('areaBand');  // 'SHORT'|'MID'|'DEEP'
     const limit     = Number(url.searchParams.get('limit') || '20');
+    const userIdStr = url.searchParams.get('userId');
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -26,7 +27,8 @@ export async function GET(req: NextRequest) {
       p_concept_id: conceptId,
       p_area_horiz: areaHoriz,
       p_area_band: areaBand,
-      p_limit: isFinite(limit) ? limit : 20
+      p_limit: isFinite(limit) ? limit : 20,
+      p_user_id: userIdStr ? userIdStr : null
     });
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ rows: data ?? [] }, { headers: { 'Cache-Control': 'no-store' } });

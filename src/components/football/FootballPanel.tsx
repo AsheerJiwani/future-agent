@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import CoachChat from "./CoachChat";
-import type { PlaySnapshot, SnapMeta } from "@/types/play";
+import AIAssistant from "./AIAssistant";
+import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
 import PlaySimulator from "./PlaySimulator";
 import { CONCEPTS, type FootballConceptId } from "../../data/football/catalog";
 import type { CoverageID } from "../../data/football/types";
+import { getOrCreateUserId } from "../../lib/user";
 
 const COVERAGES: CoverageID[] = [
   "C0","C1","C2","TAMPA2","PALMS","C3","C4","QUARTERS","C6","C9"
@@ -29,6 +31,8 @@ export default function FootballPanel() {
   const [mode, setMode] = useState<"teach" | "quiz">("teach");
   const [snapshot, setSnapshot] = useState<PlaySnapshot | undefined>(undefined);
   const [snapMeta, setSnapMeta] = useState<SnapMeta | undefined>(undefined);
+  const [lastThrow, setLastThrow] = useState<ThrowSummary | undefined>(undefined);
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Restore concept/coverage from URL (share links)
   useEffect(() => {
@@ -38,6 +42,7 @@ export default function FootballPanel() {
     const cov = sp.get("cov");
     if (c && (CONCEPTS as unknown as Array<{id:string}>).some(x => x.id === c)) setConceptId(c as FootballConceptId);
     if (cov) setCoverage(cov as CoverageID);
+    setUserId(getOrCreateUserId());
   }, []);
 
   return (
@@ -106,8 +111,12 @@ export default function FootballPanel() {
             setSnapshot(snap);
             setSnapMeta(meta);
           }}
+          onThrowGraded={(sum) => setLastThrow(sum)}
         />
-        <CoachChat conceptId={conceptId} coverage={coverage} mode={mode} snapshot={snapshot} snapMeta={snapMeta} />
+        <div className="flex flex-col gap-4">
+          <CoachChat conceptId={conceptId} coverage={coverage} mode={mode} snapshot={snapshot} snapMeta={snapMeta} />
+          <AIAssistant conceptId={conceptId} coverage={coverage} snapshot={snapshot} snapMeta={snapMeta} lastThrow={lastThrow} userId={userId ?? undefined} />
+        </div>
       </div>
     </div>
   );
