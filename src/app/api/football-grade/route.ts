@@ -24,6 +24,7 @@ type Body = {
   nearestDefender?: string;
   playId?: number;
   holdMs?: number;
+  throwArea?: string;
 };
 
 type GradeJSON = {
@@ -35,7 +36,7 @@ type GradeJSON = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { conceptId, coverage, target, time, formation, assignments, numbering, windowScore, nearestSepYds, nearestDefender, playId, holdMs }: Body = await req.json();
+    const { conceptId, coverage, target, time, formation, assignments, numbering, windowScore, nearestSepYds, nearestDefender, playId, holdMs, throwArea }: Body = await req.json();
 
     const concept: Concept = await loadConcept(conceptId);
     const rp: ReadPlan | undefined = (concept.readPlans ?? []).find((r) => r.vs === coverage);
@@ -64,6 +65,7 @@ THROW WINDOW (if provided):
   nearestDefender: ${nearestDefender ?? "(n/a)"}
   nearestSepYds: ${nearestSepYds ?? "(n/a)"}
   holdMs: ${holdMs ?? "(n/a)"}
+  throwArea: ${throwArea ?? "(n/a)"}
 
 PRE-SNAP KEYS:
 ${pre || "- none"}

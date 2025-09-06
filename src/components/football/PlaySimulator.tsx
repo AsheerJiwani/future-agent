@@ -57,7 +57,7 @@ type DefenderID =
   | "MIKE"
   | "WILL";
 
-type Actor = { id: string; color: string; path: Pt[] };
+// (Actor type removed)
 
 type RouteMap = Record<ReceiverID, Pt[]>;
 type AssignMap = Partial<Record<ReceiverID, RouteKeyword>>;
@@ -259,20 +259,20 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
     case "CORNER":
     case "CORNER_MID": {
       const stem  = { x: s.x, y: yUp(DEPTH.deep - 2) };
-      const breakOut = { x: s.x + outSign(s) * xAcross(10), y: yUp(DEPTH.deep - 4) };
-      const flag  = { x: sidelineX(s, 10), y: yUp(DEPTH.shot - 2) };
+      const breakOut = { x: s.x + outSign(s) * xAcross(12), y: yUp(DEPTH.deep - 4) };
+      const flag  = { x: sidelineX(s, 8), y: yUp(DEPTH.shot - 2) };
       return [s, stem, breakOut, flag];
     }
     case "CORNER_LOW": {
       const stem  = { x: s.x, y: yUp(DEPTH.mid) };
-      const breakOut = { x: s.x + outSign(s) * xAcross(9), y: yUp(DEPTH.mid - 1) };
-      const flag  = { x: sidelineX(s, 12), y: yUp(DEPTH.deep) };
+      const breakOut = { x: s.x + outSign(s) * xAcross(11), y: yUp(DEPTH.mid - 1) };
+      const flag  = { x: sidelineX(s, 10), y: yUp(DEPTH.deep) };
       return [s, stem, breakOut, flag];
     }
     case "CORNER_HIGH": {
       const stem  = { x: s.x, y: yUp(DEPTH.deep) };
-      const breakOut = { x: s.x + outSign(s) * xAcross(10), y: yUp(DEPTH.deep - 2) };
-      const flag  = { x: sidelineX(s, 8), y: yUp(DEPTH.shot) };
+      const breakOut = { x: s.x + outSign(s) * xAcross(12), y: yUp(DEPTH.deep - 2) };
+      const flag  = { x: sidelineX(s, 6), y: yUp(DEPTH.shot) };
       return [s, stem, breakOut, flag];
     }
 
@@ -505,6 +505,8 @@ const ZONES = {
 const MAN_COVERAGES   = new Set<CoverageID>(["C0","C1"]);
 const MATCH_COVERAGES = new Set<CoverageID>(["PALMS","C6","QUARTERS","C9"]);
 const ZONE_COVERAGES  = new Set<CoverageID>(["C2","TAMPA2","C3","C4"]);
+type C3Rotation = 'SKY' | 'BUZZ' | 'CLOUD_STRONG';
+type C3RotationMode = 'AUTO' | C3Rotation;
 
 /* =========================================
    COMPONENT
@@ -631,6 +633,8 @@ export default function PlaySimulator({
     RB: { score: 0, sepYds: 0, nearest: null },
   });
   const [lastWindow, setLastWindow] = useState<{ rid: ReceiverID; info: OpenInfo } | null>(null);
+  const [lastThrowArea, setLastThrowArea] = useState<{ key: string; horiz: 'L'|'M'|'R'; band: 'SHORT'|'MID'|'DEEP'; depthYds: number } | null>(null);
+  const [lastHoldMs, setLastHoldMs] = useState<number | null>(null);
   // Leverage meta for UI/AI
   const [levInfo, setLevInfo] = useState<Record<ReceiverID, { side: 'inside'|'outside'|'even'; via: string }>>({
     X: { side: 'even', via: '' }, Z: { side: 'even', via: '' }, SLOT: { side: 'even', via: '' }, TE: { side: 'even', via: '' }, RB: { side: 'even', via: '' }
@@ -638,6 +642,8 @@ export default function PlaySimulator({
   const [levAdjust, setLevAdjust] = useState<Record<ReceiverID, { dxYds: number; dDepthYds: number }>>({
     X: { dxYds: 0, dDepthYds: 0 }, Z: { dxYds: 0, dDepthYds: 0 }, SLOT: { dxYds: 0, dDepthYds: 0 }, TE: { dxYds: 0, dDepthYds: 0 }, RB: { dxYds: 0, dDepthYds: 0 }
   });
+  const [c3Rotation, setC3Rotation] = useState<C3Rotation>('SKY');
+  const [c3RotationMode, setC3RotationMode] = useState<C3RotationMode>('AUTO');
   // Minimal AI log (append per snap)
   const [, setAiLog] = useState<Array<{ playId: number; coverage: CoverageID; formation: FormationName; leverage: typeof levInfo; adjustments: typeof levAdjust }>>([]);
 
@@ -808,6 +814,18 @@ setCbPress({
   }
 
   function buildSnapMeta(): import("@/types/play").SnapMeta {
+    // Coverage insights (per current t)
+    let palmsTrapNow = false;
+    let quartersCarry2Now = false;
+    const sr = strongIsRight();
+    const twoStrong = wrPos(sr ? (right2() ?? "SLOT") : (left2() ?? "SLOT"), t);
+    if (coverage === 'PALMS') palmsTrapNow = yDepthYds(twoStrong) <= 10;
+    if (coverage === 'QUARTERS') quartersCarry2Now = yDepthYds(twoStrong) >= 12;
+    const safFS = defenderPos(coverage, 'FS', t);
+    const safSS = defenderPos(coverage, 'SS', t);
+    const safDeep = [safFS, safSS].filter(p => yDepthYds(p) >= 14).length;
+    const mofState: 'one-high' | 'two-high' = safDeep >= 2 ? 'two-high' : 'one-high';
+
     return {
       press: {
         CB_L: cbPress.CB_L,
@@ -824,6 +842,12 @@ setCbPress({
       },
       leverage: levInfo,
       leverageAdjust: levAdjust,
+      coverageInsights: {
+        c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
+        palmsTrapNow,
+        quartersCarry2Now,
+        mofState,
+      }
     };
   }
 
@@ -1001,6 +1025,19 @@ useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, teBlock, rbBlock, coverage, align, Dstart, O]);
 
+  // Choose C3 rotation each snap
+  useEffect(() => {
+    if (coverage !== 'C3') return;
+    if (phase !== 'post') return;
+    if (c3RotationMode === 'AUTO') {
+      const r = rngRef.current.nextFloat();
+      const rot: C3Rotation = r < 0.5 ? 'SKY' : r < 0.85 ? 'BUZZ' : 'CLOUD_STRONG';
+      setC3Rotation(rot);
+    } else {
+      setC3Rotation(c3RotationMode);
+    }
+  }, [phase, coverage, c3RotationMode]);
+
   const DEFENDER_IDS: DefenderID[] = ["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"];
 
   function wrPosSafe(id: ReceiverID, tt: number): Pt {
@@ -1040,6 +1077,37 @@ useEffect(() => {
     const dx = (a.x - b.x) / XPX;
     const dy = (a.y - b.y) / YPX;
     return Math.hypot(dx, dy);
+  }
+  // Vertical depth (yds from LOS at bottom)
+  function yDepthYds(p: Pt): number {
+    return (PX_H - p.y) / YPX;
+  }
+
+  // Classify throw area: horizontal (L/M/R by hashes) + vertical band (SHORT/MID/DEEP)
+  function classifyThrowArea(p: Pt): { horiz: 'L'|'M'|'R'; band: 'SHORT'|'MID'|'DEEP'; key: string; depthYds: number } {
+    const depthFromLOS = Math.max(0, yDepthYds(p) - 12);
+    const band: 'SHORT'|'MID'|'DEEP' = depthFromLOS <= 10 ? 'SHORT' : depthFromLOS <= 20 ? 'MID' : 'DEEP';
+    const horiz: 'L'|'M'|'R' = p.x < HASH_L ? 'L' : p.x > HASH_R ? 'R' : 'M';
+    return { horiz, band, key: `${horiz}_${band}`, depthYds: Math.round(depthFromLOS) };
+  }
+
+  // Route break fractions (by arc length, for first interior break)
+  function segmentBreakFracs(path: Pt[]): number[] {
+    if (!path || path.length < 3) return [];
+    let total = 0;
+    const lens: number[] = [];
+    for (let i = 0; i < path.length - 1; i++) {
+      const L = segLen(path[i], path[i + 1]);
+      lens.push(L); total += L;
+    }
+    if (total <= 0) return [];
+    const fracs: number[] = [];
+    let acc = 0;
+    for (let i = 0; i < lens.length - 1; i++) {
+      acc += lens[i];
+      fracs.push(acc / total);
+    }
+    return fracs;
   }
 
   // Compute openness for a single receiver at time tt
@@ -1135,11 +1203,20 @@ useEffect(() => {
 
     switch (cover) {
       case "C3": {
-        if (id === "CB_L") return L.DEEP;
-        if (id === "CB_R") return R.DEEP;
+        // Sky/Buzz/Cloud (strong) rotation variants
+        const rot = c3Rotation; // SKY | BUZZ | CLOUD_STRONG
+        if (id === "CB_L") return (rot === 'CLOUD_STRONG' && !sr) ? L.FLAT : L.DEEP;
+        if (id === "CB_R") return (rot === 'CLOUD_STRONG' && sr)  ? R.FLAT : R.DEEP;
         if (id === "FS")   return MID;
-        if (id === "SS")     return sr ? off(R.CURL, -1) : off(L.CURL, +1);
-        if (id === "NICKEL") return sr ? off(L.CURL, +1) : off(R.CURL, -1);
+        if (id === "SS") {
+          if (rot === 'BUZZ') return sr ? off(R.CURL, -2) : off(L.CURL, +2); // buzz: safety to curl/hook
+          // sky/cloud: safety toward curl/flat
+          return sr ? off(R.CURL, -1) : off(L.CURL, +1);
+        }
+        if (id === "NICKEL") {
+          if (rot === 'BUZZ') return sr ? R.FLAT : L.FLAT; // OLB/slot to flat in buzz
+          return sr ? off(L.CURL, +1) : off(R.CURL, -1);
+        }
         if (id === "MIKE") return HOOK;
         if (id === "SAM")  return sr ? off(L.CURL, +0.5) : off(R.CURL, -0.5);
         if (id === "WILL") return sr ? off(R.CURL, -0.5) : off(L.CURL, +0.5);
@@ -1482,9 +1559,24 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
 
     /* ZONE */
     if (ZONE_COVERAGES.has(cover)) {
-      const p = approach(start, anchor, 0.35, 0.6);
+      // Special ramp for TAMPA2 MIKE: hook -> pole (deep middle)
+      if (cover === 'TAMPA2' && id === 'MIKE') {
+        const hook = ZONES.HOOK_MID;
+        const pole: Pt = { x: hook.x, y: yUp(34) };
+        const f = Math.min(1, effT * 1.2); // ramp a bit quicker than clock
+        const target: Pt = { x: hook.x + (pole.x - hook.x) * f, y: hook.y + (pole.y - hook.y) * f };
+        return approach(start, target, 0.30, 0.55);
+      }
+      // Curl/flat droppers midpoint for a beat before driving
+      let p = approach(start, anchor, 0.35, 0.6);
 
+      // Compute a simple midpoint of nearby threats to emulate “squeeze then drive”
       const threats = (["X","Z","SLOT","TE","RB"] as ReceiverID[]).map(r => ({ id: r, p: wrPos(r, tt) }));
+      const midAll = threats.reduce((acc, cur) => ({ x: acc.x + cur.p.x/5, y: acc.y + cur.p.y/5 }), { x: 0, y: 0 });
+      if ((cover === 'C3' || cover === 'C4') && tt < 0.22 && id !== 'CB_L' && id !== 'CB_R') {
+        p = approach(start, { x: (anchor.x + midAll.x)/2, y: Math.min(anchor.y, midAll.y) }, 0.25, 0.45);
+      }
+
       const nearest = threats.reduce((best, cur) =>
         ((cur.p.x - anchor.x)**2 + (cur.p.y - anchor.y)**2) <
         ((best.p.x - anchor.x)**2 + (best.p.y - anchor.y)**2) ? cur : best, threats[0]);
@@ -1516,7 +1608,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
       const twoWeak   = wrPos(!sr ? (right2() ?? "SLOT") : (left2() ?? "SLOT"), tt);
       const oneWeak   = wrPos(!sr ? (right1() ?? "Z") : (left1() ?? "X"), tt);
 
-      const isVert = (pt: Pt) => pt.y < yUp(30);
+      const isVert = (pt: Pt) => yDepthYds(pt) >= 12; // #2 vertical past ~12 yds
 
       if (cover === "QUARTERS") {
         if (id === "CB_L") return approach(p, wrPos(left1() ?? "X", tt), 0.10, 0.55);
@@ -1533,6 +1625,12 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
         if (id === "NICKEL" || id === "MIKE" || id === "SAM" || id === "WILL") {
           const three = wrPos("RB", tt);
           const myTwo = (id === "NICKEL" || (id === "SAM" && !sr) || (id === "WILL" && sr)) ? twoStrong : twoWeak;
+          // Nickel wall #2 at ~6–8 yds inside leverage before passing it
+          if (id === "NICKEL" && tt < 0.25) {
+            const inside = myTwo.x > QB.x ? -xAcross(2) : xAcross(2);
+            const wall: Pt = { x: myTwo.x + inside, y: yUp(18) };
+            return approach(start, wall, 0.10, 0.55);
+          }
           const mid = { x: (myTwo.x + three.x)/2, y: (myTwo.y + three.y)/2 };
           return approach(p, mid, 0.05, 0.35);
         }
@@ -1540,16 +1638,19 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
       }
 
       if (cover === "PALMS") {
+        // Trap #2 to flat if #2 under ~10 yds; else carry #2 vertical
+        const underTwo = yDepthYds(twoStrong) <= 10;
         if ((id === "SS" && sr) || (id === "FS" && !sr)) {
-          if (isVert(twoStrong)) p = approach(p, twoStrong, 0.0, 0.40);
+          if (!underTwo) p = approach(p, twoStrong, 0.0, 0.40); // safety carries #2 if vertical
         }
         if ((id === "CB_R" && sr) || (id === "CB_L" && !sr)) {
-          if (!isVert(twoStrong)) p = approach(p, oneStrong, 0.0, 0.35);
+          if (underTwo) p = approach(p, twoStrong, 0.0, 0.40); // corner traps #2
         }
         return p;
       }
 
       if (cover === "C6") {
+        // Quarters to strength: apply #2 vertical rule on the quarters side
         if ((id === "SS" && sr) || (id === "FS" && !sr)) {
           if (isVert(twoStrong)) p = approach(p, twoStrong, 0.0, 0.35);
         }
@@ -1572,6 +1673,32 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
   /** ---------- AI grader ---------- */
   async function gradeDecision(to: ReceiverID) {
     try {
+      // Compute target break timing and first-open signal
+      const path = O[to] ?? [];
+      const breaks = segmentBreakFracs(path);
+      const firstBreak = breaks.length ? breaks[0] : undefined;
+      const mult = receiverSpeedMult(to);
+      const tBreak = firstBreak !== undefined ? Math.min(1, firstBreak / Math.max(0.0001, recSpeed * mult)) : undefined;
+      const targetBreakMs = tBreak !== undefined ? Math.round(tBreak * PLAY_MS) : undefined;
+      const holdMs = lastHoldMs ?? Math.round(t * PLAY_MS);
+      const heldVsBreakMs = targetBreakMs !== undefined ? (holdMs - targetBreakMs) : undefined;
+
+      // Find first-open receiver (score >= 0.6)
+      const rids: ReceiverID[] = ["X","Z","SLOT","TE","RB"];
+      let firstOpenId: ReceiverID | undefined;
+      let firstOpenMs: number | undefined;
+      for (let step = 0; step <= 100; step++) {
+        const tt = step / 100; // 0..1
+        for (const rid of rids) {
+          const info = computeReceiverOpenness(rid, tt);
+          if (info.score >= 0.6) {
+            firstOpenId = rid; firstOpenMs = Math.round(tt * PLAY_MS);
+            break;
+          }
+        }
+        if (firstOpenId) break;
+      }
+
       const res = await fetch("/api/football-grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1582,7 +1709,12 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           nearestSepYds: lastWindow?.info.sepYds ?? undefined,
           nearestDefender: lastWindow?.info.nearest ?? undefined,
           playId,
-          holdMs: Math.round(t * PLAY_MS),
+          holdMs,
+          targetBreakMs,
+          heldVsBreakMs,
+          firstOpenId,
+          firstOpenMs,
+          throwArea: lastThrowArea?.key,
         })
       });
       const data: { grade?: string; rationale?: string; coachingTip?: string } = await res.json();
@@ -1590,6 +1722,34 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
       const detail = [data.rationale, data.coachingTip].filter(Boolean).join("  Tip: ");
       setExplain(detail || "Good rep.");
       safeTrack('ai_grade', { grade: data.grade ?? 'OK' });
+
+      // Server-side throw log (for future analytics)
+      try {
+        const meta = buildSnapMeta();
+        const payload = {
+          conceptId,
+          coverage,
+          formation,
+          target: to,
+          time: t,
+          playId,
+          holdMs,
+          throwArea: lastThrowArea?.key,
+          depthYds: lastThrowArea?.depthYds,
+          windowScore: lastWindow?.info.score,
+          nearestSepYds: lastWindow?.info.sepYds,
+          grade: data.grade ?? 'OK',
+          extra: {
+            c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
+            coverageInsights: meta.coverageInsights,
+            targetBreakMs,
+            heldVsBreakMs,
+            firstOpenId,
+            firstOpenMs
+          }
+        };
+        void fetch('/api/throw-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      } catch {}
     } catch {
       setGrade("OK");
       setExplain("Grader unavailable. Try again.");
@@ -1703,12 +1863,16 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
   // capture window at throw time
   const win = computeReceiverOpenness(to, t);
   setLastWindow({ rid: to, info: win });
+  // capture throw area + hold time
+  const area = classifyThrowArea(p2);
+  setLastThrowArea(area);
+  setLastHoldMs(Math.round(t * PLAY_MS));
   setDecision(to);            // keep single-throw-per-play behavior
   setBallFlying(true);
   setThrowMeta({ p0, p1, p2, tStart: t, frac });
   setCaught(false);
   if (soundOn) playWhistle();
-  safeTrack('throw', { target: to, t: Number(t.toFixed(2)) });
+  safeTrack('throw', { target: to, t: Number(t.toFixed(2)), area: area.key, depthYds: area.depthYds });
 }
 
   // Ball follows the single play clock (no extra RAF)
@@ -1879,6 +2043,18 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           Simulator — {conceptId} vs {coverage}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {/* Coverage insights pill */}
+          <div className="hidden md:flex items-center gap-2 text-[11px] text-white/80">
+            {coverage === 'C3' && (
+              <span className="px-2 py-1 rounded-md bg-white/10">C3: {c3RotationMode === 'AUTO' ? c3Rotation : c3RotationMode}</span>
+            )}
+            {coverage === 'PALMS' && (
+              <span className="px-2 py-1 rounded-md bg-white/10">Palms: {yDepthYds(wrPos(strongIsRight() ? (right2() ?? 'SLOT') : (left2() ?? 'SLOT'), t)) <= 10 ? 'TRAP #2' : 'CARRY #2'}</span>
+            )}
+            {coverage === 'QUARTERS' && (
+              <span className="px-2 py-1 rounded-md bg-white/10">Quarters: {yDepthYds(wrPos(strongIsRight() ? (right2() ?? 'SLOT') : (left2() ?? 'SLOT'), t)) >= 12 ? 'CARRY #2' : 'MIDPOINT'}</span>
+            )}
+          </div>
           <button
             onClick={() => {
               try {
@@ -1936,6 +2112,44 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           <text x={QB.x + 10} y={QB.y + 4} className="fill-white/85 text-[10px]">
             QB
           </text>
+
+          {/* On-field coverage tooltip near QB */}
+          {(() => {
+            const lines: string[] = [];
+            // MOF state
+            const safFS = defenderPos(coverage, 'FS', t);
+            const safSS = defenderPos(coverage, 'SS', t);
+            const safDeep = [safFS, safSS].filter(p => yDepthYds(p) >= 14).length;
+            lines.push(`MOF: ${safDeep >= 2 ? 'two-high' : 'one-high'}`);
+            // Rotation / rules
+            if (coverage === 'C3') lines.push(`C3: ${c3RotationMode === 'AUTO' ? c3Rotation : c3RotationMode}`);
+            if (coverage === 'PALMS') {
+              const sr = strongIsRight();
+              const two = wrPos(sr ? (right2() ?? 'SLOT') : (left2() ?? 'SLOT'), t);
+              lines.push(`Palms: ${yDepthYds(two) <= 10 ? 'TRAP #2' : 'CARRY #2'}`);
+            }
+            if (coverage === 'QUARTERS') {
+              const sr = strongIsRight();
+              const two = wrPos(sr ? (right2() ?? 'SLOT') : (left2() ?? 'SLOT'), t);
+              lines.push(`Quarters: ${yDepthYds(two) >= 12 ? 'CARRY #2' : 'MIDPOINT'}`);
+            }
+            if (!lines.length) return null;
+            const x = QB.x + xAcross(8);
+            const y = QB.y - yDepthYds({ x: QB.x, y: QB.y }) / 100; // negligible; keep below
+            return (
+              <g>
+                <rect x={x} y={QB.y - 44} width={160} height={36} rx={8} fill="rgba(0,0,0,0.45)" stroke="rgba(255,255,255,0.25)" />
+                <text x={x + 8} y={QB.y - 30} className="text-[10px]" fill="rgba(255,255,255,0.95)" style={{ paintOrder: 'stroke' }}>
+                  {lines[0]}
+                </text>
+                {lines[1] && (
+                  <text x={x + 8} y={QB.y - 18} className="text-[10px]" fill="rgba(255,255,255,0.9)">
+                    {lines[1]}
+                  </text>
+                )}
+              </g>
+            );
+          })()}
 
           {/* Offense */}
           {(["X", "Z", "SLOT", "TE", "RB"] as ReceiverID[]).map((rid) => {
@@ -2185,6 +2399,24 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           >
             Clear Audibles
           </button>
+
+          {/* C3 Rotation selector (optional control) */}
+          {coverage === 'C3' && (
+            <div className="flex items-center gap-2 ml-2 text-white/80 text-xs">
+              <span>C3 Rotation</span>
+              <select
+                className="bg-white/10 text-white rounded-md px-2 py-2"
+                value={c3RotationMode}
+                onChange={(e) => setC3RotationMode(e.target.value as C3RotationMode)}
+                title="Choose Cover 3 rotation"
+              >
+                <option value="AUTO">Auto</option>
+                <option value="SKY">Sky</option>
+                <option value="BUZZ">Buzz</option>
+                <option value="CLOUD_STRONG">Cloud (Strong)</option>
+              </select>
+            </div>
+          )}
 
           {/* Inline audible controls when enabled */}
           {audibleOn && (

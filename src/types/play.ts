@@ -30,6 +30,12 @@ export type SnapMeta = {
   roles?: { blitzers?: string[]; spy?: string | null };
   leverage?: Record<ReceiverID, { side: 'inside' | 'outside' | 'even'; via: string }>;
   leverageAdjust?: Record<ReceiverID, { dxYds: number; dDepthYds: number }>;
+  coverageInsights?: {
+    c3Rotation?: 'SKY' | 'BUZZ' | 'CLOUD_STRONG';
+    palmsTrapNow?: boolean;
+    quartersCarry2Now?: boolean;
+    mofState?: 'one-high' | 'two-high';
+  };
 };
 
 export type ThrowEvent = {
@@ -40,4 +46,3 @@ export type ThrowEvent = {
   nearestDefender?: string;
   catchPoint?: Pt;
 };
-
