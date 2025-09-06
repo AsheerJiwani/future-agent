@@ -249,3 +249,4 @@ export async function POST(req: Request) {
     const msg = e instanceof Error ? e.message : "unknown";
     return new Response(JSON.stringify({ summary: `Assistant error: ${msg}` }), { status: 200, headers: { "Content-Type": "application/json" } });
   }
+}

@@ -256,10 +256,12 @@ export async function POST(req: Request) {
       const msg = resp.choices[0]?.message;
       if (!msg) break;
       if (msg.tool_calls && msg.tool_calls.length > 0) {
-        for (const tc of msg.tool_calls) {
-          const args = (() => { try { return JSON.parse(tc.function.arguments || '{}'); } catch { return {}; } })();
-          const out = await execTool(tc.function.name, args);
-          messages.push({ role: 'tool', content: JSON.stringify(out), tool_call_id: tc.id, name: tc.function.name });
+        for (const tc of msg.tool_calls as any[]) {
+          const tname = tc?.function?.name || tc?.name || "";
+          const argStr = tc?.function?.arguments || tc?.arguments || "{}";
+          const args = (() => { try { return JSON.parse(argStr); } catch { return {}; } })();
+          const out = await execTool(tname, args);
+          messages.push({ role: 'tool', content: JSON.stringify(out), tool_call_id: tc.id, name: tname });
         }
         continue; // iterate to give model tool outputs
       }

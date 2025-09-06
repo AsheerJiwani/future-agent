@@ -6,10 +6,10 @@ export function getOrCreateUserId(): string | null {
   if (typeof window === 'undefined') return null;
   try {
     const key = 'qb_user_id';
-    let id = localStorage.getItem(key);
+    let id: string | null = localStorage.getItem(key);
     if (!id) {
       // Prefer crypto UUID if available
-      const u = (window.crypto && 'randomUUID' in window.crypto)
+      const u: string = (typeof window.crypto !== 'undefined' && 'randomUUID' in window.crypto)
         ? (window.crypto as any).randomUUID()
         : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       id = u;
@@ -20,4 +20,3 @@ export function getOrCreateUserId(): string | null {
     return null;
   }
 }
-
