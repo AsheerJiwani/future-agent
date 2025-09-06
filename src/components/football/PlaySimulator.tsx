@@ -42,6 +42,10 @@ const YPX = PX_H / FIELD_LENGTH_YDS;
 
 const xAcross = (ydsAcross: number) => ydsAcross * XPX;
 const yUp = (ydsUp: number) => PX_H - ydsUp * YPX;
+// Convert a field Y coordinate to yards “upfield” from the bottom LOS
+function yDepthYds(p: Pt): number {
+  return (PX_H - p.y) / YPX;
+}
 
 // QB at bottom-middle, ~12 yds from GL
 const QB = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(12) };
@@ -258,22 +262,31 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
     }
     case "CORNER":
     case "CORNER_MID": {
-      const stem  = { x: s.x, y: yUp(DEPTH.deep - 2) };
-      const breakOut = { x: s.x + outSign(s) * xAcross(12), y: yUp(DEPTH.deep - 4) };
-      const flag  = { x: sidelineX(s, 8), y: yUp(DEPTH.shot - 2) };
-      return [s, stem, breakOut, flag];
+      // Mid corner: stem tops at 10 yds beyond LOS, then 15 yds upfield diagonally to sideline
+      const losY = yDepthYds(s);
+      const stemTopY = losY + 10;
+      const diagY = stemTopY + 15;
+      const stem = { x: s.x, y: yUp(stemTopY) };
+      const diag = { x: sidelineX(s, 8), y: yUp(diagY) };
+      return [s, stem, diag];
     }
     case "CORNER_LOW": {
-      const stem  = { x: s.x, y: yUp(DEPTH.mid) };
-      const breakOut = { x: s.x + outSign(s) * xAcross(11), y: yUp(DEPTH.mid - 1) };
-      const flag  = { x: sidelineX(s, 10), y: yUp(DEPTH.deep) };
-      return [s, stem, breakOut, flag];
+      // Low corner: stem tops at 3 yds beyond LOS, then 15 yds upfield diagonally to sideline
+      const losY = yDepthYds(s);
+      const stemTopY = losY + 3;
+      const diagY = stemTopY + 15;
+      const stem = { x: s.x, y: yUp(stemTopY) };
+      const diag = { x: sidelineX(s, 8), y: yUp(diagY) };
+      return [s, stem, diag];
     }
     case "CORNER_HIGH": {
-      const stem  = { x: s.x, y: yUp(DEPTH.deep) };
-      const breakOut = { x: s.x + outSign(s) * xAcross(12), y: yUp(DEPTH.deep - 2) };
-      const flag  = { x: sidelineX(s, 6), y: yUp(DEPTH.shot) };
-      return [s, stem, breakOut, flag];
+      // High corner: stem tops at 17 yds beyond LOS, then 15 yds upfield diagonally to sideline
+      const losY = yDepthYds(s);
+      const stemTopY = losY + 17;
+      const diagY = stemTopY + 15;
+      const stem = { x: s.x, y: yUp(stemTopY) };
+      const diag = { x: sidelineX(s, 8), y: yUp(diagY) };
+      return [s, stem, diag];
     }
 
     /* Crossers */
@@ -1077,10 +1090,6 @@ useEffect(() => {
     const dx = (a.x - b.x) / XPX;
     const dy = (a.y - b.y) / YPX;
     return Math.hypot(dx, dy);
-  }
-  // Vertical depth (yds from LOS at bottom)
-  function yDepthYds(p: Pt): number {
-    return (PX_H - p.y) / YPX;
   }
 
   // Classify throw area: horizontal (L/M/R by hashes) + vertical band (SHORT/MID/DEEP)
@@ -2117,15 +2126,13 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
             QB
           </text>
 
-          {/* On-field coverage tooltip near QB */}
+          {/* On-field coverage tooltip (top-center) */}
           {(() => {
             const lines: string[] = [];
-            // MOF state
             const safFS = defenderPos(coverage, 'FS', t);
             const safSS = defenderPos(coverage, 'SS', t);
             const safDeep = [safFS, safSS].filter(p => yDepthYds(p) >= 14).length;
             lines.push(`MOF: ${safDeep >= 2 ? 'two-high' : 'one-high'}`);
-            // Rotation / rules
             if (coverage === 'C3') lines.push(`C3: ${c3RotationMode === 'AUTO' ? c3Rotation : c3RotationMode}`);
             if (coverage === 'PALMS') {
               const sr = strongIsRight();
@@ -2138,18 +2145,20 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
               lines.push(`Quarters: ${yDepthYds(two) >= 12 ? 'CARRY #2' : 'MIDPOINT'}`);
             }
             if (!lines.length) return null;
-            const x = QB.x + xAcross(8);
+            const boxW = 200;
+            const lineH = 14;
+            const padY = 8;
+            const boxH = padY * 2 + lines.length * lineH;
+            const x = (PX_W - boxW) / 2;
+            const y = 8;
             return (
               <g>
-                <rect x={x} y={QB.y - 44} width={160} height={36} rx={8} fill="rgba(0,0,0,0.45)" stroke="rgba(255,255,255,0.25)" />
-                <text x={x + 8} y={QB.y - 30} className="text-[10px]" fill="rgba(255,255,255,0.95)" style={{ paintOrder: 'stroke' }}>
-                  {lines[0]}
-                </text>
-                {lines[1] && (
-                  <text x={x + 8} y={QB.y - 18} className="text-[10px]" fill="rgba(255,255,255,0.9)">
-                    {lines[1]}
+                <rect x={x} y={y} width={boxW} height={boxH} rx={8} fill="rgba(0,0,0,0.45)" stroke="rgba(255,255,255,0.25)" />
+                {lines.map((ln, i) => (
+                  <text key={`ct-${i}`} x={x + 10} y={y + padY + (i + 0.8) * lineH} className="text-[10px]" fill="rgba(255,255,255,0.95)" style={{ paintOrder: 'stroke' }}>
+                    {ln}
                   </text>
-                )}
+                ))}
               </g>
             );
           })()}
@@ -2206,20 +2215,24 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
                     PRO
                   </text>
                 )}
-                {phase === 'pre' && (
-                  <text
-                    x={p.x}
-                    y={p.y + 14}
-                    className="text-[8px]"
-                    fill="rgba(255,255,255,0.9)"
-                    stroke="rgba(0,0,0,0.6)"
-                    strokeWidth={2}
-                    style={{ paintOrder: 'stroke' }}
-                    textAnchor="middle"
-                  >
-                    Lev: {levInfo[rid]?.side === 'outside' ? 'OUT' : levInfo[rid]?.side === 'inside' ? 'IN' : 'EVEN'}
-                  </text>
-                )}
+                {(() => {
+                  const side = levInfo[rid]?.side;
+                  if (!(phase === 'pre' && side && side !== 'even')) return null;
+                  return (
+                    <text
+                      x={p.x}
+                      y={p.y + 14}
+                      className="text-[8px]"
+                      fill="rgba(255,255,255,0.9)"
+                      stroke="rgba(0,0,0,0.6)"
+                      strokeWidth={2}
+                      style={{ paintOrder: 'stroke' }}
+                      textAnchor="middle"
+                    >
+                      {`Lev: ${side === 'outside' ? 'OUT' : 'IN'}`}
+                    </text>
+                  );
+                })()}
                 {phase === 'post' && (
                   <circle
                     cx={p.x}
