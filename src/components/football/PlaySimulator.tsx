@@ -1672,33 +1672,35 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
 
   /** ---------- AI grader ---------- */
   async function gradeDecision(to: ReceiverID) {
-    try {
-      // Compute target break timing and first-open signal
-      const path = O[to] ?? [];
-      const breaks = segmentBreakFracs(path);
-      const firstBreak = breaks.length ? breaks[0] : undefined;
-      const mult = receiverSpeedMult(to);
-      const tBreak = firstBreak !== undefined ? Math.min(1, firstBreak / Math.max(0.0001, recSpeed * mult)) : undefined;
-      const targetBreakMs = tBreak !== undefined ? Math.round(tBreak * PLAY_MS) : undefined;
-      const holdMs = lastHoldMs ?? Math.round(t * PLAY_MS);
-      const heldVsBreakMs = targetBreakMs !== undefined ? (holdMs - targetBreakMs) : undefined;
+    // Compute target break timing and first-open signal
+    const path = O[to] ?? [];
+    const breaks = segmentBreakFracs(path);
+    const firstBreak = breaks.length ? breaks[0] : undefined;
+    const mult = receiverSpeedMult(to);
+    const tBreak = firstBreak !== undefined ? Math.min(1, firstBreak / Math.max(0.0001, recSpeed * mult)) : undefined;
+    const targetBreakMs = tBreak !== undefined ? Math.round(tBreak * PLAY_MS) : undefined;
+    const holdMs = lastHoldMs ?? Math.round(t * PLAY_MS);
+    const heldVsBreakMs = targetBreakMs !== undefined ? (holdMs - targetBreakMs) : undefined;
 
-      // Find first-open receiver (score >= 0.6)
-      const rids: ReceiverID[] = ["X","Z","SLOT","TE","RB"];
-      let firstOpenId: ReceiverID | undefined;
-      let firstOpenMs: number | undefined;
-      for (let step = 0; step <= 100; step++) {
-        const tt = step / 100; // 0..1
-        for (const rid of rids) {
-          const info = computeReceiverOpenness(rid, tt);
-          if (info.score >= 0.6) {
-            firstOpenId = rid; firstOpenMs = Math.round(tt * PLAY_MS);
-            break;
-          }
+    // Find first-open receiver (score >= 0.6)
+    const rids: ReceiverID[] = ["X","Z","SLOT","TE","RB"];
+    let firstOpenId: ReceiverID | undefined;
+    let firstOpenMs: number | undefined;
+    for (let step = 0; step <= 100; step++) {
+      const tt = step / 100; // 0..1
+      for (const rid of rids) {
+        const info = computeReceiverOpenness(rid, tt);
+        if (info.score >= 0.6) {
+          firstOpenId = rid; firstOpenMs = Math.round(tt * PLAY_MS);
+          break;
         }
-        if (firstOpenId) break;
       }
+      if (firstOpenId) break;
+    }
 
+    let gradeStr = 'OK';
+    let explainStr = '';
+    try {
       const res = await fetch("/api/football-grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1718,42 +1720,44 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
         })
       });
       const data: { grade?: string; rationale?: string; coachingTip?: string } = await res.json();
-      setGrade(data.grade ?? "OK");
-      const detail = [data.rationale, data.coachingTip].filter(Boolean).join("  Tip: ");
-      setExplain(detail || "Good rep.");
-      safeTrack('ai_grade', { grade: data.grade ?? 'OK' });
-
-      // Server-side throw log (for future analytics)
-      try {
-        const meta = buildSnapMeta();
-        const payload = {
-          conceptId,
-          coverage,
-          formation,
-          target: to,
-          time: t,
-          playId,
-          holdMs,
-          throwArea: lastThrowArea?.key,
-          depthYds: lastThrowArea?.depthYds,
-          windowScore: lastWindow?.info.score,
-          nearestSepYds: lastWindow?.info.sepYds,
-          grade: data.grade ?? 'OK',
-          extra: {
-            c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
-            coverageInsights: meta.coverageInsights,
-            targetBreakMs,
-            heldVsBreakMs,
-            firstOpenId,
-            firstOpenMs
-          }
-        };
-        void fetch('/api/throw-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      } catch {}
+      gradeStr = data.grade ?? 'OK';
+      explainStr = [data.rationale, data.coachingTip].filter(Boolean).join("  Tip: ") || "Good rep.";
     } catch {
-      setGrade("OK");
-      setExplain("Grader unavailable. Try again.");
+      gradeStr = 'OK';
+      explainStr = "Grader unavailable. Try again.";
     }
+
+    setGrade(gradeStr);
+    setExplain(explainStr);
+    safeTrack('ai_grade', { grade: gradeStr });
+
+    // Server-side throw log (for future analytics) — log regardless of grader success
+    try {
+      const meta = buildSnapMeta();
+      const payload = {
+        conceptId,
+        coverage,
+        formation,
+        target: to,
+        time: t,
+        playId,
+        holdMs,
+        throwArea: lastThrowArea?.key,
+        depthYds: lastThrowArea?.depthYds,
+        windowScore: lastWindow?.info.score,
+        nearestSepYds: lastWindow?.info.sepYds,
+        grade: gradeStr,
+        extra: {
+          c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
+          coverageInsights: meta.coverageInsights,
+          targetBreakMs,
+          heldVsBreakMs,
+          firstOpenId,
+          firstOpenMs
+        }
+      };
+      void fetch('/api/throw-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    } catch {}
   }
 
   // ---------- Ball flight + sounds (ball follows play clock, no extra RAF) ----------
