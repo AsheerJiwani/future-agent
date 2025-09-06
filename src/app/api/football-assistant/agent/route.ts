@@ -4,6 +4,10 @@ export const dynamic = "force-dynamic";
 
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam, ChatCompletionMessageToolCall } from "openai/resources/chat/completions";
+import type { NextRequest } from "next/server";
+import * as GradeRoute from "../../football-grade/route";
+import * as AudibleRoute from "../../football-audible/route";
+import * as MetricsRoute from "../../metrics/throw-summary/route";
 import { createClient } from "@supabase/supabase-js";
 import { loadConcept } from "@data/football/loadConcept";
 import type { FootballConceptId } from "@data/football/catalog";
@@ -50,7 +54,7 @@ function conceptDigest(concept: Concept, coverage: CoverageID) {
   );
 }
 
-async function getMetrics({ coverage, conceptId, areaHoriz, areaBand, limit = 12, userId }: { coverage?: string; conceptId?: string; areaHoriz?: string; areaBand?: string; limit?: number; userId?: string }) {
+async function getMetrics({ coverage, conceptId, areaHoriz, areaBand, limit = 12, userId, baseOrigin }: { coverage?: string; conceptId?: string; areaHoriz?: string; areaBand?: string; limit?: number; userId?: string; baseOrigin: string }) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
@@ -68,17 +72,22 @@ async function getMetrics({ coverage, conceptId, areaHoriz, areaBand, limit = 12
       return data ?? [];
     } catch {}
   }
-  // fallback to internal route
-  const url = new URL("http://localhost/api/metrics/throw-summary");
-  if (coverage) url.searchParams.set('coverage', coverage);
-  if (conceptId) url.searchParams.set('conceptId', conceptId);
-  if (areaHoriz) url.searchParams.set('areaHoriz', areaHoriz);
-  if (areaBand) url.searchParams.set('areaBand', areaBand);
-  url.searchParams.set('limit', String(limit));
-  if (userId) url.searchParams.set('userId', userId);
-  const res = await fetch(url);
-  const json = await res.json();
-  return json?.rows ?? [];
+  // fallback: call internal metrics handler directly
+  try {
+    const url = new URL("/api/metrics/throw-summary", baseOrigin);
+    if (coverage) url.searchParams.set('coverage', coverage);
+    if (conceptId) url.searchParams.set('conceptId', conceptId);
+    if (areaHoriz) url.searchParams.set('areaHoriz', areaHoriz);
+    if (areaBand) url.searchParams.set('areaBand', areaBand);
+    url.searchParams.set('limit', String(limit));
+    if (userId) url.searchParams.set('userId', userId);
+    const req = new Request(url, { method: 'GET' });
+    const resp = await MetricsRoute.GET(req as unknown as NextRequest);
+    const json = await resp.json();
+    return (json?.rows ?? []) as unknown[];
+  } catch {
+    return [];
+  }
 }
 
 async function getSessionMemory(userId?: string): Promise<Record<string, unknown>> {
@@ -181,7 +190,25 @@ export async function POST(req: Request) {
         function: {
           name: "grade_throw",
           description: "Call internal grader for a throw decision",
-          parameters: { type: "object", additionalProperties: true }
+          parameters: {
+            type: "object",
+            properties: {
+              conceptId: { type: "string", description: "Concept ID (e.g., SMASH)" },
+              coverage: { type: "string", description: "Coverage ID (e.g., C3, C1)" },
+              target: { type: "string", description: "Receiver ID: X, Z, SLOT, TE, RB" },
+              time: { type: "number", description: "Play clock fraction 0..1 at the throw" },
+              formation: { type: "string" },
+              assignments: { type: "object", additionalProperties: { type: "string" }, description: "Receiver->RouteKeyword map" },
+              numbering: { type: "object" },
+              windowScore: { type: "number" },
+              nearestSepYds: { type: "number" },
+              nearestDefender: { type: "string" },
+              playId: { type: "number" },
+              holdMs: { type: "number" },
+              throwArea: { type: "string" }
+            },
+            required: ["conceptId", "coverage", "target", "time"]
+          }
         }
       },
       {
@@ -189,7 +216,19 @@ export async function POST(req: Request) {
         function: {
           name: "suggest_audible",
           description: "Call internal audible suggester to adjust assignments",
-          parameters: { type: "object", additionalProperties: true }
+          parameters: {
+            type: "object",
+            properties: {
+              conceptId: { type: "string" },
+              coverage: { type: "string" },
+              formation: { type: "string" },
+              assignments: { type: "object", additionalProperties: { type: "string" } },
+              numbering: { type: "object" },
+              snapshot: { type: "object" },
+              snapMeta: { type: "object" }
+            },
+            required: ["conceptId", "coverage", "formation", "numbering"]
+          }
         }
       }
     ];
@@ -213,6 +252,14 @@ export async function POST(req: Request) {
 
     const sessionMemory = await getSessionMemory(userId);
 
+    // Resolve base origin for internal tool fetches
+    const origin = (() => {
+      try { const u = new URL(req.url); return u.origin; } catch { /* no-op */ }
+      const proto = (req.headers as Headers).get('x-forwarded-proto') ?? 'https';
+      const host = (req.headers as Headers).get('host') ?? 'localhost';
+      return `${proto}://${host}`;
+    })();
+
     const messages: ChatCompletionMessageParam[] = [
       { role: 'system', content: sys },
       { role: 'user', content: JSON.stringify({ ...user, sessionMemory }) }
@@ -226,7 +273,7 @@ export async function POST(req: Request) {
         return { digest: conceptDigest(concept, String(args.coverage) as CoverageID), sources: concept.sources ?? [] } as ToolResult;
       }
       if (name === 'get_throw_metrics') {
-        const rows = await getMetrics({ coverage: String(args.coverage || ''), conceptId: String(args.conceptId || ''), areaHoriz: String(args.areaHoriz || ''), areaBand: String(args.areaBand || ''), limit: Number(args.limit || 12), userId: args.userId ? String(args.userId) : undefined });
+        const rows = await getMetrics({ coverage: String(args.coverage || ''), conceptId: String(args.conceptId || ''), areaHoriz: String(args.areaHoriz || ''), areaBand: String(args.areaBand || ''), limit: Number(args.limit || 12), userId: args.userId ? String(args.userId) : undefined, baseOrigin: origin });
         return { rows } as ToolResult;
       }
       if (name === 'get_session_memory') {
@@ -238,12 +285,24 @@ export async function POST(req: Request) {
         return { ok } as ToolResult;
       }
       if (name === 'grade_throw') {
-        const res = await fetch("http://localhost/api/football-grade", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
-        try { return (await res.json()) as ToolResult; } catch { return {}; }
+        try {
+          const req = new Request(new URL('/api/football-grade', origin), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+          const resp = await (GradeRoute as { POST: (r: NextRequest) => Promise<Response> }).POST(req as unknown as NextRequest);
+          const json = (await resp.json()) as ToolResult;
+          return json;
+        } catch {
+          return {};
+        }
       }
       if (name === 'suggest_audible') {
-        const res = await fetch("http://localhost/api/football-audible", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
-        try { return (await res.json()) as ToolResult; } catch { return {}; }
+        try {
+          const req = new Request(new URL('/api/football-audible', origin), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+          const resp = await (AudibleRoute as { POST: (r: Request) => Promise<Response> }).POST(req);
+          const json = (await resp.json()) as ToolResult;
+          return json;
+        } catch {
+          return {};
+        }
       }
       return {};
     }

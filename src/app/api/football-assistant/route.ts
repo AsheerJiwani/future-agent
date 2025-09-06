@@ -8,6 +8,8 @@ import { loadConcept } from "@data/football/loadConcept";
 import type { FootballConceptId } from "@data/football/catalog";
 import type { CoverageID, Concept, ReadPlan, ProgressionStep, ReceiverID } from "@data/football/types";
 import type { PlaySnapshot, SnapMeta } from "@/types/play";
+import type { NextRequest } from "next/server";
+import * as MetricsRoute from "../metrics/throw-summary/route";
 
 type AssistantMode = "analysis" | "teach" | "quiz";
 type FocusKey = "timing" | "leverage" | "rotation" | "hot";
@@ -101,9 +103,9 @@ function applyOverrides(base: Concept, overrides?: Partial<Concept>): Concept {
 
 type MetricRow = { coverage: string; concept_id: string; area_horiz: string; area_band: string; n_throws: number; avg_window_score: number; avg_nearest_sep_yds: number; avg_hold_ms: number; completion_rate: number };
 
-async function fetchThrowMetrics(filters?: { coverage?: string; conceptId?: string; areaHoriz?: string; areaBand?: string; limit?: number; userId?: string }): Promise<MetricRow[]> {
+async function fetchThrowMetrics(filters: { coverage?: string; conceptId?: string; areaHoriz?: string; areaBand?: string; limit?: number; userId?: string; baseOrigin: string }): Promise<MetricRow[]> {
   // Prefer direct Supabase if configured, else try the internal API route as a fallback
-  const { coverage, conceptId, areaHoriz, areaBand, limit = 12, userId } = filters || {};
+  const { coverage, conceptId, areaHoriz, areaBand, limit = 12, userId, baseOrigin } = filters;
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -126,16 +128,16 @@ async function fetchThrowMetrics(filters?: { coverage?: string; conceptId?: stri
   }
 
   try {
-    const url = new URL("http://localhost" + "/api/metrics/throw-summary");
+    const url = new URL("/api/metrics/throw-summary", baseOrigin);
     if (coverage) url.searchParams.set('coverage', coverage);
     if (conceptId) url.searchParams.set('conceptId', conceptId);
     if (areaHoriz) url.searchParams.set('areaHoriz', areaHoriz);
     if (areaBand) url.searchParams.set('areaBand', areaBand);
     url.searchParams.set('limit', String(limit));
     if (userId) url.searchParams.set('userId', userId);
-    const res = await fetch(url, { method: 'GET' });
-    if (!res.ok) return [];
-    const json = await res.json();
+    const req2 = new Request(url, { method: 'GET' });
+    const resp = await (MetricsRoute as { GET: (r: NextRequest) => Promise<Response> }).GET(req2 as unknown as NextRequest);
+    const json = await resp.json();
     return (json?.rows ?? []) as MetricRow[];
   } catch {
     return [];
@@ -160,6 +162,13 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as AssistantRequest;
     const { conceptId, coverage, snapshot, snapMeta, focus = [], mode = "analysis" } = body;
+    // Compute origin from request for internal fallbacks
+    const origin = (() => {
+      try { const u = new URL(req.url); return u.origin; } catch { /* no-op */ }
+      const proto = (req.headers as Headers).get('x-forwarded-proto') ?? 'https';
+      const host = (req.headers as Headers).get('host') ?? 'localhost';
+      return `${proto}://${host}`;
+    })();
 
     let concept = await loadConcept(conceptId);
     concept = applyOverrides(concept, body.overrides);
@@ -171,6 +180,7 @@ export async function POST(req: Request) {
       areaHoriz: body.filters?.areaHoriz,
       areaBand: body.filters?.areaBand,
       limit: 12,
+      baseOrigin: origin,
     });
     const statsUser = body.userId ? await fetchThrowMetrics({
       coverage,
@@ -178,7 +188,8 @@ export async function POST(req: Request) {
       areaHoriz: body.filters?.areaHoriz,
       areaBand: body.filters?.areaBand,
       limit: 12,
-      userId: body.userId
+      userId: body.userId,
+      baseOrigin: origin,
     }) : [];
 
     const system = {
