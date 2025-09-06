@@ -80,9 +80,10 @@ function coerceReadPlans(v: unknown): ReadPlan[] {
 
         // Finally cast to ReadPlan; if your ReadPlan type doesn't include 'coverage',
         // you can drop it from the object at this point:
-        const { coverage: _dropIfNotInType, ...rest } = obj;
+        const restObj = { ...obj } as Record<string, unknown>;
+        delete restObj.coverage;
         const candidate = ("coverage" in ({} as ReadPlan)) ? (obj as unknown as ReadPlan)
-                                                           : (rest as unknown as ReadPlan);
+                                                           : (restObj as unknown as ReadPlan);
 
         out.push(candidate);
       }

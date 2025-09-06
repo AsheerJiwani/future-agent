@@ -54,14 +54,15 @@ export async function POST(req: NextRequest) {
           referer: req.headers.get('referer'),
           extra: body.extra ?? null
         };
-        let { error } = await supabase.from('throws').insert([row]);
+        const { error } = await supabase.from('throws').insert([row]);
         if (error) {
           console.warn('supabase insert error:', error.message);
           // Fallback: some projects may not have the optional `extra` column yet or schema cache not reloaded
           if (String(error.message).toLowerCase().includes('extra')) {
             try {
               // retry without `extra`
-              const { extra, ...rowNoExtra } = row as Record<string, unknown>;
+              const rowNoExtra: Record<string, unknown> = { ...(row as Record<string, unknown>) };
+              delete rowNoExtra.extra;
               const retry = await supabase.from('throws').insert([rowNoExtra]);
               if (retry.error) console.warn('supabase retry insert error:', retry.error.message);
             } catch (e) {
