@@ -2135,7 +2135,6 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
             }
             if (!lines.length) return null;
             const x = QB.x + xAcross(8);
-            const y = QB.y - yDepthYds({ x: QB.x, y: QB.y }) / 100; // negligible; keep below
             return (
               <g>
                 <rect x={x} y={QB.y - 44} width={160} height={36} rx={8} fill="rgba(0,0,0,0.45)" stroke="rgba(255,255,255,0.25)" />

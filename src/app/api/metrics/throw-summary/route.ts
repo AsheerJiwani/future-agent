@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +19,6 @@ export async function GET(req: NextRequest) {
       return Response.json({ error: 'Supabase not configured' }, { status: 500 });
     }
 
-    const mod: any = await import('@supabase/supabase-js');
-    const createClient = mod.createClient as (url: string, key: string, opts?: any) => any;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
     const { data, error } = await supabase.rpc('get_throw_metrics', {
@@ -36,4 +35,3 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: msg }, { status: 500 });
   }
 }
-
