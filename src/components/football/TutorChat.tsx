@@ -6,7 +6,7 @@ import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
-export default function TutorChat({ conceptId, coverage, formation, snapshot, snapMeta, lastThrow, onSetCoverage }: { conceptId?: FootballConceptId; coverage?: CoverageID; formation?: string; snapshot?: PlaySnapshot; snapMeta?: SnapMeta; lastThrow?: ThrowSummary; onSetCoverage?: (c: CoverageID)=>void }) {
+export default function TutorChat({ conceptId, coverage, formation, snapshot, snapMeta, lastThrow, adaptiveOn = false, onSetCoverage }: { conceptId?: FootballConceptId; coverage?: CoverageID; formation?: string; snapshot?: PlaySnapshot; snapMeta?: SnapMeta; lastThrow?: ThrowSummary; adaptiveOn?: boolean; onSetCoverage?: (c: CoverageID)=>void }) {
   const [history, setHistory] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [audiblesOn, setAudiblesOn] = useState(true);
@@ -58,6 +58,25 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
   // Auto-analyze after a graded throw
   useEffect(() => {
     if (!lastThrow) return;
+    // Optional: track skills for adaptive drills
+    if (adaptiveOn) {
+      try {
+        void fetch('/api/skills/track', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+            conceptId, coverage, formation,
+            throw: {
+              grade: lastThrow.grade,
+              windowScore: lastThrow.windowScore,
+              catchWindowScore: lastThrow.catchWindowScore,
+              heldVsBreakMs: (lastThrow as any)?.heldVsBreakMs,
+              throwArea: lastThrow.throwArea,
+              firstOpenId: (lastThrow as any)?.firstOpenId,
+              target: lastThrow.target,
+            }
+          })
+        });
+      } catch {}
+    }
     void send('Analyze last rep.', lastThrow as unknown as Record<string, unknown>);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastThrow?.playId, lastThrow?.grade]);
