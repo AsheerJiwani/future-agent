@@ -87,7 +87,7 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
     console.log('[TutorChat] Sending "Analyze last rep." to AI tutor');
     void send('Analyze last rep.', lastThrow as unknown as Record<string, unknown>);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastThrow?.playId, lastThrow?.grade]);
+  }, [lastThrow?.playId, lastThrow?.grade, lastThrow?.target, lastThrow?.time, lastThrow?.throwArea]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-3 md:p-4 backdrop-blur-lg">

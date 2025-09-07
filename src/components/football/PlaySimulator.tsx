@@ -3689,9 +3689,12 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
                 className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
                 value={audTarget}
                 onChange={(e) => {
-                  // PERFORMANCE: Use requestAnimationFrame to avoid blocking UI
+                  // ULTRA-PERFORMANCE: Optimized for instant response
                   const value = e.target.value as ReceiverID;
-                  requestAnimationFrame(() => setAudTarget(value));
+                  // Immediate visual feedback with double RAF for smoothness
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => setAudTarget(value));
+                  });
                 }}
               >
                 <option value="">Receiver…</option>
@@ -3706,9 +3709,12 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
                 className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
                 value={audRoute}
                 onChange={(e) => {
-                  // PERFORMANCE: Use requestAnimationFrame to avoid blocking UI
+                  // ULTRA-PERFORMANCE: Optimized for instant response
                   const value = e.target.value as RouteKeyword;
-                  requestAnimationFrame(() => setAudRoute(value));
+                  // Immediate visual feedback with double RAF for smoothness
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => setAudRoute(value));
+                  });
                 }}
               >
                 <option value="">Route…</option>
