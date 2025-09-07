@@ -84,10 +84,24 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
       } catch {}
     }
     
-    console.log('[TutorChat] Sending "Analyze last rep." to AI tutor');
-    void send('Analyze last rep.', lastThrow as unknown as Record<string, unknown>);
+    console.log('[TutorChat] Sending "Analyze last rep." to AI tutor with:', {
+      playId: lastThrow.playId,
+      grade: lastThrow.grade,
+      target: lastThrow.target,
+      throwArea: lastThrow.throwArea,
+      hasExplanation: !!lastThrow.explanation
+    });
+    
+    // Add timestamp to ensure uniqueness and force AI analysis
+    const analysisRequest = {
+      ...lastThrow,
+      analysisTimestamp: Date.now()
+    };
+    
+    void send('Analyze last rep.', analysisRequest as unknown as Record<string, unknown>);
+    // Use uniqueId and throwTimestamp to ensure every throw triggers analysis
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastThrow?.playId, lastThrow?.grade, lastThrow?.target, lastThrow?.time, lastThrow?.throwArea]);
+  }, [lastThrow?.uniqueId, lastThrow?.throwTimestamp]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-3 md:p-4 backdrop-blur-lg">

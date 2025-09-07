@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, startTransition } from "react";
 import { getOrCreateUserId } from "../../lib/user";
 // import AIAssistant from "./AIAssistant";
 import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
@@ -215,7 +215,7 @@ export default function FootballPanel() {
             onChange={(e) => {
               // PERFORMANCE: Use requestAnimationFrame for non-blocking concept changes
               const value = e.target.value as FootballConceptId;
-              requestAnimationFrame(() => setConceptId(value));
+              startTransition(() => setConceptId(value));
             }}
             className="bg-white/10 text-white rounded-xl px-3 py-2 outline-none"
           >
@@ -232,7 +232,7 @@ export default function FootballPanel() {
             onChange={(e) => {
               // PERFORMANCE: Use requestAnimationFrame for non-blocking coverage changes  
               const value = e.target.value as CoverageID;
-              requestAnimationFrame(() => setCoverage(value));
+              startTransition(() => setCoverage(value));
             }}
             className="bg-white/10 text-white rounded-xl px-3 py-2 outline-none"
           >

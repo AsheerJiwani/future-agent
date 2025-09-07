@@ -75,4 +75,6 @@ export type ThrowSummary = {
   formation?: string;
   catchWindowScore?: number;
   catchSepYds?: number;
+  throwTimestamp?: number;
+  uniqueId?: string;
 };

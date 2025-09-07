@@ -1,6 +1,6 @@
 "use client";
 
-import { JSX, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { JSX, useEffect, useMemo, useRef, useState, useCallback, startTransition } from "react";
 import type { FootballConceptId } from "../../data/football/catalog";
 import type { CoverageID, ReceiverID, RouteKeyword, Pt, AlignMap } from "../../data/football/types";
 import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
@@ -473,6 +473,51 @@ function computeNumbering(align: AlignMap): Numbering {
   return { ...tag(leftIds, "left", leftBand), ...tag(rightIds, "right", rightBand) } as Numbering;
 }
 
+/* --------- PERFORMANCE: Memoization Caches for Ultra-Fast Rendering --------- */
+const formationCache = new Map<string, AlignMap>();
+const numberingCache = new Map<string, Numbering>();
+const routeCache = new Map<string, RouteMap>();
+
+// Debounced state update pattern for preventing rapid-fire updates
+const debounceMap = new Map<string, NodeJS.Timeout>();
+function debouncedUpdate(key: string, updateFn: () => void, delay = 16) {
+  const existing = debounceMap.get(key);
+  if (existing) clearTimeout(existing);
+  
+  const timeout = setTimeout(() => {
+    updateFn();
+    debounceMap.delete(key);
+  }, delay);
+  
+  debounceMap.set(key, timeout);
+}
+
+function getCachedFormation(formationName: FormationName, hashSide: 'L'|'R', customAlign: AlignMap | null): AlignMap {
+  if (customAlign) return customAlign;
+  
+  const key = `${formationName}_${hashSide}`;
+  if (formationCache.has(key)) {
+    return formationCache.get(key)!;
+  }
+  
+  const base = FORMATIONS[formationName];
+  const adjusted = adjustSplitsForHash(base, hashSide);
+  formationCache.set(key, adjusted);
+  return adjusted;
+}
+
+function getCachedNumbering(align: AlignMap): Numbering {
+  // Simple cache key based on positions - for production you might want a more sophisticated key
+  const key = JSON.stringify(align);
+  if (numberingCache.has(key)) {
+    return numberingCache.get(key)!;
+  }
+  
+  const numbering = computeNumbering(align);
+  numberingCache.set(key, numbering);
+  return numbering;
+}
+
 /* --------- Concept defaults (used if JSON lacks assignments) --------- */
 function buildConceptRoutes(
   conceptId: FootballConceptId,
@@ -607,7 +652,7 @@ export default function PlaySimulator({
     setRouteOrient(orient0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conceptId, formation]);
-  const [numbering, setNumbering] = useState<Numbering>(() => computeNumbering(FORMATIONS[formation]));
+  const [numbering, setNumbering] = useState<Numbering>(() => getCachedNumbering(FORMATIONS[formation]));
 
   // Defender starts (dynamic, strength-aware)
   const [Dstart, setDstart] = useState<Record<DefenderID, Pt>>(D_ALIGN);
@@ -760,7 +805,7 @@ export default function PlaySimulator({
       const rid = d.rid as ReceiverID | undefined;
       const type = (d.type ?? 'across') as 'jet'|'short'|'across';
       const dir = d.dir as ('left'|'right'|undefined);
-      const base = (customAlign ?? FORMATIONS[formation]) as AlignMap;
+      const base = getCachedFormation(formation, hashSide, customAlign);
       if (!rid) return;
       const cur = base[rid as keyof AlignMap] as Pt | undefined;
       if (!cur) return;
@@ -1310,10 +1355,9 @@ setManExtraRoles({ blitzers, spy });
     if (motionBusy) return;
     
     // IMMEDIATE: Basic alignment and numbering for instant visual feedback
-    const base = (customAlign ?? FORMATIONS[formation]) as AlignMap;
-    const A = customAlign ? base : adjustSplitsForHash(base, hashSide);
-    setAlign(A as AlignMap);
-    setNumbering(computeNumbering(A));
+    const A = getCachedFormation(formation, hashSide, customAlign);
+    setAlign(A);
+    setNumbering(getCachedNumbering(A));
     
     // BACKGROUND: Defer expensive route and defender computations
     setTimeout(() => {
@@ -2505,6 +2549,9 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         formation,
         catchWindowScore: computeReceiverOpenness(to, Math.min(1, t)).score,
         catchSepYds: computeReceiverOpenness(to, Math.min(1, t)).sepYds,
+        // Add unique identifier to ensure AI Tutor always triggers
+        throwTimestamp: Date.now(),
+        uniqueId: `${playId}-${to}-${Date.now()}`
       };
       
       // Debug: ensure callback fires
@@ -3041,7 +3088,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             <input type="checkbox" checked={showDefense} onChange={(e) => {
               // PERFORMANCE: Use requestAnimationFrame for instant Show Defense toggle
               const checked = e.target.checked;
-              requestAnimationFrame(() => setShowDefense(checked));
+              startTransition(() => setShowDefense(checked));
             }} /> Show Defense
           </label>
           <label className="flex items-center gap-2 text-white/70 text-xs">
@@ -3104,7 +3151,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             onChange={(e) => {
               // PERFORMANCE: Use requestAnimationFrame for instant Formation changes
               const value = e.target.value as FormationName;
-              requestAnimationFrame(() => setFormation(value));
+              startTransition(() => setFormation(value));
             }}
             className="bg-white/10 text-white text-xs rounded-md px-2 py-1"
           >
@@ -3556,7 +3603,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             onChange={(e) => {
               // PERFORMANCE: Use requestAnimationFrame to avoid blocking UI
               const value = e.target.value as ReceiverID;
-              requestAnimationFrame(() => setMotionRid(value));
+              startTransition(() => setMotionRid(value));
             }}
             disabled={motionBusy || phase !== 'pre'}
           >
@@ -3674,7 +3721,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
                   <label className="ml-2 flex items-center gap-1"><input type="checkbox" checked={showDefense} onChange={(e) => {
                     // PERFORMANCE: Use requestAnimationFrame for instant Show Defense toggle
                     const checked = e.target.checked;
-                    requestAnimationFrame(() => setShowDefense(checked));
+                    startTransition(() => setShowDefense(checked));
                   }} /> Show Defense</label>
                   <label className="ml-2 flex items-center gap-1"><input type="checkbox" checked={showNearest} onChange={(e)=>setShowNearest(e.target.checked)} /> Show Nearest</label>
                 </>
@@ -3693,7 +3740,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
                   const value = e.target.value as ReceiverID;
                   // Immediate visual feedback with double RAF for smoothness
                   requestAnimationFrame(() => {
-                    requestAnimationFrame(() => setAudTarget(value));
+                    startTransition(() => setAudTarget(value));
                   });
                 }}
               >
@@ -3713,7 +3760,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
                   const value = e.target.value as RouteKeyword;
                   // Immediate visual feedback with double RAF for smoothness
                   requestAnimationFrame(() => {
-                    requestAnimationFrame(() => setAudRoute(value));
+                    startTransition(() => setAudRoute(value));
                   });
                 }}
               >
