@@ -1303,53 +1303,55 @@ setManExtraRoles({ blitzers, spy });
   setManLagProfile(prof);
 }, [phase, coverage]);
 
-  // Rebuild alignment, numbering, routes (with leverage), and defender starts whenever inputs change
+  // SPLIT APPROACH: Immediate visual updates + background expensive computations
   useEffect(() => {
     // Only rebuild at pre-snap or when structure changes, and avoid thrashing during motion
     if (phase !== 'pre') return;
     if (motionBusy) return;
+    
+    // IMMEDIATE: Basic alignment and numbering for instant visual feedback
     const base = (customAlign ?? FORMATIONS[formation]) as AlignMap;
     const A = customAlign ? base : adjustSplitsForHash(base, hashSide);
     setAlign(A as AlignMap);
     setNumbering(computeNumbering(A));
     
-    // Compute defender starts first so we can adjust routes by leverage
-    const starts = computeDefenderStarts(A as AlignMap);
+    // BACKGROUND: Defer expensive route and defender computations
+    setTimeout(() => {
+      // Compute defender starts first so we can adjust routes by leverage
+      const starts = computeDefenderStarts(A as AlignMap);
 
-    // Use preserved route orientation so routes don't flip after motion
-    const routes = buildConceptRoutes(conceptId, A as AlignMap, coverage, routeOrient);
+      // Use preserved route orientation so routes don't flip after motion
+      const routes = buildConceptRoutes(conceptId, A as AlignMap, coverage, routeOrient);
 
-    if (teBlock) routes.TE = passProPathTE(A as AlignMap);
-    if (rbBlock) routes.RB = passProPathRB(A as AlignMap);
+      if (teBlock) routes.TE = passProPathTE(A as AlignMap);
+      if (rbBlock) routes.RB = passProPathRB(A as AlignMap);
 
-    // Apply manual audible overrides (skip if that player is blocking)
-    (Object.entries(manualAssignments) as [ReceiverID, RouteKeyword][])
-      .forEach(([rid, kw]) => {
+      // Apply manual audible overrides (skip if that player is blocking)
+      (Object.entries(manualAssignments) as [ReceiverID, RouteKeyword][])
+        .forEach(([rid, kw]) => {
+          if ((rid === "TE" && teBlock) || (rid === "RB" && rbBlock)) return;
+          routes[rid] = routeFromKeyword(kw, (A as AlignMap)[rid], coverage, routeOrient[rid]);
+        });
+
+      // Leverage-driven tweaks (man + match) and collect meta
+      const levMeta: Record<ReceiverID, { side: 'inside'|'outside'|'even'; via: string }> = { X: {side:'even', via:''}, Z: {side:'even', via:''}, SLOT: {side:'even', via:''}, TE: {side:'even', via:''}, RB: {side:'even', via:''} };
+      const adjMeta: Record<ReceiverID, { dxYds: number; dDepthYds: number }> = { X: {dxYds:0,dDepthYds:0}, Z: {dxYds:0,dDepthYds:0}, SLOT: {dxYds:0,dDepthYds:0}, TE: {dxYds:0,dDepthYds:0}, RB: {dxYds:0,dDepthYds:0} };
+      (Object.keys(routes) as ReceiverID[]).forEach((rid) => {
         if ((rid === "TE" && teBlock) || (rid === "RB" && rbBlock)) return;
-        routes[rid] = routeFromKeyword(kw, (A as AlignMap)[rid], coverage, routeOrient[rid]);
+        routes[rid] = leverageAdjustPath(rid, routes[rid], coverage, A, starts, levMeta, adjMeta);
       });
 
-    // Leverage-driven tweaks (man + match) and collect meta
-    const levMeta: Record<ReceiverID, { side: 'inside'|'outside'|'even'; via: string }> = { X: {side:'even', via:''}, Z: {side:'even', via:''}, SLOT: {side:'even', via:''}, TE: {side:'even', via:''}, RB: {side:'even', via:''} };
-    const adjMeta: Record<ReceiverID, { dxYds: number; dDepthYds: number }> = { X: {dxYds:0,dDepthYds:0}, Z: {dxYds:0,dDepthYds:0}, SLOT: {dxYds:0,dDepthYds:0}, TE: {dxYds:0,dDepthYds:0}, RB: {dxYds:0,dDepthYds:0} };
-    (Object.keys(routes) as ReceiverID[]).forEach((rid) => {
-      if ((rid === "TE" && teBlock) || (rid === "RB" && rbBlock)) return;
-      routes[rid] = leverageAdjustPath(rid, routes[rid], coverage, A, starts, levMeta, adjMeta);
-    });
-
-    setO(routes);
-
-    // strength-aware defensive starting spots
-    setDstart(starts);
-
-    // expose leverage info for UI/AI
-    setLevInfo(levMeta);
-    setLevAdjust(adjMeta);
-    // If we just completed a motion and requested Auto Snap, do it after rebuild
-    if (autoSnapAfterMotionRef.current && phase === 'pre') {
-      autoSnapAfterMotionRef.current = false;
-      startSnap();
-    }
+      setO(routes);
+      setDstart(starts);
+      setLevInfo(levMeta);
+      setLevAdjust(adjMeta);
+      
+      // Handle auto-snap after motion
+      if (autoSnapAfterMotionRef.current && phase === 'pre') {
+        autoSnapAfterMotionRef.current = false;
+        startSnap();
+      }
+    }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, formation, conceptId, coverage, teBlock, rbBlock, manualAssignments, setT, customAlign, motionBusy, hashSide]);
 
@@ -2761,15 +2763,14 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       setThrowMeta(null);
       setCaught(true);
       
-      // Defer expensive operations to avoid blocking UI
+      // CRITICAL: Execute immediately for AI Tutor functionality
       if (decision) {
-        setTimeout(() => {
-          try {
-            const ci = computeReceiverOpenness(decision, t);
-            setLastCatchInfo({ rid: decision, t, score: ci.score, sep: ci.sepYds });
-          } catch {}
-          gradeDecision(decision);
-        }, 0);
+        try {
+          const ci = computeReceiverOpenness(decision, t);
+          setLastCatchInfo({ rid: decision, t, score: ci.score, sep: ci.sepYds });
+        } catch {}
+        // Must call gradeDecision immediately to ensure onThrowGraded fires for AI Tutor
+        gradeDecision(decision);
       }
       if (soundOn) playCatchPop();
     }
