@@ -6,7 +6,7 @@ import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
-export default function TutorChat({ conceptId, coverage, formation, snapshot, snapMeta, lastThrow, adaptiveOn = false, onSetCoverage, isFullScreen = false }: { conceptId?: FootballConceptId; coverage?: CoverageID; formation?: string; snapshot?: PlaySnapshot; snapMeta?: SnapMeta; lastThrow?: ThrowSummary; adaptiveOn?: boolean; onSetCoverage?: (c: CoverageID)=>void; isFullScreen?: boolean }) {
+export default function TutorChat({ conceptId, coverage, formation, snapshot, snapMeta, lastThrow, adaptiveOn = false, onSetCoverage, isFullScreen = false, isTopBar = false }: { conceptId?: FootballConceptId; coverage?: CoverageID; formation?: string; snapshot?: PlaySnapshot; snapMeta?: SnapMeta; lastThrow?: ThrowSummary; adaptiveOn?: boolean; onSetCoverage?: (c: CoverageID)=>void; isFullScreen?: boolean; isTopBar?: boolean }) {
   const [history, setHistory] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [audiblesOn, setAudiblesOn] = useState(true);
@@ -112,6 +112,96 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
     // ROBUST: Multiple dependency checks to ensure triggering
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastThrow?.uniqueId, lastThrow?.throwTimestamp, lastThrow?.playId, lastThrow?.grade, lastThrow?.target]);
+
+  if (isTopBar) {
+    // TOP BAR MODE: Horizontal layout for top bar integration
+    return (
+      <div className="flex items-center gap-4 h-full">
+        {/* STATUS & CONTROLS - Left side */}
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+          <div className="text-sm font-semibold text-white">AI Defense Coach</div>
+          <div className="flex items-center gap-3 text-xs text-white/60">
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" checked={tutor} onChange={(e)=>setTutor(e.target.checked)} className="rounded" /> 
+              <span>Auto-Analysis</span>
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" checked={quizAfter} onChange={(e)=>setQuizAfter(e.target.checked)} className="rounded" /> 
+              <span>Quiz Mode</span>
+            </label>
+          </div>
+        </div>
+
+        {/* AI FEEDBACK - Center flex area */}
+        <div className="flex-1 flex items-center gap-3 overflow-x-auto">
+          {/* Suggested Coverage Card */}
+          {suggested && (
+            <div className="flex-shrink-0 bg-gradient-to-r from-indigo-500/20 to-fuchsia-500/20 border border-indigo-400/30 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2">
+                <div className="text-indigo-300 text-xs font-semibold">🎯 {suggested.cov}</div>
+                {onSetCoverage && (
+                  <button 
+                    onClick={()=>onSetCoverage(suggested.cov)} 
+                    className="px-2 py-1 rounded bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium transition-colors"
+                  >
+                    Apply
+                  </button>
+                )}
+              </div>
+              {suggested.why && <div className="text-white/70 text-xs mt-1">{suggested.why}</div>}
+            </div>
+          )}
+
+          {/* Grade Card */}
+          {gradeCard && (
+            <div className="flex-shrink-0 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-400/30 rounded-lg px-3 py-2">
+              <div className="text-emerald-300 text-xs font-semibold">📊 {gradeCard.grade}</div>
+              <div className="text-white/70 text-xs">{gradeCard.nextRead}</div>
+            </div>
+          )}
+
+          {/* Training Prompt - Always visible when no feedback */}
+          {!suggested && !gradeCard && !loading && (
+            <div className="flex-shrink-0 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-400/30 rounded-lg px-3 py-2">
+              <div className="text-amber-300 text-xs font-semibold mb-1">🏈 NFL DEFENSE TRAINING</div>
+              <div className="text-white text-xs">
+                Ready to master NFL-level defense reads? Study the coverage, read the receivers, make the perfect throw.
+              </div>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {loading && (
+            <div className="flex-shrink-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-400/30 rounded-lg px-3 py-2">
+              <div className="text-blue-300 text-xs font-semibold">🧠 ANALYZING</div>
+              <div className="flex items-center gap-1 text-blue-300">
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                <span className="text-xs ml-1">Thinking...</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* QUICK CHAT - Right side */}
+        <div className="flex-shrink-0">
+          <form className="flex gap-2" onSubmit={(e)=>{e.preventDefault(); if(!input.trim()) return; const msg=input.trim(); setInput(''); void send(msg);}}>
+            <input 
+              value={input} 
+              onChange={(e)=>setInput(e.target.value)} 
+              placeholder="Ask AI coach..." 
+              className="w-40 bg-white/10 border border-white/20 rounded px-3 py-1.5 text-white text-sm placeholder-white/50 outline-none focus:border-white/40 transition-colors" 
+            />
+            <button disabled={loading} className="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white text-xs font-medium disabled:opacity-50 transition-opacity">
+              {loading ? '...' : 'Ask'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (isFullScreen) {
     // FULL-SCREEN MODE: Smart widget positioned above route zones
