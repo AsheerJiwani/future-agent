@@ -61,6 +61,8 @@ export type ThrowSummary = {
   time?: number; // 0..1
   playId?: number;
   holdMs?: number;
+  heldVsBreakMs?: number;
+  firstOpenId?: string;
   throwArea?: string; // e.g., "L_SHORT"
   depthYds?: number;
   windowScore?: number;
@@ -69,6 +71,4 @@ export type ThrowSummary = {
   grade?: string;
   catchWindowScore?: number;
   catchSepYds?: number;
-  heldVsBreakMs?: number;
-  firstOpenId?: ReceiverID;
 };

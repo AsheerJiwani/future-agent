@@ -545,6 +545,11 @@ const ZONES = {
   FLAT_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 8), y: yUp(20) },
 };
 
+// Defender id list (used by openness, wrPosSafe, etc.) — keep above first usage to avoid TDZ
+const DEFENDER_IDS: DefenderID[] = [
+  "CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"
+];
+
 /* --------- Coverage families --------- */
 const MAN_COVERAGES   = new Set<CoverageID>(["C0","C1"]);
 const MATCH_COVERAGES = new Set<CoverageID>(["PALMS","C6","QUARTERS","C9"]);
@@ -606,6 +611,10 @@ export default function PlaySimulator({
 
   // Defender starts (dynamic, strength-aware)
   const [Dstart, setDstart] = useState<Record<DefenderID, Pt>>(D_ALIGN);
+  // Live defender positions (lifted above openness/useMemo to avoid TDZ on first render)
+  const [Dlive, setDlive] = useState<Record<DefenderID, Pt>>(Dstart);
+  const lastTRef = useRef<number>(0);
+  const [overlayTick, setOverlayTick] = useState(0);
   // Speeds
   const [recSpeed, setRecSpeed] = useState(1.0); // 0.7–1.5
   const [defSpeed, setDefSpeed] = useState(0.95); // 0.7–1.5
@@ -892,6 +901,19 @@ export default function PlaySimulator({
   type ThrowMeta = { p0: Pt; p1: Pt; p2: Pt; tStart: number; frac: number };
   const [throwMeta, setThrowMeta] = useState<ThrowMeta | null>(null);
 
+  // --- CB technique and press state (moved up to avoid TDZ in wrPosSafe) ---
+  type CBTechnique = "normal" | "press" | "pressStrong";
+  const [cbTechnique] = useState<CBTechnique>("normal");
+  type CBPressOutcome = "NONE" | "JAM_LOCK" | "WHIFF" | "JAM_AND_RELEASE";
+  type CBPressState = { rid: ReceiverID | null; outcome: CBPressOutcome };
+  type CBPressInfo = { outcome: CBPressOutcome; untilT: number };
+  const [cbPress, setCbPress] = useState<{ CB_L: CBPressState; CB_R: CBPressState }>({
+    CB_L: { rid: null, outcome: "NONE" },
+    CB_R: { rid: null, outcome: "NONE" },
+  });
+  const PRESS_DELAY_FRAC = 0.3 / (PLAY_MS / 1000);
+  const WHIFF_DELAY_FRAC = 1.0 / (PLAY_MS / 1000);
+
   // Generous menu of routes
   const ROUTE_MENU: RouteKeyword[] = [
     "GO","SPEED_OUT","CURL",
@@ -968,23 +990,7 @@ export default function PlaySimulator({
   }, [phase, resetClock, startClock, stopClock]);
 
 
-  // --- CB technique: normal, press on both, press only to strength
-type CBTechnique = "normal" | "press" | "pressStrong";
-const [cbTechnique] = useState<CBTechnique>("normal");
-
-// Press outcomes per CB at the snap
-type CBPressOutcome = "NONE" | "JAM_LOCK" | "WHIFF" | "JAM_AND_RELEASE";
-type CBPressState = { rid: ReceiverID | null; outcome: CBPressOutcome };
-type CBPressInfo = { outcome: CBPressOutcome; untilT: number }; // untilT is play-clock fraction [0..1]
-
-  const [cbPress, setCbPress] = useState<{ CB_L: CBPressState; CB_R: CBPressState }>({
-      CB_L: { rid: null, outcome: "NONE" },
-      CB_R: { rid: null, outcome: "NONE" },
-  });
-
-// Fractions of play clock for delays (uses your PLAY_MS)
-const PRESS_DELAY_FRAC = 0.3 / (PLAY_MS / 1000);   // ~0.10 if PLAY_MS=3000
-const WHIFF_DELAY_FRAC = 1.0 / (PLAY_MS / 1000);   // ~0.33 if PLAY_MS=3000
+  // Press outcomes per CB at the snap (types defined above)
 
   // Sample press outcomes for corners at the instant the play starts
   useEffect(() => {
@@ -1401,10 +1407,7 @@ setManExtraRoles({ blitzers, spy });
     setC3Rotation(rot);
   }, [phase, coverage, c3RotationMode, lastMotion, align, numbering]);
 
-  const DEFENDER_IDS: DefenderID[] = ["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"];
-  const [Dlive, setDlive] = useState<Record<DefenderID, Pt>>(Dstart);
-  const lastTRef = useRef<number>(0);
-  const [overlayTick, setOverlayTick] = useState(0);
+  // (Dlive/lastTRef/overlayTick are defined earlier to avoid TDZ)
 
   function wrPosSafe(id: ReceiverID, tt: number): Pt {
     // During pre-snap (including motion), show the live alignment position

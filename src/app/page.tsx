@@ -6,8 +6,8 @@ import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 
 /* ---------- Backgrounds (client-only) ---------- */
-const Starfield = dynamic(() => import("../components/Starfield").then(m => m.default), { ssr: false });
-const Nebula   = dynamic(() => import("../components/Nebula").then(m => m.default),   { ssr: false });
+const Starfield = dynamic(() => import("../components/Starfield"), { ssr: false });
+const Nebula   = dynamic(() => import("../components/Nebula"),   { ssr: false });
 
 /* =========================================================
    ==============  FUTURECASTING (unchanged) ===============

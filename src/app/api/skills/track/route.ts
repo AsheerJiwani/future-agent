@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     // Heuristic deltas
-    const g = (body.throw?.grade || '').toUpperCase();
+    // const g = (body.throw?.grade || '').toUpperCase();
     const w = typeof body.throw?.catchWindowScore === 'number' ? body.throw?.catchWindowScore : body.throw?.windowScore;
     const held = typeof body.throw?.heldVsBreakMs === 'number' ? body.throw?.heldVsBreakMs : undefined;
     const firstOpen = body.throw?.firstOpenId;
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const userId = body.userId || uidHeader || null;
     const rows = deltas.map(d => ({ user_id: userId, kind: 'skill', data: { ...d, coverage: body.coverage, conceptId: body.conceptId, at: new Date().toISOString() } }));
     if (rows.length) {
-      try { await supabase.from('assistant_memory').insert(rows); } catch (e) { /* ignore */ }
+      try { await supabase.from('assistant_memory').insert(rows); } catch { /* ignore */ }
     }
     return Response.json({ ok: true, stored: true, deltas });
   } catch (e) {
@@ -70,4 +70,3 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: msg }, { status: 200 });
   }
 }
-
