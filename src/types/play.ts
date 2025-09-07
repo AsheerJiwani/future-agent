@@ -30,11 +30,20 @@ export type SnapMeta = {
   roles?: { blitzers?: string[]; spy?: string | null };
   leverage?: Record<ReceiverID, { side: 'inside' | 'outside' | 'even'; via: string }>;
   leverageAdjust?: Record<ReceiverID, { dxYds: number; dDepthYds: number }>;
+  motion?: { rid: ReceiverID; type: 'jet' | 'short' | 'across'; dir: 'left' | 'right'; atMs?: number };
   coverageInsights?: {
     c3Rotation?: 'SKY' | 'BUZZ' | 'CLOUD_STRONG';
     palmsTrapNow?: boolean;
     quartersCarry2Now?: boolean;
     mofState?: 'one-high' | 'two-high';
+    tripsCheck?: 'SOLO' | 'POACH' | 'MABLE';
+    tripsSide?: 'left' | 'right' | null;
+    c3KickPush?: boolean;
+    hotNow?: boolean;
+    fireZone?: boolean;
+    fireZoneDropper?: string | null;
+    fireZoneBlitzer?: string | null;
+    banjoActive?: boolean;
   };
 };
 

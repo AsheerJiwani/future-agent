@@ -9,7 +9,7 @@ type Msg = { role: 'user' | 'assistant'; content: string };
 export default function TutorChat({ conceptId, coverage, formation, snapshot, snapMeta, lastThrow, onSetCoverage }: { conceptId?: FootballConceptId; coverage?: CoverageID; formation?: string; snapshot?: PlaySnapshot; snapMeta?: SnapMeta; lastThrow?: ThrowSummary; onSetCoverage?: (c: CoverageID)=>void }) {
   const [history, setHistory] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [audibles, setAudibles] = useState(true);
+  const [audiblesOn, setAudiblesOn] = useState(true);
   const [tutor, setTutor] = useState(true);
   const [quizAfter, setQuizAfter] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -23,15 +23,18 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
       const res = await fetch('/api/football-tutor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conceptId, coverage, formation, snapshot, snapMeta, throwCtx, toggles: { audibles, tutor, quiz: quizAfter }, history: [...history, { role:'user', content: msg }] })
+        body: JSON.stringify({ conceptId, coverage, formation, snapshot, snapMeta, throwCtx, toggles: { audibles: audiblesOn, tutor, quiz: quizAfter }, history: [...history, { role:'user', content: msg }] })
       });
-      const data = await res.json() as { reply?: string; suggestedCoverage?: CoverageID; suggestedReason?: string; grade?: { grade: string; rationale: string; nextRead: string; coachingTip: string; letter?: string }; coverage_read?: { family: string; cues: string[] }; progression?: { step: number; text: string }[]; audible?: { formation?: string; assignments?: Record<string,string>; rationale?: string }; quiz?: { question: string; answer: string; explain: string } };
+      const data = await res.json() as { reply?: string; improvements?: string[]; reads?: string[]; audibles?: Array<{ label?: string; formation?: string; assignments?: Record<string,string>; rationale: string }>; suggestedCoverage?: CoverageID; suggestedReason?: string; grade?: { grade: string; rationale: string; nextRead: string; coachingTip: string; letter?: string }; coverage_read?: { family: string; cues: string[] }; progression?: { step: number; text: string }[]; audible?: { formation?: string; assignments?: Record<string,string>; rationale?: string }; quiz?: { question: string; answer: string; explain: string } };
       setHistory(h => [...h, { role: 'user', content: msg }, { role: 'assistant', content: data.reply || '…' }]);
       if (data.grade) setGradeCard(data.grade);
       if (data.coverage_read) setCovRead(data.coverage_read);
       if (data.progression) setProg(data.progression);
       if (data.suggestedCoverage) setSuggested({ cov: data.suggestedCoverage, why: data.suggestedReason || '' });
       if (data.audible) setAudible(data.audible);
+      if (data.audibles) setAudibleList(data.audibles);
+      if (data.improvements) setImprove(data.improvements);
+      if (data.reads) setReads(data.reads);
       if (data.quiz) setQuiz(data.quiz);
     } catch {
       setHistory(h => [...h, { role: 'assistant', content: 'Tutor unavailable. Try again.' }]);
@@ -45,9 +48,12 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
   const [prog, setProg] = useState<{ step: number; text: string }[] | null>(null);
   const [suggested, setSuggested] = useState<{ cov: CoverageID; why: string } | null>(null);
   const [audible, setAudible] = useState<{ formation?: string; assignments?: Record<string,string>; rationale?: string } | null>(null);
+  const [audibleList, setAudibleList] = useState<Array<{ label?: string; formation?: string; assignments?: Record<string,string>; rationale: string }> | null>(null);
   const [quiz, setQuiz] = useState<{ question: string; answer: string; explain: string } | null>(null);
   const [quizAns, setQuizAns] = useState('');
   const [quizResult, setQuizResult] = useState<'correct'|'wrong'|''>('');
+  const [improve, setImprove] = useState<string[] | null>(null);
+  const [reads, setReads] = useState<string[] | null>(null);
 
   // Auto-analyze after a graded throw
   useEffect(() => {
@@ -61,7 +67,7 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
       <div className="flex items-center justify-between mb-2">
         <div className="text-xs uppercase tracking-wide text-white/60">AI Football Tutor</div>
         <div className="flex items-center gap-3 text-xs text-white/70">
-          <label className="flex items-center gap-1"><input type="checkbox" checked={audibles} onChange={(e)=>setAudibles(e.target.checked)} /> Audible Suggestions</label>
+          <label className="flex items-center gap-1"><input type="checkbox" checked={audiblesOn} onChange={(e)=>setAudiblesOn(e.target.checked)} /> Audible Suggestions</label>
           <label className="flex items-center gap-1"><input type="checkbox" checked={tutor} onChange={(e)=>setTutor(e.target.checked)} /> Play Tutor</label>
           <label className="flex items-center gap-1"><input type="checkbox" checked={quizAfter} onChange={(e)=>setQuizAfter(e.target.checked)} /> Quiz after reps</label>
         </div>
@@ -97,6 +103,18 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
           </div>
         </div>
       )}
+      {improve && improve.length>0 && (
+        <div className="mb-2 rounded-xl bg-white/5 border border-white/10 p-2 text-white/90 text-sm">
+          <div className="text-white/60 text-xs">What to Improve</div>
+          <ul className="list-disc list-inside">{improve.map((s,i)=>(<li key={i}>{s}</li>))}</ul>
+        </div>
+      )}
+      {reads && reads.length>0 && (
+        <div className="mb-2 rounded-xl bg-white/5 border border-white/10 p-2 text-white/90 text-sm">
+          <div className="text-white/60 text-xs">Reads Advice</div>
+          <ul className="list-disc list-inside">{reads.map((s,i)=>(<li key={i}>{s}</li>))}</ul>
+        </div>
+      )}
       {audible && (audible.assignments || audible.formation) && (
         <div className="mb-2 rounded-xl bg-white/5 border border-white/10 p-2 text-white/90 text-sm flex items-center justify-between">
           <div>
@@ -108,6 +126,24 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
             {audible.rationale && <div className="text-white/60">{audible.rationale}</div>}
           </div>
           {audible.assignments && <button onClick={()=>{ try{ window.dispatchEvent(new CustomEvent('apply-audible',{ detail: { assignments: audible.assignments } })); }catch{} }} className="px-2 py-1 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white text-xs">Apply Audible</button>}
+        </div>
+      )}
+      {audibleList && audibleList.length>0 && (
+        <div className="mb-2 rounded-xl bg-white/5 border border-white/10 p-2 text-white/90 text-sm">
+          <div className="text-white/60 text-xs mb-1">Audible Ideas</div>
+          <div className="space-y-2">
+            {audibleList.map((a,i)=> (
+              <div key={i} className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-semibold">{a.label || `Audible #${i+1}`}</div>
+                  {a.formation && <div className="text-white/60">Formation: {a.formation}</div>}
+                  {a.assignments && <ul className="list-disc list-inside">{Object.entries(a.assignments).map(([k,v])=> (<li key={k}><span className="text-white/60">{k}:</span> {v}</li>))}</ul>}
+                  <div className="text-white/60">{a.rationale}</div>
+                </div>
+                {a.assignments && <button onClick={()=>{ try{ window.dispatchEvent(new CustomEvent('apply-audible',{ detail: { assignments: a.assignments } })); }catch{} }} className="px-2 py-1 rounded-lg bg-white/10 text-white text-xs self-center">Apply</button>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {covRead && (

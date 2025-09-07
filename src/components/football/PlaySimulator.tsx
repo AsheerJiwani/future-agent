@@ -160,12 +160,16 @@ const H = {
   meshSpan: 18,
 };
 
-function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[] {
+function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID, refLeft?: boolean): Pt[] {
   const twoHigh = ["C2", "TAMPA2", "C4", "QUARTERS", "C6", "PALMS"].includes(coverage);
+  const left = (refLeft !== undefined) ? refLeft : isLeftOfQB(s);
+  const outS = left ? -1 : +1;
+  const inS  = left ? +1 : -1;
+  const sidelineXRef = (off = SIDELINE_MARGIN) => (left ? xAcross(off) : xAcross(FIELD_WIDTH_YDS - off));
   switch (name) {
     /* Verticals */
     case "GO": {
-      const rel = { x: s.x + outSign(s) * xAcross(2), y: yUp(DEPTH.short) };
+      const rel = { x: s.x + outS * xAcross(2), y: yUp(DEPTH.short) };
       return [s, rel, { x: rel.x, y: yUp(DEPTH.shot) }];
     }
     case "SEAM": {
@@ -187,45 +191,45 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
     }
     case "STICK": {
       const stem = { x: s.x, y: yUp(DEPTH.short) };
-      const breakPt = { x: s.x + outSign(s) * xAcross(4), y: stem.y };
+      const breakPt = { x: s.x + outS * xAcross(4), y: stem.y };
       return [s, stem, breakPt];
     }
     case "SLANT": {
-      const breakPt = { x: s.x + inSign(s) * xAcross(6), y: yUp(DEPTH.quick) };
-      return [s, breakPt, { x: breakPt.x + inSign(s) * xAcross(4), y: yUp(DEPTH.mid) }];
+      const breakPt = { x: s.x + inS * xAcross(6), y: yUp(DEPTH.quick) };
+      return [s, breakPt, { x: breakPt.x + inS * xAcross(4), y: yUp(DEPTH.mid) }];
     }
     case "SPEED_OUT": {
       const stem = { x: s.x, y: yUp(DEPTH.quick) };
-      const out = { x: s.x + outSign(s) * xAcross(H.outQuick), y: stem.y };
+      const out = { x: s.x + outS * xAcross(H.outQuick), y: stem.y };
       return [s, stem, out];
     }
     case "FLAT": {
-      const out = { x: s.x + outSign(s) * xAcross(H.flat), y: yUp(DEPTH.quick) };
+      const out = { x: s.x + outS * xAcross(H.flat), y: yUp(DEPTH.quick) };
       return [s, out];
     }
     case "CHECK": {
-      return [s, { x: s.x + inSign(s) * xAcross(3), y: yUp(DEPTH.quick - 1) }];
+      return [s, { x: s.x + inS * xAcross(3), y: yUp(DEPTH.quick - 1) }];
     }
 
     /* Intermediate */
     case "OUT": {
       const stem = { x: s.x, y: yUp(DEPTH.mid) };
-      const breakPt = { x: s.x + outSign(s) * xAcross(H.outDeep), y: stem.y };
+      const breakPt = { x: s.x + outS * xAcross(H.outDeep), y: stem.y };
       return [s, stem, breakPt];
     }
     case "OUT_LOW": {
       const stem = { x: s.x, y: yUp(DEPTH.quick) };
-      const breakPt = { x: s.x + outSign(s) * xAcross(H.outQuick), y: stem.y };
+      const breakPt = { x: s.x + outS * xAcross(H.outQuick), y: stem.y };
       return [s, stem, breakPt];
     }
     case "OUT_MID": {
       const stem = { x: s.x, y: yUp(DEPTH.mid) };
-      const breakPt = { x: s.x + outSign(s) * xAcross(12), y: stem.y };
+      const breakPt = { x: s.x + outS * xAcross(12), y: stem.y };
       return [s, stem, breakPt];
     }
     case "OUT_HIGH": {
       const stem = { x: s.x, y: yUp(DEPTH.deep) };
-      const breakPt = { x: s.x + outSign(s) * xAcross(H.outDeep), y: stem.y };
+      const breakPt = { x: s.x + outS * xAcross(H.outDeep), y: stem.y };
       return [s, stem, breakPt];
     }
     case "CURL": {
@@ -236,22 +240,22 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
     case "COMEBACK":
     case "COMEBACK_MID": {
       const stem = { x: s.x, y: yUp(DEPTH.dig) };
-      const back = { x: sidelineX(s, 6), y: yUp(DEPTH.curl) };
+      const back = { x: sidelineXRef(6), y: yUp(DEPTH.curl) };
       return [s, stem, back];
     }
     case "COMEBACK_LOW": {
       const stem = { x: s.x, y: yUp(DEPTH.curl) };
-      const back = { x: sidelineX(s, 8), y: yUp(DEPTH.quick) };
+      const back = { x: sidelineXRef(8), y: yUp(DEPTH.quick) };
       return [s, stem, back];
     }
     case "COMEBACK_HIGH": {
       const stem = { x: s.x, y: yUp(DEPTH.shot - 2) };
-      const back = { x: sidelineX(s, 6), y: yUp(DEPTH.dig) };
+      const back = { x: sidelineXRef(6), y: yUp(DEPTH.dig) };
       return [s, stem, back];
     }
     case "DIG": {
       const stem = { x: s.x, y: yUp(DEPTH.dig) };
-      const inCut = { x: QB.x + inSign(s) * xAcross(10), y: stem.y };
+      const inCut = { x: QB.x + inS * xAcross(10), y: stem.y };
       return [s, stem, inCut];
     }
 
@@ -277,7 +281,7 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
       const stemTopY = losY + 3;
       const diagY = stemTopY + 15;
       const stem = { x: s.x, y: yUp(stemTopY) };
-      const diag = { x: sidelineX(s, 8), y: yUp(diagY) };
+      const diag = { x: sidelineXRef(8), y: yUp(diagY) };
       return [s, stem, diag];
     }
     case "CORNER_HIGH": {
@@ -286,29 +290,29 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID): Pt[]
       const stemTopY = losY + 17;
       const diagY = stemTopY + 15;
       const stem = { x: s.x, y: yUp(stemTopY) };
-      const diag = { x: sidelineX(s, 8), y: yUp(diagY) };
+      const diag = { x: sidelineXRef(8), y: yUp(diagY) };
       return [s, stem, diag];
     }
 
     /* Crossers */
     case "OVER": {
       const stem = { x: s.x, y: yUp(DEPTH.deep - 2) };
-      const cross = { x: oppositeHashX(s), y: yUp(DEPTH.deep) };
+      const cross = { x: left ? HASH_R : HASH_L, y: yUp(DEPTH.deep) };
       return [s, stem, cross];
     }
     case "CROSS": {
       const stem = { x: s.x, y: yUp(DEPTH.mid - 1) };
-      const cross = { x: oppositeHashX(s), y: yUp(DEPTH.mid) };
+      const cross = { x: left ? HASH_R : HASH_L, y: yUp(DEPTH.mid) };
       return [s, stem, cross];
     }
     case "SHALLOW": {
-      const under = { x: oppositeHashX(s), y: yUp(18) };
+      const under = { x: left ? HASH_R : HASH_L, y: yUp(18) };
       return [s, under];
     }
 
     /* RB */
     case "WHEEL": {
-      const flat = { x: sidelineX(s, 8), y: yUp(DEPTH.quick) };
+      const flat = { x: sidelineXRef(8), y: yUp(DEPTH.quick) };
       const up = { x: flat.x, y: yUp(DEPTH.deep) };
       return [s, flat, up];
     }
@@ -448,15 +452,16 @@ function computeNumbering(align: AlignMap): Numbering {
 function buildConceptRoutes(
   conceptId: FootballConceptId,
   A: AlignMap,
-  coverage: CoverageID
+  coverage: CoverageID,
+  orient?: Record<ReceiverID, boolean>
 ): RouteMap {
   const ID = (conceptId as string).toUpperCase();
   const mk = (m: Partial<Record<ReceiverID, RouteKeyword>>): RouteMap => ({
-    X: routeFromKeyword(m.X ?? "HITCH", A.X, coverage),
-    Z: routeFromKeyword(m.Z ?? "HITCH", A.Z, coverage),
-    SLOT: routeFromKeyword(m.SLOT ?? "FLAT", A.SLOT, coverage),
-    TE: routeFromKeyword(m.TE ?? "STICK", A.TE, coverage),
-    RB: routeFromKeyword(m.RB ?? "CHECK", A.RB, coverage),
+    X: routeFromKeyword(m.X ?? "HITCH", A.X, coverage, orient?.X),
+    Z: routeFromKeyword(m.Z ?? "HITCH", A.Z, coverage, orient?.Z),
+    SLOT: routeFromKeyword(m.SLOT ?? "FLAT", A.SLOT, coverage, orient?.SLOT),
+    TE: routeFromKeyword(m.TE ?? "STICK", A.TE, coverage, orient?.TE),
+    RB: routeFromKeyword(m.RB ?? "CHECK", A.RB, coverage, orient?.RB),
   });
 
   switch (ID) {
@@ -547,8 +552,31 @@ export default function PlaySimulator({
   const [manualAssignments, setManualAssignments] = useState<AssignMap>({});
 
   const [align, setAlign] = useState<AlignMap>(FORMATIONS[formation]);
-  const [O, setO] = useState<RouteMap>(() =>
-    buildConceptRoutes(conceptId, FORMATIONS[formation], coverage));
+  const [customAlign, setCustomAlign] = useState<AlignMap | null>(null);
+  const [O, setO] = useState<RouteMap>(() => {
+    const A0 = FORMATIONS[formation];
+    const orient0: Record<ReceiverID, boolean> = {
+      X: (A0.X.x < QB.x),
+      Z: (A0.Z.x < QB.x),
+      SLOT: (A0.SLOT.x < QB.x),
+      TE: (A0.TE.x < QB.x),
+      RB: (A0.RB.x < QB.x)
+    };
+    return buildConceptRoutes(conceptId, A0, coverage, orient0);
+  });
+  // Reset route orientation when concept or formation changes (call-time anchor)
+  useEffect(() => {
+    const A0 = FORMATIONS[formation];
+    const orient0: Record<ReceiverID, boolean> = {
+      X: (A0.X.x < QB.x),
+      Z: (A0.Z.x < QB.x),
+      SLOT: (A0.SLOT.x < QB.x),
+      TE: (A0.TE.x < QB.x),
+      RB: (A0.RB.x < QB.x)
+    };
+    setRouteOrient(orient0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conceptId, formation]);
   const [numbering, setNumbering] = useState<Numbering>(() => computeNumbering(FORMATIONS[formation]));
 
   // Defender starts (dynamic, strength-aware)
@@ -586,6 +614,22 @@ export default function PlaySimulator({
   const [audRoute, setAudRoute]   = useState<RouteKeyword | "">("");
 
   const [, setCaught] = useState(false);
+
+  // --- Motion state (only one motion at a time) ---
+  type MotionType = 'jet'|'short'|'across';
+  type MotionDir = 'left'|'right';
+  const [motionRid, setMotionRid] = useState<ReceiverID | "">("");
+  const [motionType, setMotionType] = useState<MotionType>('across');
+  const [motionDir, setMotionDir] = useState<MotionDir>('right');
+  const [snapOnMotion, setSnapOnMotion] = useState<boolean>(true);
+  const [motionBusy, setMotionBusy] = useState<boolean>(false);
+  const [lastMotion, setLastMotion] = useState<{ rid: ReceiverID; type: MotionType; dir: MotionDir } | null>(null);
+  const autoSnapAfterMotionRef = useRef<boolean>(false);
+  const [routeOrient, setRouteOrient] = useState<Record<ReceiverID, boolean>>({ X: true, Z: false, SLOT: false, TE: false, RB: false });
+  // Dev & checks
+  const [fireZoneOn, setFireZoneOn] = useState<boolean>(false);
+  const [showDev, setShowDev] = useState<boolean>(false);
+  const [motionLockRid, setMotionLockRid] = useState<ReceiverID | null>(null);
 
   // Relative speed multipliers by position (realistic-ish deltas)
   function receiverSpeedMult(id: ReceiverID): number {
@@ -656,12 +700,46 @@ export default function PlaySimulator({
         setManualAssignments(ce.detail.assignments);
       }
     }
+    function onApplyMotion(e: Event) {
+      const ce = e as CustomEvent<{ rid: ReceiverID; type?: 'jet'|'short'|'across'; dir?: 'left'|'right' }>; 
+      const d = ce.detail ?? { rid: undefined, type: 'across' as const, dir: undefined };
+      const rid = d.rid as ReceiverID | undefined;
+      const type = (d.type ?? 'across') as 'jet'|'short'|'across';
+      const dir = d.dir as ('left'|'right'|undefined);
+      const base = (customAlign ?? FORMATIONS[formation]) as AlignMap;
+      if (!rid) return;
+      const cur = base[rid as keyof AlignMap] as Pt | undefined;
+      if (!cur) return;
+      if (motionBusy) return;
+      if (motionLockRid && motionLockRid !== rid) return;
+      const sign = dir ? (dir === 'left' ? -1 : 1) : (cur.x < QB.x ? 1 : -1);
+      let dx = 0; const dy = 0;
+      if (type === 'short') dx = sign * xAcross(6);
+      else if (type === 'jet') dx = sign * xAcross(10);
+      else if (type === 'across') dx = (QB.x - cur.x) * 2; // reflect across QB
+      const end: Pt = { x: Math.max(xAcross(4), Math.min(xAcross(FIELD_WIDTH_YDS - 4), cur.x + dx)), y: cur.y + dy };
+      setMotionBusy(true);
+      // Compute realistic motion duration based on yards distance and receiver speed
+      const yards = Math.hypot((end.x - cur.x)/XPX, (end.y - cur.y)/YPX);
+      const baseYps = 6.0; // baseline yards/sec
+      const eff = Math.max(4.5, baseYps * recSpeed * receiverSpeedMult(rid) * 0.9);
+      const durMs = Math.max(800, Math.min(3500, Math.round((yards / eff) * 1000)));
+      setLastMotion({ rid, type, dir: (dir ?? (cur.x < QB.x ? 'right' : 'left')) as 'left'|'right' });
+      animateAlign(rid, cur, end, durMs, base, () => { setMotionBusy(false); setMotionLockRid(rid); });
+    }
     window.addEventListener('replay-at-break', onReplayAtBreak as EventListener);
     window.addEventListener('replay-at-catch', onReplayAtCatch as EventListener);
     window.addEventListener('agent-snap-now', onAgentSnapNow as EventListener);
     window.addEventListener('apply-audible', onApplyAudible as EventListener);
-    return () => window.removeEventListener('replay-at-break', onReplayAtBreak as EventListener);
-  }, [O, recSpeed, decision, seek]);
+    window.addEventListener('apply-motion', onApplyMotion as EventListener);
+    return () => {
+      window.removeEventListener('replay-at-break', onReplayAtBreak as EventListener);
+      window.removeEventListener('replay-at-catch', onReplayAtCatch as EventListener);
+      window.removeEventListener('agent-snap-now', onAgentSnapNow as EventListener);
+      window.removeEventListener('apply-audible', onApplyAudible as EventListener);
+      window.removeEventListener('apply-motion', onApplyMotion as EventListener);
+    };
+  }, [O, recSpeed, decision, seek, customAlign, formation, motionBusy]);
   useEffect(() => {
     setUserId(getOrCreateUserId());
   }, []);
@@ -727,6 +805,28 @@ export default function PlaySimulator({
   [phase, ballFlying, decision, t]
 );
 
+  // Smoothly animate a single receiver's alignment pre-snap
+  const motionRafRef = useRef<number | null>(null);
+  function animateAlign(rid: ReceiverID, from: Pt, to: Pt, durMs = 900, baseAlign: AlignMap, onDone?: () => void) {
+    // Cancel any prior RAF
+    if (motionRafRef.current !== null) {
+      try { cancelAnimationFrame(motionRafRef.current); } catch {}
+      motionRafRef.current = null;
+    }
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const u = Math.min(1, (now - t0) / durMs);
+      const ease = u < 0.5 ? 2 * u * u : -1 + (4 - 2 * u) * u;
+      const x = from.x + (to.x - from.x) * ease;
+      const y = from.y + (to.y - from.y) * ease;
+      const nxt: AlignMap = { ...(baseAlign as AlignMap), [rid]: { x, y } } as AlignMap;
+      setCustomAlign(nxt);
+      if (u < 1) motionRafRef.current = requestAnimationFrame(step);
+      else { motionRafRef.current = null; onDone?.(); }
+    };
+    motionRafRef.current = requestAnimationFrame(step);
+  }
+
   // Receivers available to audible (exclude blockers)
   const selectableReceivers = useMemo<ReceiverID[]>(
     () => (["X","Z","SLOT","TE","RB"] as ReceiverID[])
@@ -758,17 +858,17 @@ type CBPressOutcome = "NONE" | "JAM_LOCK" | "WHIFF" | "JAM_AND_RELEASE";
 type CBPressState = { rid: ReceiverID | null; outcome: CBPressOutcome };
 type CBPressInfo = { outcome: CBPressOutcome; untilT: number }; // untilT is play-clock fraction [0..1]
 
-const [cbPress, setCbPress] = useState<{ CB_L: CBPressState; CB_R: CBPressState }>({
-    CB_L: { rid: null, outcome: "NONE" },
-    CB_R: { rid: null, outcome: "NONE" },
-});
+  const [cbPress, setCbPress] = useState<{ CB_L: CBPressState; CB_R: CBPressState }>({
+      CB_L: { rid: null, outcome: "NONE" },
+      CB_R: { rid: null, outcome: "NONE" },
+  });
 
 // Fractions of play clock for delays (uses your PLAY_MS)
 const PRESS_DELAY_FRAC = 0.3 / (PLAY_MS / 1000);   // ~0.10 if PLAY_MS=3000
 const WHIFF_DELAY_FRAC = 1.0 / (PLAY_MS / 1000);   // ~0.33 if PLAY_MS=3000
 
-// Sample press outcomes for corners at the instant the play starts
-useEffect(() => {
+  // Sample press outcomes for corners at the instant the play starts
+  useEffect(() => {
   // Ensure pre-snap clears any prior press state
   if (phase !== "post") {
     const leftOne  = left1();
@@ -853,7 +953,18 @@ setCbPress({
     CB_R: { x: align[rightOuter].x, y: R.outcome !== "NONE" ? yPress : yOff },
   }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [phase, coverage, align, numbering, cbTechnique]);
+  }, [phase, coverage, align, numbering, cbTechnique]);
+
+  // Live pre-snap updates while motion animates: update defender starts only (avoid route churn loops)
+  useEffect(() => {
+    if (!customAlign) return;
+    if (!motionBusy) return; // only during motion
+
+    // Update defender pre-snap starts so the defense adjusts as motion occurs
+    const starts = computeDefenderStarts(customAlign);
+    setDstart(starts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customAlign, motionBusy]);
 
   // Build AI payload helpers
   function buildSnapshot(): import("@/types/play").PlaySnapshot {
@@ -885,6 +996,31 @@ setCbPress({
     const safDeep = [safFS, safSS].filter(p => yDepthYds(p) >= 14).length;
     const mofState: 'one-high' | 'two-high' = safDeep >= 2 ? 'two-high' : 'one-high';
 
+    // Trips detection via numbering
+    const hasL3 = !!left3?.();
+    const hasR3 = !!right3?.();
+    const tripsSide: 'left'|'right'|null = hasL3 ? 'left' : hasR3 ? 'right' : null;
+    // Simplified trips check heuristic
+    let tripsCheck: 'SOLO'|'POACH'|'MABLE' | undefined;
+    if (tripsSide) {
+      // If Quarters, prefer POACH; else if C1, MABLE; else SOLO
+      tripsCheck = coverage === 'QUARTERS' ? 'POACH' : coverage === 'C1' ? 'MABLE' : 'SOLO';
+    }
+
+    // C3 kick/push hint when recent jet moved toward strong side and auto rotation chose CLOUD_STRONG
+    const sr2 = strongIsRight();
+    const towardStrong = lastMotion ? ((sr2 && lastMotion.dir === 'right') || (!sr2 && lastMotion.dir === 'left')) : false;
+    const c3KickPush = coverage === 'C3' && !!lastMotion && lastMotion.type === 'jet' && towardStrong && c3Rotation === 'CLOUD_STRONG';
+
+    // Fire-zone hints
+    const fireZoneDropper: DefenderID | null = (coverage === 'C3' && fireZoneOn) ? (sr2 ? 'WILL' : 'SAM') : null;
+    const fireZoneBlitzer: DefenderID | null = (coverage === 'C3' && fireZoneOn) ? 'NICKEL' : null;
+
+    // Hot signal: in man if blitzers exceed blockers; in fire-zone if blitzer present
+    const blockers = (teBlock ? 1 : 0) + (rbBlock ? 1 : 0);
+    const hotNow = ((coverage === 'C0' || coverage === 'C1') && (manExtraRoles.blitzers.length > blockers))
+      || ((coverage === 'C3') && fireZoneOn && !!fireZoneBlitzer);
+
     return {
       press: {
         CB_L: cbPress.CB_L,
@@ -901,11 +1037,20 @@ setCbPress({
       },
       leverage: levInfo,
       leverageAdjust: levAdjust,
+      motion: lastMotion ? { rid: lastMotion.rid, type: lastMotion.type, dir: lastMotion.dir } : undefined,
       coverageInsights: {
         c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
         palmsTrapNow,
         quartersCarry2Now,
         mofState,
+        tripsCheck,
+        tripsSide: tripsSide ?? null,
+        c3KickPush,
+        hotNow,
+        fireZone: coverage === 'C3' ? fireZoneOn : false,
+        fireZoneDropper: fireZoneDropper ?? null,
+        fireZoneBlitzer: fireZoneBlitzer ?? null,
+        banjoActive: (coverage === 'C1' || coverage === 'C9') && formation === 'BUNCH_LEFT',
       }
     };
   }
@@ -998,14 +1143,17 @@ useEffect(() => {
 
   // Rebuild alignment, numbering, routes (with leverage), and defender starts whenever inputs change
   useEffect(() => {
-    const A = FORMATIONS[formation];
+    // Avoid thrashing recompute while a motion animation is in progress
+    if (motionBusy) return;
+    const A = customAlign ?? FORMATIONS[formation];
     setAlign(A);
     setNumbering(computeNumbering(A));
-
+    
     // Compute defender starts first so we can adjust routes by leverage
     const starts = computeDefenderStarts(A);
 
-    const routes = buildConceptRoutes(conceptId, A, coverage);
+    // Use preserved route orientation so routes don't flip after motion
+    const routes = buildConceptRoutes(conceptId, A, coverage, routeOrient);
 
     if (teBlock) routes.TE = passProPathTE(A);
     if (rbBlock) routes.RB = passProPathRB(A);
@@ -1014,7 +1162,7 @@ useEffect(() => {
     (Object.entries(manualAssignments) as [ReceiverID, RouteKeyword][])
       .forEach(([rid, kw]) => {
         if ((rid === "TE" && teBlock) || (rid === "RB" && rbBlock)) return;
-        routes[rid] = routeFromKeyword(kw, A[rid], coverage);
+        routes[rid] = routeFromKeyword(kw, A[rid], coverage, routeOrient[rid]);
       });
 
     // Leverage-driven tweaks (man + match) and collect meta
@@ -1030,8 +1178,21 @@ useEffect(() => {
     // strength-aware defensive starting spots
     setDstart(starts);
 
-    // reset to pre-snap for consistency
-    setPhase("pre");
+    // expose leverage info for UI/AI
+    setLevInfo(levMeta);
+    setLevAdjust(adjMeta);
+    // If we just completed a motion and requested Auto Snap, do it after rebuild
+    if (autoSnapAfterMotionRef.current && phase === 'pre') {
+      autoSnapAfterMotionRef.current = false;
+      startSnap();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formation, conceptId, coverage, teBlock, rbBlock, manualAssignments, setT, customAlign, motionBusy]);
+
+  // Reset to pre-snap when structural knobs change (but not during motion)
+  useEffect(() => {
+    if (motionBusy) return;
+    setPhase('pre');
     setT(0);
     setDecision(null);
     setGrade(null);
@@ -1039,11 +1200,8 @@ useEffect(() => {
     setBallFlying(false);
     setBallT(0);
     setCatchAt(null);
-    // expose leverage info for UI/AI
-    setLevInfo(levMeta);
-    setLevAdjust(adjMeta);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formation, conceptId, coverage, teBlock, rbBlock, manualAssignments, setT]);
+  }, [formation, conceptId, coverage, teBlock, rbBlock]);
 
   useEffect(() => {
     if (phase !== "post") {
@@ -1084,52 +1242,69 @@ useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, teBlock, rbBlock, coverage, align, Dstart, O]);
 
-  // Choose C3 rotation each snap
+  // Choose C3 rotation each snap (bias based on recent motion and strength)
   useEffect(() => {
     if (coverage !== 'C3') return;
     if (phase !== 'post') return;
-    if (c3RotationMode === 'AUTO') {
-      const r = rngRef.current.nextFloat();
-      const rot: C3Rotation = r < 0.5 ? 'SKY' : r < 0.85 ? 'BUZZ' : 'CLOUD_STRONG';
-      setC3Rotation(rot);
-    } else {
+    if (c3RotationMode !== 'AUTO') {
       setC3Rotation(c3RotationMode);
+      return;
     }
-  }, [phase, coverage, c3RotationMode]);
+    const sr = strongIsRight();
+    const recentJet = lastMotion && lastMotion.type === 'jet' ? lastMotion : null;
+    if (recentJet) {
+      // If fast motion moved toward strong side, bias to CLOUD_STRONG to handle flat immediately
+      const towardStrong = (sr && recentJet.dir === 'right') || (!sr && recentJet.dir === 'left');
+      if (towardStrong) { setC3Rotation('CLOUD_STRONG'); return; }
+      // Otherwise favor SKY/BUZZ split with slight BUZZ tilt
+      const r = rngRef.current.nextFloat();
+      setC3Rotation(r < 0.35 ? 'SKY' : 'BUZZ');
+      return;
+    }
+    // Default AUTO random
+    const r = rngRef.current.nextFloat();
+    const rot: C3Rotation = r < 0.5 ? 'SKY' : r < 0.85 ? 'BUZZ' : 'CLOUD_STRONG';
+    setC3Rotation(rot);
+  }, [phase, coverage, c3RotationMode, lastMotion, align, numbering]);
 
   const DEFENDER_IDS: DefenderID[] = ["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"];
 
   function wrPosSafe(id: ReceiverID, tt: number): Pt {
-  const path = O[id];
-  const tPlay = Math.max(0, Math.min(1, tt));
-  let tAdj = tPlay;
-
-  // NB: must be CB_L / CB_R (underscore), and guard with optional chaining
-  const pressL = cbPress?.CB_L;
-  const pressR = cbPress?.CB_R;
-
-  const mine =
-    pressL?.rid === id ? pressL :
-    pressR?.rid === id ? pressR :
-    undefined;
-
-  if (mine && mine.outcome !== "NONE") {
-    if (mine.outcome === "JAM_LOCK") {
-      // stuck on LOS for the whole play
-      return align[id] ?? QB;
+    // During pre-snap (including motion), show the live alignment position
+    if (phase !== 'post') {
+      const Acur = (customAlign ?? align) as AlignMap;
+      return Acur[id] ?? align[id] ?? QB;
     }
-    if (mine.outcome === "JAM_AND_RELEASE") {
-      // delay WR’s route by PRESS_DELAY_FRAC, then continue
-      const denom = (1 - PRESS_DELAY_FRAC) || 1; // guard divide-by-zero
-      tAdj = tPlay < PRESS_DELAY_FRAC ? 0 : (tPlay - PRESS_DELAY_FRAC) / denom;
+    const path = O[id];
+    const tPlay = Math.max(0, Math.min(1, tt));
+    let tAdj = tPlay;
+
+    // NB: must be CB_L / CB_R (underscore), and guard with optional chaining
+    const pressL = cbPress?.CB_L;
+    const pressR = cbPress?.CB_R;
+
+    const mine =
+      pressL?.rid === id ? pressL :
+      pressR?.rid === id ? pressR :
+      undefined;
+
+    if (mine && mine.outcome !== "NONE") {
+      if (mine.outcome === "JAM_LOCK") {
+        // stuck on LOS for the whole play
+        return align[id] ?? QB;
+      }
+      if (mine.outcome === "JAM_AND_RELEASE") {
+        // delay WR’s route by PRESS_DELAY_FRAC, then continue
+        const denom = (1 - PRESS_DELAY_FRAC) || 1; // guard divide-by-zero
+        tAdj = tPlay < PRESS_DELAY_FRAC ? 0 : (tPlay - PRESS_DELAY_FRAC) / denom;
+      }
+      // WHIFF → no WR delay
     }
-    // WHIFF → no WR delay
+
+    const s = Math.min(1, tAdj * recSpeed * receiverSpeedMult(id));
+    if (!path || path.length === 0) return align[id] ?? QB;
+    return posOnPathLenScaled(path, s);
   }
-
-  const s = Math.min(1, tAdj * recSpeed * receiverSpeedMult(id));
-  if (!path || path.length === 0) return align[id] ?? QB;
-  return posOnPathLenScaled(path, s);
-}
 
   // Distance in yards accounting for non-uniform px scales
   function distYds(a: Pt, b: Pt): number {
@@ -1260,6 +1435,8 @@ useEffect(() => {
       case "C3": {
         // Sky/Buzz/Cloud (strong) rotation variants
         const rot = c3Rotation; // SKY | BUZZ | CLOUD_STRONG
+        const sr = strongIsRight();
+        const dropper: DefenderID | null = fireZoneOn ? (sr ? 'WILL' : 'SAM') : null;
         if (id === "CB_L") return (rot === 'CLOUD_STRONG' && !sr) ? L.FLAT : L.DEEP;
         if (id === "CB_R") return (rot === 'CLOUD_STRONG' && sr)  ? R.FLAT : R.DEEP;
         if (id === "FS")   return MID;
@@ -1273,8 +1450,14 @@ useEffect(() => {
           return sr ? off(L.CURL, +1) : off(R.CURL, -1);
         }
         if (id === "MIKE") return HOOK;
-        if (id === "SAM")  return sr ? off(L.CURL, +0.5) : off(R.CURL, -0.5);
-        if (id === "WILL") return sr ? off(R.CURL, -0.5) : off(L.CURL, +0.5);
+        if (id === "SAM")  {
+          if (fireZoneOn && dropper === 'SAM') return sr ? R.FLAT : L.FLAT; // drop to flat on strong side
+          return sr ? off(L.CURL, +0.5) : off(R.CURL, -0.5);
+        }
+        if (id === "WILL") {
+          if (fireZoneOn && dropper === 'WILL') return sr ? R.FLAT : L.FLAT;
+          return sr ? off(R.CURL, -0.5) : off(L.CURL, +0.5);
+        }
         return D_ALIGN[id];
       }
       case "C2": {
@@ -1445,6 +1628,8 @@ useEffect(() => {
   const right1 = () => findByNumber("right", 1) ?? "Z";
   const left2  = () => findByNumber("left", 2)  ?? (left1()  === "X" ? "SLOT" : "TE");
   const right2 = () => findByNumber("right", 2) ?? (right1() === "Z" ? "SLOT" : "TE");
+  const left3  = () => findByNumber("left", 3);
+  const right3 = () => findByNumber("right", 3);
 
   /** Cut severity for a receiver at play-time `tt` (0..1).
  *  Returns 0..1 where 0 = straight, 1 = sharp cut right now.
@@ -1536,7 +1721,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
             if (info.outcome === "JAM_AND_RELEASE" && tt < PRESS_DELAY_FRAC) return { x: start.x, y: start.y };
             if (info.outcome === "WHIFF" && tt < WHIFF_DELAY_FRAC) return { x: start.x, y: start.y };
   }
-    // who is in man on whom
+    // who is in man on whom (base)
     const manMap: Partial<Record<DefenderID, ReceiverID>> = {
         CB_L:   "X",
         CB_R:   "Z",
@@ -1545,6 +1730,16 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
         MIKE:   "RB",
         // FS free in C1; in C0 we treat FS as free unless you choose to man him elsewhere.
     };
+
+    // Bunch banjo (simple): early in route, swap Nickel/Corner responsibility on bunch side
+    const bunchLeft = formation === 'BUNCH_LEFT';
+    if (tt < 0.20 && bunchLeft) {
+      // On left side, let Nickel match outside-most and CB_L take next
+      const outsideLeft: ReceiverID = align.X.x < align.Z.x ? 'X' : 'Z';
+      const nextLeft: ReceiverID = outsideLeft === 'X' ? 'SLOT' : 'TE';
+      manMap.NICKEL = outsideLeft;
+      manMap.CB_L = nextLeft;
+    }
 
     // Extra-LB roles from snap-time draw (never 2 spies)
     const iBlitz = manExtraRoles.blitzers.includes(id);
@@ -1614,6 +1809,37 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
 
     /* ZONE */
     if (ZONE_COVERAGES.has(cover)) {
+      // Fire Zone (3-under/3-deep) behavior for C3
+      if (cover === 'C3' && fireZoneOn) {
+        const sr = strongIsRight();
+        const dropper: DefenderID = sr ? 'WILL' : 'SAM';
+        if (id === 'CB_L') return ZONES.DEEP_LEFT;
+        if (id === 'CB_R') return ZONES.DEEP_RIGHT;
+        if (id === 'FS')   return ZONES.DEEP_MIDDLE;
+        if (id === 'MIKE') return ZONES.HOOK_MID;
+        if (id === 'NICKEL') {
+          // blitz path toward QB
+          const gapX = QB.x + (sr ? xAcross(6) : -xAcross(6));
+          const blitzPoint: Pt = { x: gapX, y: QB.y };
+          return approach(start, blitzPoint, 0.20, 1.25);
+        }
+        if (id === dropper) {
+          // drop to strong flat
+          const flat = sr ? ZONES.FLAT_RIGHT : ZONES.FLAT_LEFT;
+          return approach(start, flat, 0.25, 0.60);
+        }
+        if (id === 'SS') {
+          // buzz to weak curl
+          const curl = sr ? ZONES.CURL_LEFT : ZONES.CURL_RIGHT;
+          return approach(start, curl, 0.20, 0.55);
+        }
+        if (id === (sr ? 'SAM' : 'WILL')) {
+          // opposite OLB shade weak curl
+          const curl = sr ? ZONES.CURL_LEFT : ZONES.CURL_RIGHT;
+          return approach(start, curl, 0.20, 0.50);
+        }
+        return approach(start, zoneAnchor(cover, id), 0.25, 0.55);
+      }
       // Special ramp for TAMPA2 MIKE: hook -> pole (deep middle)
       if (cover === 'TAMPA2' && id === 'MIKE') {
         const hook = ZONES.HOOK_MID;
@@ -1646,6 +1872,28 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
         return p;
       }
 
+      // C3 kick/push adjustment early vs motion: send flat player to the motion side
+      if (cover === 'C3' && tt < 0.22 && lastMotion) {
+        const toRight = lastMotion.dir === 'right';
+        const flatPt = toRight ? ZONES.FLAT_RIGHT : ZONES.FLAT_LEFT;
+        if (id === 'NICKEL') return approach(start, flatPt, 0.20, 0.60);
+        if (id === 'SS' && c3Rotation !== 'BUZZ') {
+          // SKY/CLOUD: safety toward curl/flat on motion side
+          const curlPt = toRight ? ZONES.CURL_RIGHT : ZONES.CURL_LEFT;
+          return approach(start, curlPt, 0.15, 0.55);
+        }
+      }
+
+      // C2 dynamic trap behavior: corner drives #2 under; safety caps #1
+      if (cover === 'C2') {
+        const twoL = wrPos(left2() ?? 'SLOT', tt);
+        const twoR = wrPos(right2() ?? 'SLOT', tt);
+        const underL = yDepthYds(twoL) <= 10;
+        const underR = yDepthYds(twoR) <= 10;
+        if (id === 'CB_L' && underL) return approach(start, twoL, 0.0, 0.50);
+        if (id === 'CB_R' && underR) return approach(start, twoR, 0.0, 0.50);
+      }
+
       return near ? approach(p, nearest.p, 0.0, 0.45) : p;
     }
 
@@ -1666,27 +1914,40 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
       const isVert = (pt: Pt) => yDepthYds(pt) >= 12; // #2 vertical past ~12 yds
 
       if (cover === "QUARTERS") {
+        // Trips checks (SOLO/POACH) simplified: weak safety poaches #3 vertical to the trips side,
+        // boundary corner isolates #1. Nickel walls #2 early.
+        const tripsOnRight = !!right3();
+        const tripsOnLeft  = !!left3();
         if (id === "CB_L") return approach(p, wrPos(left1() ?? "X", tt), 0.10, 0.55);
         if (id === "CB_R") return approach(p, wrPos(right1() ?? "Z", tt), 0.10, 0.55);
 
+        // Safeties: carry #2 vertical; if trips, weak safety poaches #3 vertical
         if (id === "SS" || id === "FS") {
-          const tgt2 = id === "SS" ? (sr ? twoStrong : twoWeak) : (sr ? twoWeak : twoStrong);
-          if (isVert(tgt2)) return approach(p, tgt2, 0.05, 0.45);
-          const tgt1 = id === "SS" ? (sr ? oneStrong : oneWeak) : (sr ? oneWeak : oneStrong);
-          const mid = { x: (tgt1.x + tgt2.x)/2, y: (tgt1.y + tgt2.y)/2 };
+          const isSS = id === 'SS';
+          const myTwo = isSS ? (sr ? twoStrong : twoWeak) : (sr ? twoWeak : twoStrong);
+          if (isVert(myTwo)) return approach(p, myTwo, 0.05, 0.45);
+
+          const myOne = isSS ? (sr ? oneStrong : oneWeak) : (sr ? oneWeak : oneStrong);
+          // Poach #3 if trips to the opposite safety's side
+          const threeStrong = sr ? (right3() ?? null) : (left3() ?? null);
+          const pThree = threeStrong ? wrPos(threeStrong, tt) : null;
+          const imWeakSafety = (sr && !isSS) || (!sr && isSS);
+          if (imWeakSafety && pThree && isVert(pThree)) return approach(p, pThree, 0.05, 0.40);
+
+          const mid = { x: (myOne.x + myTwo.x)/2, y: (myOne.y + myTwo.y)/2 };
           return approach(p, mid, 0.05, 0.30);
         }
 
+        // Nickel/LBs: wall #2 to trips and midpoint #3/RB underneath
         if (id === "NICKEL" || id === "MIKE" || id === "SAM" || id === "WILL") {
-          const three = wrPos("RB", tt);
           const myTwo = (id === "NICKEL" || (id === "SAM" && !sr) || (id === "WILL" && sr)) ? twoStrong : twoWeak;
-          // Nickel wall #2 at ~6–8 yds inside leverage before passing it
-          if (id === "NICKEL" && tt < 0.25) {
+          if (id === "NICKEL" && (tripsOnLeft || tripsOnRight) && tt < 0.25) {
             const inside = myTwo.x > QB.x ? -xAcross(2) : xAcross(2);
             const wall: Pt = { x: myTwo.x + inside, y: yUp(18) };
             return approach(start, wall, 0.10, 0.55);
           }
-          const mid = { x: (myTwo.x + three.x)/2, y: (myTwo.y + three.y)/2 };
+          const pThree = (sr ? (right3() ? wrPos(right3()!, tt) : wrPos("RB", tt)) : (left3() ? wrPos(left3()!, tt) : wrPos("RB", tt)));
+          const mid = { x: (myTwo.x + pThree.x)/2, y: (myTwo.y + pThree.y)/2 };
           return approach(p, mid, 0.05, 0.35);
         }
         return p;
@@ -1713,6 +1974,18 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
       }
 
       if (cover === "C9") {
+        const bunchLeft = formation === 'BUNCH_LEFT';
+        if (bunchLeft && tt < 0.20) {
+          // Early switch (banjo) on bunch: Nickel match outside-most briefly, CB_L take next
+          if (id === 'NICKEL') {
+            const outer = left1() ?? 'X';
+            return approach(start, wrPos(outer, tt), 0.10, 0.60);
+          }
+          if (id === 'CB_L') {
+            const nxt = left2() ?? 'SLOT';
+            return approach(start, wrPos(nxt, tt), 0.10, 0.55);
+          }
+        }
         if ((id === "CB_R" && sr) || (id === "CB_L" && !sr)) {
           p = approach(p, oneStrong, 0.0, 0.38);
         }
@@ -1888,6 +2161,38 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     setBallFlying(false); setBallT(0); setCatchAt(null);
   }
 
+  function applyMotionNow() {
+    if (!motionRid || motionBusy || phase !== 'pre') return;
+    try {
+      const A = (customAlign ?? FORMATIONS[formation]) as AlignMap;
+      const cur = A[motionRid as ReceiverID];
+      if (!cur) return;
+      if (motionLockRid && motionLockRid !== motionRid) return;
+      const sign = motionDir === 'left' ? -1 : 1;
+      let dx = 0; const dy = 0;
+      if (motionType === 'short') dx = sign * xAcross(6);
+      else if (motionType === 'jet') dx = sign * xAcross(10);
+      else if (motionType === 'across') dx = (QB.x - cur.x) * 2;
+      const end: Pt = { x: Math.max(xAcross(4), Math.min(xAcross(FIELD_WIDTH_YDS - 4), cur.x + dx)), y: cur.y + dy };
+      setMotionBusy(true);
+      setLastMotion({ rid: motionRid as ReceiverID, type: motionType, dir: motionDir });
+      // Compute realistic motion duration based on yards distance and receiver speed
+      const yards = Math.hypot((end.x - cur.x)/XPX, (end.y - cur.y)/YPX);
+      const baseYps = 6.0; // baseline yards/sec
+      const eff = Math.max(4.5, baseYps * recSpeed * receiverSpeedMult(motionRid as ReceiverID) * 0.9);
+      const durMs = Math.max(800, Math.min(3500, Math.round((yards / eff) * 1000)));
+      animateAlign(motionRid as ReceiverID, cur, end, durMs, A, () => {
+        setMotionBusy(false);
+        if (snapOnMotion) {
+          autoSnapAfterMotionRef.current = true;
+        }
+        setMotionLockRid(motionRid as ReceiverID);
+      });
+    } catch {
+      setMotionBusy(false);
+    }
+  }
+
   function startSnap() {
     setT(0);
     setDecision(null);
@@ -1906,6 +2211,8 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     setAiLog((log) => log.concat([{ playId: playId + 1, coverage, formation, leverage: levInfo, adjustments: levAdjust }]));
     setPhase("pre");
     queueMicrotask(() => setPhase("post"));
+    // Clear motion lock for the next pre-snap sequence
+    setMotionLockRid(null);
   }
 
   function hardReset() {
@@ -1919,6 +2226,7 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
     setCatchAt(null);
     setCaught(false);
     setThrowMeta(null);
+    setMotionLockRid(null);
   }
   function startThrow(to: ReceiverID) {
   // Blocked targets can’t receive throws
@@ -2446,6 +2754,53 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           </label>
         </div>
 
+        {/* Motion controls */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 ml-2">
+          <div className="text-white/60 text-xs">Motion</div>
+          <select
+            className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
+            value={motionRid}
+            onChange={(e) => setMotionRid(e.target.value as ReceiverID)}
+            disabled={motionBusy || phase !== 'pre'}
+          >
+            <option value="">Receiver…</option>
+            {(["X","Z","SLOT","TE","RB"] as ReceiverID[]).map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+          <select
+            className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
+            value={motionType}
+            onChange={(e) => setMotionType(e.target.value as 'jet'|'short'|'across')}
+            disabled={motionBusy || phase !== 'pre'}
+          >
+            <option value="jet">Jet</option>
+            <option value="short">Short</option>
+            <option value="across">Across</option>
+          </select>
+          <select
+            className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
+            value={motionDir}
+            onChange={(e) => setMotionDir(e.target.value as 'left'|'right')}
+            disabled={motionBusy || phase !== 'pre'}
+          >
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+          </select>
+          <label className="flex items-center gap-2 text-white/70 text-xs">
+            <input type="checkbox" checked={snapOnMotion} onChange={(e)=>setSnapOnMotion(e.target.checked)} disabled={motionBusy || phase !== 'pre'} /> Snap on motion
+          </label>
+          <button
+            onClick={applyMotionNow}
+            disabled={!motionRid || motionBusy || phase !== 'pre'}
+            className="px-3 py-2 rounded-xl bg-emerald-400 text-black font-semibold disabled:opacity-60"
+            title="Animate motion before snap"
+          >
+            Move
+          </button>
+          {motionBusy && <div className="text-white/60 text-xs">Motioning…</div>}
+        </div>
+
         {/* Throw targets + Audible */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
         {throwButtons.map(to => (
@@ -2500,6 +2855,8 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
                 <option value="BUZZ">Buzz</option>
                 <option value="CLOUD_STRONG">Cloud (Strong)</option>
               </select>
+              <label className="ml-2 flex items-center gap-1"><input type="checkbox" checked={fireZoneOn} onChange={(e)=>setFireZoneOn(e.target.checked)} /> Fire Zone (3u/3d)</label>
+              <label className="ml-2 flex items-center gap-1"><input type="checkbox" checked={showDev} onChange={(e)=>setShowDev(e.target.checked)} /> Dev Overlay</label>
             </div>
           )}
 
@@ -2557,6 +2914,23 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           </div>
         )}
       </div>
+      {showDev && (
+        <div className="mt-3 p-3 rounded-xl bg-white/5 text-white text-xs space-y-1 border border-white/10">
+          <div className="uppercase text-white/60">Dev Checks</div>
+          <div>Coverage: {coverage} {coverage==='C3' ? `(rot=${c3RotationMode==='AUTO'?c3Rotation:c3RotationMode}${fireZoneOn? ', fire-zone':''})` : ''}</div>
+          {(() => { const m = buildSnapMeta(); return (
+            <>
+              <div>Trips: {m.coverageInsights?.tripsSide || '—'} {m.coverageInsights?.tripsCheck ? `(${m.coverageInsights?.tripsCheck})` : ''}</div>
+              <div>MOF: {m.coverageInsights?.mofState}</div>
+              <div>Hot: {m.coverageInsights?.hotNow ? 'YES' : 'no'}</div>
+              {coverage==='C3' && (
+                <div>Kick/Push: {m.coverageInsights?.c3KickPush ? 'bias' : '—'} · Dropper: {m.coverageInsights?.fireZoneDropper || '—'} · Blitzer: {m.coverageInsights?.fireZoneBlitzer || '—'}</div>
+              )}
+              <div>Banjo: {m.coverageInsights?.banjoActive ? 'on' : 'off'}</div>
+            </>
+          ); })()}
+        </div>
+      )}
     </div>
   );
 }

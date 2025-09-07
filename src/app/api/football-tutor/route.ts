@@ -52,8 +52,8 @@ Constraints: concise, football-accurate, simulator-aware. Never reveal raw JSON;
     ].join(' | ');
     const know = await similarKnowledge(queryText, 5);
     const knowledgeBlock = know.length ? `\nKNOWLEDGE:\n` + know.map(k=>`- ${k.title}: ${k.bullets.join(' ')}`).join('\n') : '';
-    const analysisBlock = body.throwCtx ? `\nANALYZE LAST REP:\n${JSON.stringify(body.throwCtx)}\nUse the knowledge above + coverage + play to suggest what could be improved (timing, read, leverage) in 2-3 bullets.` : '';
-    const userContent = `${seed}\nFORMATION: ${body.formation ?? '(n/a)'}\nTOGGLES: audibles=${!!body.toggles?.audibles}, tutor=${!!body.toggles?.tutor}, quiz=${!!body.toggles?.quiz}${knowledgeBlock}${analysisBlock}\nReturn JSON: {"reply": string, "suggestedCoverage": "C0|C1|C2|TAMPA2|PALMS|C3|C4|QUARTERS|C6|C9", "reason": string, "quiz"?: {"question": string, "answer": string, "explain": string}}`;
+    const analysisBlock = body.throwCtx ? `\nANALYZE LAST REP:\n${JSON.stringify(body.throwCtx)}\nUse the knowledge above + coverage + play to suggest what could be improved (timing, read, leverage) in 2-3 bullets. Cite a short fragment from the relevant knowledge bullet using the pattern (Ref: <few words>).` : '';
+    const userContent = `${seed}\nFORMATION: ${body.formation ?? '(n/a)'}\nTOGGLES: audibles=${!!body.toggles?.audibles}, tutor=${!!body.toggles?.tutor}, quiz=${!!body.toggles?.quiz}${knowledgeBlock}${analysisBlock}\nReturn JSON: {"reply": string, "improvements"?: string[], "reads"?: string[], "audibles"?: [{"label"?: string, "formation"?: string, "assignments"?: { [rid: string]: string }, "rationale": string }], "suggestedCoverage": "C0|C1|C2|TAMPA2|PALMS|C3|C4|QUARTERS|C6|C9", "reason": string, "quiz"?: {"question": string, "answer": string, "explain": string}}\nIf audibles=true, include up to 2 audibles. Use exact route keywords (e.g., CORNER, OUT_LOW, WHEEL, DIG). Keep each rationale to one line.`;
 
     const resp = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -67,8 +67,8 @@ Constraints: concise, football-accurate, simulator-aware. Never reveal raw JSON;
     });
 
     const raw = resp.choices[0]?.message?.content ?? "{}";
-    let parsed: { reply?: string; suggestedCoverage?: CoverageID; reason?: string; quiz?: { question: string; answer: string; explain: string } };
-    try { parsed = JSON.parse(raw) as { reply?: string; suggestedCoverage?: CoverageID; reason?: string; quiz?: { question: string; answer: string; explain: string } }; } catch { parsed = { reply: raw }; }
+    let parsed: { reply?: string; improvements?: string[]; reads?: string[]; audibles?: Array<{ label?: string; formation?: string; assignments?: Record<string,string>; rationale: string }>; suggestedCoverage?: CoverageID; reason?: string; quiz?: { question: string; answer: string; explain: string } };
+    try { parsed = JSON.parse(raw) as { reply?: string; improvements?: string[]; reads?: string[]; audibles?: Array<{ label?: string; formation?: string; assignments?: Record<string,string>; rationale: string }>; suggestedCoverage?: CoverageID; reason?: string; quiz?: { question: string; answer: string; explain: string } }; } catch { parsed = { reply: raw }; }
     const content = parsed.reply || '';
 
     // Build coverage_read/progression from concept + coverage
@@ -118,6 +118,7 @@ Constraints: concise, football-accurate, simulator-aware. Never reveal raw JSON;
 
     // Audible suggestion via internal tool if toggled
     let audible: { formation?: string; assignments?: Partial<Record<string,string>>; rationale?: string } | undefined;
+    const audiblesLLM: Array<{ label?: string; formation?: string; assignments?: Record<string,string>; rationale: string }> | undefined = parsed.audibles;
     if (body.toggles?.audibles && body.conceptId && body.coverage && body.formation) {
       try {
         const aReq = new Request('http://local/aud', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
@@ -145,7 +146,7 @@ Constraints: concise, football-accurate, simulator-aware. Never reveal raw JSON;
       } catch { /* ignore audible failure */ }
     }
 
-    return new Response(JSON.stringify({ reply: content, suggestedCoverage: parsed.suggestedCoverage, suggestedReason: parsed.reason, coverage_read, progression, grade: gradeBlock, audible, quiz: parsed.quiz }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ reply: content, improvements: parsed.improvements, reads: parsed.reads, audibles: audiblesLLM, suggestedCoverage: parsed.suggestedCoverage, suggestedReason: parsed.reason, coverage_read, progression, grade: gradeBlock, audible, quiz: parsed.quiz }), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
     return new Response(JSON.stringify({ reply: `Tutor error: ${msg}` }), { status: 200, headers: { "Content-Type": "application/json" } });
