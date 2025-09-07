@@ -57,7 +57,13 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
 
   // Auto-analyze after a graded throw
   useEffect(() => {
-    if (!lastThrow) return;
+    if (!lastThrow) {
+      console.log('[TutorChat] No lastThrow data');
+      return;
+    }
+    
+    console.log('[TutorChat] lastThrow received:', { playId: lastThrow.playId, grade: lastThrow.grade, target: lastThrow.target });
+    
     // Optional: track skills for adaptive drills
     if (adaptiveOn) {
       try {
@@ -77,6 +83,8 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
         });
       } catch {}
     }
+    
+    console.log('[TutorChat] Sending "Analyze last rep." to AI tutor');
     void send('Analyze last rep.', lastThrow as unknown as Record<string, unknown>);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastThrow?.playId, lastThrow?.grade]);

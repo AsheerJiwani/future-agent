@@ -69,6 +69,10 @@ export type ThrowSummary = {
   nearestSepYds?: number;
   nearestDefender?: string | null;
   grade?: string;
+  explanation?: string;
+  conceptId?: string;
+  coverage?: string;
+  formation?: string;
   catchWindowScore?: number;
   catchSepYds?: number;
 };

@@ -2483,7 +2483,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
 
     // Notify parent so downstream AI Assistant can refresh with this throw context
     try {
-      onThrowGraded?.({
+      const throwSummary = {
         target: to,
         time: t,
         playId,
@@ -2494,9 +2494,17 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         nearestSepYds: lastWindow?.info.sepYds,
         nearestDefender: lastWindow?.info.nearest ?? null,
         grade: gradeStr,
+        explanation: explainStr,
+        conceptId,
+        coverage,
+        formation,
         catchWindowScore: computeReceiverOpenness(to, Math.min(1, t)).score,
         catchSepYds: computeReceiverOpenness(to, Math.min(1, t)).sepYds,
-      });
+      };
+      
+      // Debug: ensure callback fires
+      console.log('[PlaySimulator] onThrowGraded called with:', { playId, grade: gradeStr, target: to });
+      onThrowGraded?.(throwSummary);
       // Broadcast a lightweight rep result for in-sim drill banner
       try {
         const rep = {
