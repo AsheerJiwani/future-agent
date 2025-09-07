@@ -611,11 +611,13 @@ export default function PlaySimulator({
   coverage,
   onSnapshot,
   onThrowGraded,
+  fullScreen = false,
 }: {
   conceptId: FootballConceptId;
   coverage: CoverageID;
   onSnapshot?: (snap: PlaySnapshot, meta: SnapMeta) => void;
   onThrowGraded?: (summary: ThrowSummary) => void;
+  fullScreen?: boolean;
 }) {
   const [phase, setPhase] = useState<"pre" | "post" | "decided">("pre");
   const { t, setT, seek, start: startClock, stop: stopClock, reset: resetClock } = usePlayClock(3000);

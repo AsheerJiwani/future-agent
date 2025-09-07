@@ -6,7 +6,7 @@ import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
-export default function TutorChat({ conceptId, coverage, formation, snapshot, snapMeta, lastThrow, adaptiveOn = false, onSetCoverage }: { conceptId?: FootballConceptId; coverage?: CoverageID; formation?: string; snapshot?: PlaySnapshot; snapMeta?: SnapMeta; lastThrow?: ThrowSummary; adaptiveOn?: boolean; onSetCoverage?: (c: CoverageID)=>void }) {
+export default function TutorChat({ conceptId, coverage, formation, snapshot, snapMeta, lastThrow, adaptiveOn = false, onSetCoverage, isFullScreen = false }: { conceptId?: FootballConceptId; coverage?: CoverageID; formation?: string; snapshot?: PlaySnapshot; snapMeta?: SnapMeta; lastThrow?: ThrowSummary; adaptiveOn?: boolean; onSetCoverage?: (c: CoverageID)=>void; isFullScreen?: boolean }) {
   const [history, setHistory] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [audiblesOn, setAudiblesOn] = useState(true);
@@ -113,6 +113,138 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastThrow?.uniqueId, lastThrow?.throwTimestamp, lastThrow?.playId, lastThrow?.grade, lastThrow?.target]);
 
+  if (isFullScreen) {
+    // FULL-SCREEN MODE: Smart widget positioned above route zones
+    return (
+      <div className="bg-black/70 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl">
+        {/* COMPACT HEADER */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+            <div className="text-sm font-semibold text-white">AI Defense Coach</div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" checked={tutor} onChange={(e)=>setTutor(e.target.checked)} className="rounded" /> 
+              <span>Auto-Analysis</span>
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" checked={quizAfter} onChange={(e)=>setQuizAfter(e.target.checked)} className="rounded" /> 
+              <span>Quiz Mode</span>
+            </label>
+          </div>
+        </div>
+
+        {/* AI FEEDBACK CARDS - Horizontal layout */}
+        <div className="p-3">
+          <div className="flex gap-3 overflow-x-auto">
+            {/* Suggested Coverage Card */}
+            {suggested && (
+              <div className="flex-shrink-0 bg-gradient-to-r from-indigo-500/20 to-fuchsia-500/20 border border-indigo-400/30 rounded-xl p-3 min-w-64">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-indigo-300 text-xs font-semibold">🎯 COVERAGE SUGGESTION</div>
+                  {onSetCoverage && (
+                    <button 
+                      onClick={()=>onSetCoverage(suggested.cov)} 
+                      className="px-2 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-medium transition-colors"
+                    >
+                      Apply
+                    </button>
+                  )}
+                </div>
+                <div className="text-white font-semibold">{suggested.cov}</div>
+                {suggested.why && <div className="text-white/70 text-sm mt-1">{suggested.why}</div>}
+              </div>
+            )}
+
+            {/* Grade Card */}
+            {gradeCard && (
+              <div className="flex-shrink-0 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-400/30 rounded-xl p-3 min-w-64">
+                <div className="text-emerald-300 text-xs font-semibold mb-2">📊 THROW ANALYSIS</div>
+                <div className="space-y-1 text-sm">
+                  <div><span className="text-white/60">Grade:</span> <span className="text-white font-medium">{gradeCard.grade}</span></div>
+                  <div><span className="text-white/60">Next Read:</span> <span className="text-white">{gradeCard.nextRead}</span></div>
+                  <div><span className="text-white/60">Tip:</span> <span className="text-white">{gradeCard.coachingTip}</span></div>
+                </div>
+              </div>
+            )}
+
+            {/* Training Prompt Card - Always visible when no other feedback */}
+            {!suggested && !gradeCard && !loading && (
+              <div className="flex-shrink-0 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-400/30 rounded-xl p-3 min-w-80">
+                <div className="text-amber-300 text-xs font-semibold mb-2">🏈 NFL DEFENSE TRAINING</div>
+                <div className="text-white text-sm mb-3">
+                  Ready to master NFL-level defense reads? Each rep builds game-winning instincts. Study the coverage, read the receivers, make the perfect throw.
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={()=>{ try{ window.dispatchEvent(new CustomEvent('agent-snap-now')); }catch{} }} 
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+                  >
+                    Take the Snap
+                  </button>
+                  <button 
+                    onClick={()=>{ try{ window.dispatchEvent(new CustomEvent('start-snap')); }catch{} }} 
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
+                  >
+                    Auto-Start
+                  </button>
+                </div>
+                <div className="text-amber-200/80 text-xs mt-2">
+                  💡 Tip: Look for leverage mismatches and coverage rotations
+                </div>
+              </div>
+            )}
+
+            {/* Loading State with Motivation */}
+            {loading && (
+              <div className="flex-shrink-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-400/30 rounded-xl p-3 min-w-64">
+                <div className="text-blue-300 text-xs font-semibold mb-2">🧠 ANALYZING YOUR READ</div>
+                <div className="text-white text-sm mb-2">AI coach is studying your throw...</div>
+                <div className="flex items-center gap-2 text-blue-300">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                  <span className="text-sm ml-2">Thinking...</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* QUICK CHAT INPUT */}
+        <div className="px-3 pb-3">
+          <form className="flex gap-2" onSubmit={(e)=>{e.preventDefault(); if(!input.trim()) return; const msg=input.trim(); setInput(''); void send(msg);}}>
+            <input 
+              value={input} 
+              onChange={(e)=>setInput(e.target.value)} 
+              placeholder="Ask about reads, audibles, or coverage..." 
+              className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm placeholder-white/50 outline-none focus:border-white/40 transition-colors" 
+            />
+            <button disabled={loading} className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white text-sm font-medium disabled:opacity-50 transition-opacity">
+              {loading ? 'Thinking...' : 'Ask'}
+            </button>
+          </form>
+        </div>
+
+        {/* CHAT HISTORY - Collapsible */}
+        {history.length > 0 && (
+          <div className="mx-3 mb-3 bg-white/5 border border-white/10 rounded-lg">
+            <div className="max-h-32 overflow-y-auto p-2 space-y-2 text-sm">
+              {history.slice(-4).map((m,i) => (
+                <div key={i} className={m.role==='assistant' ? 'text-white/90' : 'text-indigo-300'}>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded mr-2 bg-white/10">{m.role==='assistant'?'AI':'You'}</span>
+                  <span className="align-middle">{m.content}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // TRADITIONAL MODE: Original layout
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-3 md:p-4 backdrop-blur-lg">
       <div className="flex items-center justify-between mb-2">

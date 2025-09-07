@@ -191,226 +191,129 @@ export default function FootballPanel() {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-xl">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-white/60">QB Assistant Lab</div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode("teach")}
-            className={`px-3 py-1.5 rounded-xl text-sm ${mode==="teach" ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white" : "bg-white/10 text-white/80"}`}
-          >Teach</button>
-          <button
-            onClick={() => setMode("quiz")}
-            className={`px-3 py-1.5 rounded-xl text-sm ${mode==="quiz" ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white" : "bg-white/10 text-white/80"}`}
-          >Quiz</button>
+    <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
+      {/* AI TUTOR WIDGET - Positioned above route zones (30+ yard area) */}
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-4xl px-4">
+        <TutorChat 
+          adaptiveOn={adaptiveOn} 
+          conceptId={conceptId} 
+          coverage={coverage} 
+          formation={snapshot?.formation} 
+          snapshot={snapshot} 
+          snapMeta={snapMeta} 
+          lastThrow={lastThrow} 
+          onSetCoverage={(c)=>setCoverage(c)}
+          isFullScreen={true}
+        />
+      </div>
+
+      {/* MAIN FIELD AREA - Full screen simulator */}
+      <div className="absolute inset-0 pt-32">
+        <PlaySimulator
+          conceptId={conceptId}
+          coverage={coverage}
+          onSnapshot={(snap, meta) => {
+            setSnapshot(snap);
+            setSnapMeta(meta);
+          }}
+          onThrowGraded={(sum) => setLastThrow(sum)}
+          fullScreen={true}
+        />
+      </div>
+
+      {/* COMPACT TRAINING CONTROLS - Bottom overlay */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-40 flex items-center gap-3 bg-black/80 backdrop-blur-xl border border-white/20 rounded-2xl px-6 py-3">
+        <div className="text-xs uppercase tracking-wide text-emerald-400 font-semibold">NFL Defense Trainer</div>
+        <div className="w-px h-6 bg-white/20"></div>
+        
+        {/* Compact concept selector */}
+        <select
+          value={conceptId}
+          onChange={(e) => {
+            const value = e.target.value as FootballConceptId;
+            startTransition(() => setConceptId(value));
+          }}
+          className="bg-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/20"
+        >
+          {CONCEPTS.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+
+        {/* Compact coverage selector */}
+        <select
+          value={coverage}
+          onChange={(e) => {
+            const value = e.target.value as CoverageID;
+            startTransition(() => setCoverage(value));
+          }}
+          className="bg-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/20"
+        >
+          {COVERAGES.map(cv => (
+            <option key={cv} value={cv}>{COVERAGE_LABEL[cv]}</option>
+          ))}
+        </select>
+
+        <div className="w-px h-6 bg-white/20"></div>
+
+        {/* Training mode toggle */}
+        <label className="flex items-center gap-2 text-white/80 text-sm cursor-pointer">
+          <input type="checkbox" checked={adaptiveOn} onChange={(e)=>setAdaptiveOn(e.target.checked)} className="rounded" /> 
+          <span>AI Training</span>
+        </label>
+
+        {/* Quick rep button */}
+        <button
+          onClick={()=>void runReps(5)}
+          className="px-4 py-2 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white text-sm font-medium transition-colors"
+        >
+          Run 5 Reps
+        </button>
+
+        {/* Session streak */}
+        <div className="text-white/60 text-sm">
+          Streak: <span className="text-emerald-400 font-semibold">{sessionInfo.streak}</span>
         </div>
       </div>
 
-      {/* Selectors */}
-      <div className="grid gap-3 md:grid-cols-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-white/60 text-xs">Concept</span>
-          <select
-            value={conceptId}
-            onChange={(e) => {
-              // PERFORMANCE: Use requestAnimationFrame for non-blocking concept changes
-              const value = e.target.value as FootballConceptId;
-              startTransition(() => setConceptId(value));
-            }}
-            className="bg-white/10 text-white rounded-xl px-3 py-2 outline-none"
-          >
-            {CONCEPTS.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-white/60 text-xs">Coverage</span>
-          <select
-            value={coverage}
-            onChange={(e) => {
-              // PERFORMANCE: Use requestAnimationFrame for non-blocking coverage changes  
-              const value = e.target.value as CoverageID;
-              startTransition(() => setCoverage(value));
-            }}
-            className="bg-white/10 text-white rounded-xl px-3 py-2 outline-none"
-          >
-            {COVERAGES.map(cv => (
-              <option key={cv} value={cv}>{COVERAGE_LABEL[cv]}</option>
-            ))}
-          </select>
-        </label>
-
-        <div className="flex items-end gap-3 flex-wrap">
-          <label className="flex items-center gap-2 text-white/70 text-xs">
-            <input type="checkbox" checked={adaptiveOn} onChange={(e)=>setAdaptiveOn(e.target.checked)} /> Adaptive Drills
-          </label>
-          <label className="flex items-center gap-2 text-white/70 text-xs">
-            <span>Star</span>
-            <select value={starRid} onChange={(e)=>{ const v = e.target.value as typeof starRid; setStarRid(v); try { window.dispatchEvent(new CustomEvent('set-star', { detail: { rid: v || '' } })); } catch {} }} className="bg-white/10 text-white rounded-md px-2 py-2">
-              <option value="">—</option>
-              <option value="X">X</option>
-              <option value="Z">Z</option>
-              <option value="SLOT">SLOT</option>
-              <option value="TE">TE</option>
-              <option value="RB">RB</option>
-            </select>
-          </label>
-          <button
-            onClick={async ()=>{
-              if (!adaptiveOn) return;
-              try {
-                const res = await fetch('/api/adaptive/next', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conceptId, coverage }) });
-                const data = await res.json() as { suggestedCoverage?: CoverageID; suggestedFormation?: 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT'; motions?: Array<{ rid: 'X'|'Z'|'SLOT'|'TE'|'RB'; type?: 'jet'|'short'|'across'; dir?: 'left'|'right' }>; fireZone?: { on: boolean; preset?: 'NICKEL'|'SAM'|'WILL' }; reason?: string; recs?: Array<{ skill: string; coverage: CoverageID; reason: string }> };
-                if (data.recs) setSessionInfo(s => ({ ...s, recs: data.recs }));
-                // Capture prev for revert then apply suggestion
-                setLastDrill({ prev: { coverage, formation: (snapshot?.formation as 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT') }, suggestion: { suggestedCoverage: data.suggestedCoverage, suggestedFormation: data.suggestedFormation, motions: data.motions, fireZone: data.fireZone } });
-                if (data.suggestedCoverage) setCoverage(data.suggestedCoverage);
-                // Apply formation preset (opt-in) via event
-                if (data.suggestedFormation) {
-                  try { window.dispatchEvent(new CustomEvent('set-formation', { detail: { formation: data.suggestedFormation } })); } catch {}
-                }
-                // Apply suggested motion(s) (best effort, one at a time)
-                if (Array.isArray(data.motions)) {
-                  for (const m of data.motions) {
-                    try { window.dispatchEvent(new CustomEvent('apply-motion', { detail: m })); } catch {}
-                  }
-                }
-                // Apply fire-zone if requested
-                if (data.fireZone?.on) {
-                  try { window.dispatchEvent(new CustomEvent('set-firezone', { detail: { on: true, preset: data.fireZone?.preset } })); } catch {}
-                }
-                // Show a drill banner in the simulator
-                try {
-                  window.dispatchEvent(new CustomEvent('adaptive-drill', { detail: {
-                    coverage: data.suggestedCoverage,
-                    formation: data.suggestedFormation,
-                    motions: data.motions,
-                    fireZone: data.fireZone,
-                    reason: data.reason
-                  }}));
-                } catch {}
-              } catch {}
-            }}
-            className={`px-3 py-1.5 rounded-xl text-sm ${adaptiveOn ? 'bg-gradient-to-r from-amber-500 to-lime-500 text-black' : 'bg-white/10 text-white/50 cursor-not-allowed'}`}
-            title={adaptiveOn ? 'Get the next drill' : 'Enable Adaptive Drills to use'}
-          >Next Drill</button>
-          {adaptiveOn && !autoRun.on && (
-            <button onClick={()=>void runReps(5)} className="px-3 py-1.5 rounded-xl text-sm bg-white/10 text-white/80">Run 5 Reps</button>
-          )}
-          {adaptiveOn && autoRun.on && (
-            <button onClick={()=>setAutoRun({ on:false, left: 0 })} className="px-3 py-1.5 rounded-xl text-sm bg-rose-600/80 text-white">Stop ({autoRun.left})</button>
-          )}
-          {/* Routine picker */}
-          <div className="flex items-center gap-2 text-white/70 text-xs">
-            <span>Routine</span>
-            <select value={routineName} onChange={(e)=>setRoutineName(e.target.value)} className="bg-white/10 text-white rounded-md px-2 py-2">
-              <option value="">—</option>
-              {routines.map((r,i)=>(<option key={i} value={r.name}>{r.name}</option>))}
-            </select>
-            <button
-              className="px-2 py-1.5 rounded-md bg-white/10 text-white/80"
-              onClick={()=>{
-                const r = routines.find(rr=>rr.name===routineName);
-                if (!r) return;
-                setLastDrill({ prev: { coverage, formation: (snapshot?.formation as 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT') }, suggestion: { suggestedCoverage: r.drill.coverage, suggestedFormation: r.drill.formation, motions: r.drill.motions, fireZone: r.drill.fireZone } });
-                if (r.drill.coverage) setCoverage(r.drill.coverage);
-                if (r.drill.formation) { try { window.dispatchEvent(new CustomEvent('set-formation', { detail: { formation: r.drill.formation } })); } catch {} }
-                if (r.drill.motions) { r.drill.motions.forEach(m=>{ try{ window.dispatchEvent(new CustomEvent('apply-motion', { detail: m })); }catch{} }); }
-                if (r.drill.fireZone?.on) { try { window.dispatchEvent(new CustomEvent('set-firezone', { detail: { on: true, preset: r.drill.fireZone.preset } })); } catch {} }
-                try { window.dispatchEvent(new CustomEvent('adaptive-drill', { detail: { coverage: r.drill.coverage, formation: r.drill.formation, motions: r.drill.motions, fireZone: r.drill.fireZone, reason: 'Routine' } })); } catch {}
-              }}
-            >Apply</button>
-            {adaptiveOn && routineName && (
-              <button onClick={()=>void runReps(5)} className="px-2 py-1.5 rounded-md bg-white/10 text-white/80">Run 5</button>
+      {/* PERFORMANCE STATS - Top right corner */}
+      <div className="absolute top-4 right-4 z-40 bg-black/80 backdrop-blur-xl border border-white/20 rounded-xl px-4 py-3 text-white min-w-48">
+        <div className="text-xs uppercase tracking-wide text-emerald-400 font-semibold mb-2">Performance</div>
+        {lastThrow ? (
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-white/60">Grade:</span>
+              <span className={`font-bold ${lastThrow.grade?.includes('A') ? 'text-emerald-400' : lastThrow.grade?.includes('B') ? 'text-yellow-400' : 'text-orange-400'}`}>
+                {lastThrow.grade ?? '—'}
+              </span>
+            </div>
+            {lastThrow.throwArea && (
+              <div className="flex justify-between items-center">
+                <span className="text-white/60">Target:</span>
+                <span className="text-white font-medium">{lastThrow.throwArea}</span>
+              </div>
             )}
-            <button
-              className="px-2 py-1.5 rounded-md bg-white/10 text-white/80"
-              onClick={async ()=>{
-                if (!routineName) return;
-                // eslint-disable-next-line no-alert
-                const nn = (window.prompt('Rename routine to:', routineName) || '').trim();
-                if (!nn || nn === routineName) return;
-                try {
-                  await fetch('/api/routine/rename', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oldName: routineName, newName: nn }) });
-                  setRoutineName(nn);
-                  const res = await fetch('/api/routine/list', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-                  const data = await res.json() as { routines?: RoutineData[] };
-                  setRoutines(data.routines || []);
-                } catch {}
-              }}
-            >Rename</button>
-            <button
-              className="px-2 py-1.5 rounded-md bg-rose-600/80 text-white"
-              onClick={async ()=>{
-                if (!routineName) return;
-                if (!window.confirm(`Delete routine "${routineName}"?`)) return;
-                try {
-                  await fetch('/api/routine/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: routineName }) });
-                  setRoutineName('');
-                  const res = await fetch('/api/routine/list', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-                  const data = await res.json() as { routines?: RoutineData[] };
-                  setRoutines(data.routines || []);
-                } catch {}
-              }}
-            >Delete</button>
+            {(typeof lastThrow.catchWindowScore === 'number') && (
+              <div className="flex justify-between items-center">
+                <span className="text-white/60">Window:</span>
+                <span className={`font-medium ${lastThrow.catchWindowScore > 0.7 ? 'text-emerald-400' : lastThrow.catchWindowScore > 0.4 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {(lastThrow.catchWindowScore * 100).toFixed(0)}%
+                </span>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Side-by-side: Simulator + Assistant */}
-      <div className="grid lg:grid-cols-2 gap-4 mt-4">
-        <div className="relative">
-          <PlaySimulator
-            conceptId={conceptId}
-            coverage={coverage}
-            onSnapshot={(snap, meta) => {
-              setSnapshot(snap);
-              setSnapMeta(meta);
-            }}
-            onThrowGraded={(sum) => setLastThrow(sum)}
-          />
-          {lastThrow && (
-            <div className="absolute top-15 left-6 rounded-xl bg-black/60 text-white text-xs px-3 py-2 border border-white/10 shadow-lg">
-              <div className="uppercase tracking-wide text-white/60">Last Grade</div>
-              <div className="text-sm font-semibold">{lastThrow.grade ?? '—'}</div>
-              {lastThrow.throwArea && (
-                <div className="text-white/60">Area: {lastThrow.throwArea}</div>
-              )}
-              {(typeof lastThrow.catchWindowScore === 'number') && (
-                <div className="text-white/60">Open@Catch: {lastThrow.catchWindowScore?.toFixed?.(2)}{typeof lastThrow.catchSepYds==='number' ? ` (${lastThrow.catchSepYds.toFixed(1)} yds)` : ''}</div>
-              )}
-              <div className="mt-2 flex gap-2">
-                <button onClick={()=>{
-                  try { window.dispatchEvent(new CustomEvent('replay-at-break', { detail: { rid: lastThrow.target } })); } catch {}
-                }} className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15">Replay @ break</button>
-                <button onClick={()=>{
-                  try { window.dispatchEvent(new CustomEvent('replay-at-catch')); } catch {}
-                }} className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15">Replay @ catch</button>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-4">
-          <TutorChat adaptiveOn={adaptiveOn} conceptId={conceptId} coverage={coverage} formation={snapshot?.formation} snapshot={snapshot} snapMeta={snapMeta} lastThrow={lastThrow} onSetCoverage={(c)=>setCoverage(c)} />
-          {/* Session View: simple progress + recommended reps */}
-          <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-white/90 text-sm">
-            <div className="text-white/60 text-xs mb-1">Session</div>
-            <div className="flex items-center gap-4 text-xs">
-              <div>Streak: <span className="font-semibold">{sessionInfo.streak}</span></div>
-            </div>
-            {sessionInfo.recs && sessionInfo.recs.length>0 && (
-              <div className="mt-2">
-                <div className="text-white/60 text-xs mb-1">Recommended Reps</div>
-                <ul className="list-disc list-inside">
-                  {sessionInfo.recs.slice(0,3).map((r,i)=> (
-                    <li key={i}><span className="text-white/60">{r.skill}:</span> {r.coverage} — {r.reason}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {!sessionInfo.recs && <div className="text-white/50 text-xs mt-1">Enable Adaptive Drills and run a few reps to get tailored suggestions.</div>}
+        ) : (
+          <div className="text-white/60 text-sm">
+            <div className="text-amber-300 mb-1">🎯 Ready to train</div>
+            <div>Make your first read to get started!</div>
+          </div>
+        )}
+        
+        {/* Session Progress */}
+        <div className="mt-3 pt-2 border-t border-white/10">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-white/60">Session:</span>
+            <span className="text-emerald-400 font-semibold">{sessionInfo.streak} reps</span>
           </div>
         </div>
       </div>
