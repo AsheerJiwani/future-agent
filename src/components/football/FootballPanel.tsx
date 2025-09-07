@@ -212,7 +212,11 @@ export default function FootballPanel() {
           <span className="text-white/60 text-xs">Concept</span>
           <select
             value={conceptId}
-            onChange={(e) => setConceptId(e.target.value as FootballConceptId)}
+            onChange={(e) => {
+              // PERFORMANCE: Use requestAnimationFrame for non-blocking concept changes
+              const value = e.target.value as FootballConceptId;
+              requestAnimationFrame(() => setConceptId(value));
+            }}
             className="bg-white/10 text-white rounded-xl px-3 py-2 outline-none"
           >
             {CONCEPTS.map(c => (
@@ -225,7 +229,11 @@ export default function FootballPanel() {
           <span className="text-white/60 text-xs">Coverage</span>
           <select
             value={coverage}
-            onChange={(e) => setCoverage(e.target.value as CoverageID)}
+            onChange={(e) => {
+              // PERFORMANCE: Use requestAnimationFrame for non-blocking coverage changes  
+              const value = e.target.value as CoverageID;
+              requestAnimationFrame(() => setCoverage(value));
+            }}
             className="bg-white/10 text-white rounded-xl px-3 py-2 outline-none"
           >
             {COVERAGES.map(cv => (

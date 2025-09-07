@@ -3038,7 +3038,11 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             )}
           </div>
           <label className="flex items-center gap-2 text-white/70 text-xs">
-            <input type="checkbox" checked={showDefense} onChange={(e)=>setShowDefense(e.target.checked)} /> Show Defense
+            <input type="checkbox" checked={showDefense} onChange={(e) => {
+              // PERFORMANCE: Use requestAnimationFrame for instant Show Defense toggle
+              const checked = e.target.checked;
+              requestAnimationFrame(() => setShowDefense(checked));
+            }} /> Show Defense
           </label>
           <label className="flex items-center gap-2 text-white/70 text-xs">
             <input type="checkbox" checked={showDev} onChange={(e)=>setShowDev(e.target.checked)} /> Dev Overlay
@@ -3097,7 +3101,11 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           <label className="text-white/70 text-xs">Formation</label>
           <select
             value={formation}
-            onChange={(e) => setFormation(e.target.value as FormationName)}
+            onChange={(e) => {
+              // PERFORMANCE: Use requestAnimationFrame for instant Formation changes
+              const value = e.target.value as FormationName;
+              requestAnimationFrame(() => setFormation(value));
+            }}
             className="bg-white/10 text-white text-xs rounded-md px-2 py-1"
           >
             <option value="TRIPS_RIGHT">Trips Right (3x1)</option>
@@ -3663,7 +3671,11 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
               <label className="ml-2 flex items-center gap-1"><input type="checkbox" checked={showDev} onChange={(e)=>setShowDev(e.target.checked)} /> Dev Overlay</label>
               {showDev && (
                 <>
-                  <label className="ml-2 flex items-center gap-1"><input type="checkbox" checked={showDefense} onChange={(e)=>setShowDefense(e.target.checked)} /> Show Defense</label>
+                  <label className="ml-2 flex items-center gap-1"><input type="checkbox" checked={showDefense} onChange={(e) => {
+                    // PERFORMANCE: Use requestAnimationFrame for instant Show Defense toggle
+                    const checked = e.target.checked;
+                    requestAnimationFrame(() => setShowDefense(checked));
+                  }} /> Show Defense</label>
                   <label className="ml-2 flex items-center gap-1"><input type="checkbox" checked={showNearest} onChange={(e)=>setShowNearest(e.target.checked)} /> Show Nearest</label>
                 </>
               )}
