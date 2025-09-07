@@ -705,7 +705,6 @@ export default function PlaySimulator({
   const [snapOnMotion, setSnapOnMotion] = useState<boolean>(true);
   const [motionBusy, setMotionBusy] = useState<boolean>(false);
   const [lastMotion, setLastMotion] = useState<{ rid: ReceiverID; type: MotionType; dir: MotionDir } | null>(null);
-  const autoSnapAfterMotionRef = useRef<boolean>(false);
   const [routeOrient, setRouteOrient] = useState<Record<ReceiverID, boolean>>({ X: true, Z: false, SLOT: false, TE: false, RB: false });
   // Dev & checks
   const [fireZoneOn, setFireZoneOn] = useState<boolean>(false);
@@ -740,21 +739,26 @@ export default function PlaySimulator({
     return 1.10;
   }, [starRid]);
   function defenderSpeedMult(id: DefenderID): number {
+    // REALISTIC SPEED CAP: Defenders capped at 90% of their receiver equivalents
     switch (id) {
       case "CB_L":
       case "CB_R":
-        return 1.00; // top-end corners
+        // Cover X/Z WRs: 90% of baseline WR speed (1.00)
+        return 0.90;
       case "NICKEL":
-        return 0.98; // close to CB
+        // Cover SLOT: 90% of SLOT speed (0.98)
+        return 0.88;
       case "FS":
       case "SS":
-        return 0.96; // a touch slower than CBs
+        // Cover deep routes from WRs/RBs: 90% of average receiver
+        return 0.86;
       case "SAM":
       case "MIKE":
       case "WILL":
-        return 0.88; // LBs
+        // Cover TEs/RBs: 90% of TE speed (0.90)
+        return 0.81;
       default:
-        return 1.0;
+        return 0.85; // Default safe cap
     }
   }
 
@@ -1390,16 +1394,7 @@ setManExtraRoles({ blitzers, spy });
       setLevInfo(levMeta);
       setLevAdjust(adjMeta);
       
-      // Handle auto-snap after motion - ensure alignment is settled first
-      if (autoSnapAfterMotionRef.current && phase === 'pre') {
-        autoSnapAfterMotionRef.current = false;
-        // Use requestAnimationFrame to ensure motion alignment is fully processed
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            startSnap();
-          });
-        });
-      }
+      // Auto-snap after motion is now handled directly in motion completion callback
     }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, formation, conceptId, coverage, teBlock, rbBlock, manualAssignments, setT, customAlign, motionBusy, hashSide]);
@@ -2679,14 +2674,14 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         setMotionLockRid(motionRid as ReceiverID);
         
         if (snapOnMotion) {
-          // CRITICAL: Ensure motion alignment is fully settled before auto-snap
-          // This prevents receiver "glitching" during snap-on-motion
-          setTimeout(() => {
-            setMotionBoost({ rid: motionRid as ReceiverID, untilT: 0.12, mult: 1.18 });
-            autoSnapAfterMotionRef.current = true;
-            // Trigger route rebuild which will detect autoSnapAfterMotionRef and call startSnap()
-            setPhase('pre'); // Force a rebuild cycle
-          }, 50); // Small delay to ensure animation state is settled
+          // SIMPLIFIED: Direct snap after motion completes - no complex timing
+          setMotionBoost({ rid: motionRid as ReceiverID, untilT: 0.12, mult: 1.18 });
+          // Use minimal delay to ensure DOM is settled, then snap immediately
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              startSnap();
+            });
+          });
         }
       });
     } catch {

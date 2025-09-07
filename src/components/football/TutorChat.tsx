@@ -62,7 +62,21 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
       return;
     }
     
-    console.log('[TutorChat] lastThrow received:', { playId: lastThrow.playId, grade: lastThrow.grade, target: lastThrow.target });
+    // CRITICAL FIX: Always trigger analysis with multiple identifiers
+    const shouldAnalyze = lastThrow.uniqueId || lastThrow.throwTimestamp || lastThrow.playId;
+    if (!shouldAnalyze) {
+      console.log('[TutorChat] Missing identifiers, skipping analysis');
+      return;
+    }
+    
+    console.log('[TutorChat] ✓ TRIGGERING AI Analysis for throw:', { 
+      uniqueId: lastThrow.uniqueId,
+      throwTimestamp: lastThrow.throwTimestamp,
+      playId: lastThrow.playId, 
+      grade: lastThrow.grade, 
+      target: lastThrow.target,
+      time: new Date().toISOString()
+    });
     
     // Optional: track skills for adaptive drills
     if (adaptiveOn) {
@@ -84,24 +98,20 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
       } catch {}
     }
     
-    console.log('[TutorChat] Sending "Analyze last rep." to AI tutor with:', {
-      playId: lastThrow.playId,
-      grade: lastThrow.grade,
-      target: lastThrow.target,
-      throwArea: lastThrow.throwArea,
-      hasExplanation: !!lastThrow.explanation
-    });
-    
-    // Add timestamp to ensure uniqueness and force AI analysis
+    // GUARANTEED UNIQUE: Force analysis with multiple timestamps
     const analysisRequest = {
       ...lastThrow,
-      analysisTimestamp: Date.now()
+      analysisTimestamp: Date.now(),
+      forceAnalysis: true,
+      requestId: Math.random().toString(36).substring(7)
     };
     
+    console.log('[TutorChat] → Sending "Analyze last rep." with request ID:', analysisRequest.requestId);
     void send('Analyze last rep.', analysisRequest as unknown as Record<string, unknown>);
-    // Use uniqueId and throwTimestamp to ensure every throw triggers analysis
+    
+    // ROBUST: Multiple dependency checks to ensure triggering
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastThrow?.uniqueId, lastThrow?.throwTimestamp]);
+  }, [lastThrow?.uniqueId, lastThrow?.throwTimestamp, lastThrow?.playId, lastThrow?.grade, lastThrow?.target]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-3 md:p-4 backdrop-blur-lg">
