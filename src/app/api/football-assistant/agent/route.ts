@@ -34,6 +34,7 @@ type AgentBody = {
   focus?: Array<"timing"|"leverage"|"rotation"|"hot">;
   userId?: string;
   throwCtx?: Record<string, unknown>;
+  toggles?: { audibles?: boolean; tutor?: boolean };
 };
 
 function conceptDigest(concept: Concept, coverage: CoverageID) {
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
     const body = (await req.json()) as AgentBody;
     const { conceptId, coverage, snapshot, snapMeta, filters, focus = [], userId, throwCtx } = body;
 
-  const tools = [
+    const tools = [
       {
         type: "function" as const,
         function: {
@@ -234,7 +235,7 @@ export async function POST(req: Request) {
     ];
 
     const sys =
-      `You are QB Coach Agent. Use tools to fetch concept, metrics, session memory, and grading.\n` +
+      `You are QB Coach Agent. Use tools to fetch concept, metrics, session memory, grading, and audibles.\n` +
       `Respond with STRICT JSON: {summary, coverage_read, progression, leverage, open_reads, audible, coaching_points, quiz, stats, sources}.\n` +
       `Maintain a tiny session memory: track user tendencies and 2-3 coaching themes; keep it under 20 short keys.\n` +
       `Prefer updating memory only when a meaningful habit is seen.\n` +
@@ -247,7 +248,8 @@ export async function POST(req: Request) {
       snapMeta,
       filters,
       userId,
-      throwCtx
+      throwCtx,
+      toggles: body.toggles ?? {}
     };
 
     const sessionMemory = await getSessionMemory(userId);
@@ -260,9 +262,14 @@ export async function POST(req: Request) {
       return `${proto}://${host}`;
     })();
 
+    const togglesText = (() => {
+      const t = body.toggles ?? {};
+      return `\nTOGGLES: audibles=${!!t.audibles}, tutor=${!!t.tutor}. If audibles=true, populate 'audible' with concrete suggestions (routes/formation) using tool as needed. If tutor=true, ensure 'progression' is populated with concise, next-snap coaching bullet points.`;
+    })();
+
     const messages: ChatCompletionMessageParam[] = [
       { role: 'system', content: sys },
-      { role: 'user', content: JSON.stringify({ ...user, sessionMemory }) }
+      { role: 'user', content: JSON.stringify({ ...user, sessionMemory }) + togglesText }
     ];
 
     type ToolArgs = Record<string, unknown>;
@@ -318,6 +325,9 @@ export async function POST(req: Request) {
       const msg = resp.choices[0]?.message;
       if (!msg) break;
       if (msg.tool_calls && msg.tool_calls.length > 0) {
+        // Include the assistant message that requested the tool calls
+        messages.push({ role: 'assistant', content: msg.content ?? '', tool_calls: msg.tool_calls } as ChatCompletionMessageParam);
+
         for (const tc of (msg.tool_calls as ChatCompletionMessageToolCall[])) {
           if (tc.type !== 'function') continue;
           const tname = tc.function.name || "";
@@ -330,7 +340,17 @@ export async function POST(req: Request) {
       }
       // No tools, final content intended
       const content = msg.content || "{}";
-      return new Response(content, { headers: { 'Content-Type': 'application/json' } });
+      try {
+        const obj = JSON.parse(content) as { summary?: unknown } & Record<string, unknown>;
+        if (obj && typeof obj.summary !== 'string') {
+          obj.summary = JSON.stringify(obj.summary);
+        }
+        return new Response(JSON.stringify(obj), { headers: { 'Content-Type': 'application/json' } });
+      } catch {
+        // If model didn't return JSON (shouldn't happen), wrap as string summary
+        const fallback = { summary: String(content) };
+        return new Response(JSON.stringify(fallback), { headers: { 'Content-Type': 'application/json' } });
+      }
     }
 
     // Fallback if loop didn’t return a final message

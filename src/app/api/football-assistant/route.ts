@@ -37,6 +37,7 @@ type AssistantRequest = {
   };
   overrides?: Partial<Concept>;
   userId?: string;
+  toggles?: { audibles?: boolean; tutor?: boolean };
 };
 
 type AssistantResponse = {
@@ -200,6 +201,7 @@ export async function POST(req: Request) {
         `Be concise, specific, and actionable. If teaching, keep bullets tight. If quiz, ask one probing question.\n` +
         `Return STRICT JSON only (no markdown). Keys: summary, coverage_read, progression, leverage, open_reads, audible, coaching_points, quiz, stats, sources.\n` +
         `If FOCUS keys are provided (timing, leverage, rotation, hot), prioritize coaching on those dimensions.\n` +
+        `If toggles.audibles=true, include 'audible' with concrete suggestions. If toggles.tutor=true, ensure 'progression' emphasizes next-snap coaching points.\n` +
         `Never include extra keys or commentary.`
     };
 
@@ -225,7 +227,7 @@ export async function POST(req: Request) {
       (body.throwCtx ? `\nLAST THROW:\n${JSON.stringify(body.throwCtx)}\n` : "") +
       `\nAGG_STATS_GLOBAL (top-N):\n${JSON.stringify(statsGlobal)}\n` +
       (body.userId ? `\nAGG_STATS_USER (${body.userId}):\n${JSON.stringify(statsUser)}\n` : "") +
-      `\nMODE: ${mode}\nFOCUS: ${focus.join(", ") || "(none)"}`;
+      `\nMODE: ${mode}\nFOCUS: ${focus.join(", ") || "(none)"}\nTOGGLES: audibles=${!!body.toggles?.audibles}, tutor=${!!body.toggles?.tutor}`;
 
     const messages = [system, { role: "user" as const, content: userContent }];
 
@@ -251,6 +253,10 @@ export async function POST(req: Request) {
       sources: digest.sources?.slice(0, 3) ?? []
     };
 
+    // Coerce summary to string if model emitted an object
+    if (parsed && typeof (parsed.summary as unknown) !== 'string') {
+      (parsed as { summary: unknown }).summary = JSON.stringify(parsed?.summary);
+    }
     const base = parsed && typeof parsed.summary === 'string' ? parsed : fallback;
     const finalResult: AssistantResponse & { stats_user?: MetricRow[] } = {
       ...base,

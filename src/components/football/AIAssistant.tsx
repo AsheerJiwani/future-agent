@@ -46,6 +46,9 @@ export default function AIAssistant({
   const [focus, setFocus] = useState<FocusState>({ timing: true, leverage: true, rotation: false, hot: false });
   const [useAgent, setUseAgent] = useState(true);
   const [usedFallback, setUsedFallback] = useState(false);
+  const [audiblesOn, setAudiblesOn] = useState(true);
+  const [tutorOn, setTutorOn] = useState(true);
+  const ZONE_SET = useMemo(() => new Set<CoverageID>(["C2","TAMPA2","C3","C4"] as CoverageID[]), []);
 
   const filters = useMemo(() => ({
     areaBand: band || undefined,
@@ -65,6 +68,7 @@ export default function AIAssistant({
         filters,
         focus: Object.entries(focus).filter(([, v]) => v).map(([k]) => k),
         userId,
+        toggles: { audibles: audiblesOn, tutor: tutorOn },
         mode: "analysis" as const
       };
 
@@ -142,6 +146,14 @@ export default function AIAssistant({
           <input type="checkbox" checked={useAgent} onChange={(e) => setUseAgent(e.target.checked)} />
           Use Agent
         </label>
+        <label className="flex items-center gap-2 text-xs text-white/70">
+          <input type="checkbox" checked={audiblesOn} onChange={(e)=>setAudiblesOn(e.target.checked)} />
+          Audible Suggestions
+        </label>
+        <label className="flex items-center gap-2 text-xs text-white/70">
+          <input type="checkbox" checked={tutorOn} onChange={(e)=>setTutorOn(e.target.checked)} />
+          Play Tutor
+        </label>
         <button onClick={analyze} disabled={loading} className="ml-0 md:ml-auto px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white disabled:opacity-50">
           {loading ? "Analyzing…" : "Analyze Last Snapshot"}
         </button>
@@ -153,9 +165,31 @@ export default function AIAssistant({
           {usedFallback && (
             <div className="text-amber-300/80 text-xs">Agent unavailable; used Assistant fallback.</div>
           )}
+          {/* Optional Grade panel if summary contains a JSON grade blob */}
+          {(() => {
+            try {
+              const parsed = data.summary && data.summary.trim().startsWith("{") ? JSON.parse(data.summary) as { grade?: string; rationale?: string; nextRead?: string; coachingTip?: string } : null;
+              if (parsed && (parsed.grade || parsed.rationale || parsed.nextRead || parsed.coachingTip)) {
+                return (
+                  <div>
+                    <div className="text-white/60 text-xs mb-1">Grade</div>
+                    <div className="text-white/90 text-sm space-y-0.5">
+                      {parsed.grade && <div><span className="text-white/60">Grade:</span> {parsed.grade}</div>}
+                      {parsed.rationale && <div><span className="text-white/60">Why:</span> {parsed.rationale}</div>}
+                      {parsed.nextRead && <div><span className="text-white/60">Next Read:</span> {parsed.nextRead}</div>}
+                      {parsed.coachingTip && <div><span className="text-white/60">Tip:</span> {parsed.coachingTip}</div>}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            } catch { return null; }
+          })()}
           <div>
             <div className="text-white/60 text-xs mb-1">Summary</div>
-            <div className="text-white/90 text-sm whitespace-pre-wrap">{data.summary}</div>
+            <div className="text-white/90 text-sm whitespace-pre-wrap">
+              {typeof data.summary === 'string' ? data.summary : JSON.stringify(data.summary)}
+            </div>
           </div>
 
           {data.coverage_read && (
@@ -168,7 +202,7 @@ export default function AIAssistant({
             </div>
           )}
 
-          {data.progression && data.progression.length > 0 && (
+          {Array.isArray(data.progression) && data.progression.length > 0 && (
             <div>
               <div className="text-white/60 text-xs mb-1">Progression</div>
               <ol className="list-decimal list-inside text-white/90 text-sm">
@@ -177,7 +211,7 @@ export default function AIAssistant({
             </div>
           )}
 
-          {data.leverage && (
+          {(!ZONE_SET.has(coverage) && data.leverage) && (
             <div>
               <div className="text-white/60 text-xs mb-1">Leverage</div>
               <div className="grid grid-cols-2 gap-x-3 text-white/90 text-sm">
@@ -188,7 +222,7 @@ export default function AIAssistant({
             </div>
           )}
 
-          {data.open_reads && data.open_reads.length > 0 && (
+          {Array.isArray(data.open_reads) && data.open_reads.length > 0 && (
             <div>
               <div className="text-white/60 text-xs mb-1">Open Reads</div>
               <ul className="list-disc list-inside text-white/90 text-sm">

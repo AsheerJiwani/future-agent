@@ -623,6 +623,45 @@ export default function PlaySimulator({
   useEffect(() => {
     rngRef.current = new XorShift32(mixSeed(rngSeed, playId));
   }, [rngSeed, playId]);
+
+  // External control: replay at target break (last decision or provided rid)
+  useEffect(() => {
+    function onReplayAtBreak(e: Event) {
+      const ce = e as CustomEvent<{ rid?: ReceiverID }>;
+      const rid = ce.detail?.rid ?? (decision as ReceiverID | null);
+      if (!rid) return;
+      const path = O[rid] ?? [];
+      const breaks = segmentBreakFracs(path);
+      if (!breaks.length) return;
+      const firstBreak = breaks[0];
+      const mult = receiverSpeedMult(rid);
+      const tBreak = Math.min(1, firstBreak / Math.max(0.0001, recSpeed * mult));
+      // ensure post phase and seek the clock to the break point
+      setPhase("post");
+      seek(tBreak);
+    }
+    function onReplayAtCatch() {
+      // Approximate: seek near end of rep
+      setPhase("post");
+      seek(0.95);
+    }
+    function onAgentSnapNow() {
+      // Trigger a fresh snap
+      setPhase("post");
+      // ensure clock restarts; usePlayClock resets on phase change
+    }
+    function onApplyAudible(e: Event) {
+      const ce = e as CustomEvent<{ assignments?: Partial<Record<ReceiverID, RouteKeyword>> }>; // RouteKeyword is in scope
+      if (ce.detail?.assignments) {
+        setManualAssignments(ce.detail.assignments);
+      }
+    }
+    window.addEventListener('replay-at-break', onReplayAtBreak as EventListener);
+    window.addEventListener('replay-at-catch', onReplayAtCatch as EventListener);
+    window.addEventListener('agent-snap-now', onAgentSnapNow as EventListener);
+    window.addEventListener('apply-audible', onApplyAudible as EventListener);
+    return () => window.removeEventListener('replay-at-break', onReplayAtBreak as EventListener);
+  }, [O, recSpeed, decision, seek]);
   useEffect(() => {
     setUserId(getOrCreateUserId());
   }, []);
@@ -1728,6 +1767,8 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
           nearestDefender: lastWindow?.info.nearest ?? undefined,
           playId,
           holdMs,
+          catchWindowScore: computeReceiverOpenness(to, Math.min(1, t)).score,
+          catchSepYds: computeReceiverOpenness(to, Math.min(1, t)).sepYds,
           targetBreakMs,
           heldVsBreakMs,
           firstOpenId,
@@ -1760,6 +1801,8 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
         nearestSepYds: lastWindow?.info.sepYds,
         nearestDefender: lastWindow?.info.nearest ?? null,
         grade: gradeStr,
+        catchWindowScore: computeReceiverOpenness(to, Math.min(1, t)).score,
+        catchSepYds: computeReceiverOpenness(to, Math.min(1, t)).sepYds,
       });
     } catch {}
 
@@ -1783,6 +1826,8 @@ function cutSeverityFor(rid: ReceiverID, tt: number): number {
         extra: {
           c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
           coverageInsights: meta.coverageInsights,
+          catchWindowScore: computeReceiverOpenness(to, Math.min(1, t)).score,
+          catchSepYds: computeReceiverOpenness(to, Math.min(1, t)).sepYds,
           targetBreakMs,
           heldVsBreakMs,
           firstOpenId,
