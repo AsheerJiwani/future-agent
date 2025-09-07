@@ -10,6 +10,35 @@ import type { CoverageID } from "../../data/football/types";
 // import { getOrCreateUserId } from "../../lib/user";
 import TutorChat from "./TutorChat";
 
+type DrillConfig = {
+  coverage?: CoverageID;
+  formation?: 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT';
+  motions?: Array<{ rid: 'X'|'Z'|'SLOT'|'TE'|'RB'; type?: 'jet'|'short'|'across'; dir?: 'left'|'right' }>;
+  fireZone?: { on: boolean; preset?: 'NICKEL'|'SAM'|'WILL' };
+};
+
+type LastDrillState = {
+  prev: { coverage: CoverageID; formation?: 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT' };
+  suggestion: {
+    suggestedCoverage?: CoverageID;
+    suggestedFormation?: 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT';
+    motions?: Array<{ rid: 'X'|'Z'|'SLOT'|'TE'|'RB'; type?: 'jet'|'short'|'across'; dir?: 'left'|'right' }>;
+    fireZone?: { on: boolean; preset?: 'NICKEL'|'SAM'|'WILL' };
+  };
+};
+
+type SessionData = {
+  streak?: number;
+  lastDrill?: LastDrillState;
+  starRid?: string;
+  adaptiveOn?: boolean;
+};
+
+type RoutineData = {
+  name: string;
+  drill: DrillConfig;
+};
+
 const COVERAGES: CoverageID[] = [
   "C0","C1","C2","TAMPA2","PALMS","C3","C4","QUARTERS","C6","C9"
 ];
@@ -80,7 +109,7 @@ export default function FootballPanel() {
     (async () => {
       try {
         const res = await fetch('/api/session/load', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
-        const data = await res.json() as { session?: { streak?: number; lastDrill?: any; starRid?: string; adaptiveOn?: boolean } };
+        const data = await res.json() as { session?: SessionData };
         if (data.session?.streak) setSessionInfo(s => ({ ...s, streak: data.session!.streak! }));
         if (typeof data.session?.adaptiveOn === 'boolean') setAdaptiveOn(data.session.adaptiveOn);
         if (data.session?.lastDrill) setLastDrill(data.session.lastDrill);
@@ -97,7 +126,7 @@ export default function FootballPanel() {
     (async () => {
       try {
         const res = await fetch('/api/routine/list', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
-        const data = await res.json() as { routines?: Array<{ name: string; drill: any }> };
+        const data = await res.json() as { routines?: RoutineData[] };
         setRoutines(data.routines || []);
       } catch {}
     })();
@@ -228,7 +257,7 @@ export default function FootballPanel() {
                 const data = await res.json() as { suggestedCoverage?: CoverageID; suggestedFormation?: 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT'; motions?: Array<{ rid: 'X'|'Z'|'SLOT'|'TE'|'RB'; type?: 'jet'|'short'|'across'; dir?: 'left'|'right' }>; fireZone?: { on: boolean; preset?: 'NICKEL'|'SAM'|'WILL' }; reason?: string; recs?: Array<{ skill: string; coverage: CoverageID; reason: string }> };
                 if (data.recs) setSessionInfo(s => ({ ...s, recs: data.recs }));
                 // Capture prev for revert then apply suggestion
-                setLastDrill({ prev: { coverage, formation: (snapshot?.formation as any) }, suggestion: { suggestedCoverage: data.suggestedCoverage, suggestedFormation: data.suggestedFormation, motions: data.motions, fireZone: data.fireZone } });
+                setLastDrill({ prev: { coverage, formation: (snapshot?.formation as 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT') }, suggestion: { suggestedCoverage: data.suggestedCoverage, suggestedFormation: data.suggestedFormation, motions: data.motions, fireZone: data.fireZone } });
                 if (data.suggestedCoverage) setCoverage(data.suggestedCoverage);
                 // Apply formation preset (opt-in) via event
                 if (data.suggestedFormation) {
@@ -277,10 +306,10 @@ export default function FootballPanel() {
               onClick={()=>{
                 const r = routines.find(rr=>rr.name===routineName);
                 if (!r) return;
-                setLastDrill({ prev: { coverage, formation: (snapshot?.formation as any) }, suggestion: { suggestedCoverage: r.drill.coverage, suggestedFormation: r.drill.formation, motions: r.drill.motions as any, fireZone: r.drill.fireZone as any } });
+                setLastDrill({ prev: { coverage, formation: (snapshot?.formation as 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT') }, suggestion: { suggestedCoverage: r.drill.coverage, suggestedFormation: r.drill.formation, motions: r.drill.motions, fireZone: r.drill.fireZone } });
                 if (r.drill.coverage) setCoverage(r.drill.coverage);
                 if (r.drill.formation) { try { window.dispatchEvent(new CustomEvent('set-formation', { detail: { formation: r.drill.formation } })); } catch {} }
-                if (r.drill.motions) { (r.drill.motions as any[]).forEach(m=>{ try{ window.dispatchEvent(new CustomEvent('apply-motion', { detail: m })); }catch{} }); }
+                if (r.drill.motions) { r.drill.motions.forEach(m=>{ try{ window.dispatchEvent(new CustomEvent('apply-motion', { detail: m })); }catch{} }); }
                 if (r.drill.fireZone?.on) { try { window.dispatchEvent(new CustomEvent('set-firezone', { detail: { on: true, preset: r.drill.fireZone.preset } })); } catch {} }
                 try { window.dispatchEvent(new CustomEvent('adaptive-drill', { detail: { coverage: r.drill.coverage, formation: r.drill.formation, motions: r.drill.motions, fireZone: r.drill.fireZone, reason: 'Routine' } })); } catch {}
               }}
@@ -299,7 +328,7 @@ export default function FootballPanel() {
                   await fetch('/api/routine/rename', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oldName: routineName, newName: nn }) });
                   setRoutineName(nn);
                   const res = await fetch('/api/routine/list', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-                  const data = await res.json() as { routines?: Array<{ name: string; drill: any }> };
+                  const data = await res.json() as { routines?: RoutineData[] };
                   setRoutines(data.routines || []);
                 } catch {}
               }}
@@ -313,7 +342,7 @@ export default function FootballPanel() {
                   await fetch('/api/routine/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: routineName }) });
                   setRoutineName('');
                   const res = await fetch('/api/routine/list', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-                  const data = await res.json() as { routines?: Array<{ name: string; drill: any }> };
+                  const data = await res.json() as { routines?: RoutineData[] };
                   setRoutines(data.routines || []);
                 } catch {}
               }}

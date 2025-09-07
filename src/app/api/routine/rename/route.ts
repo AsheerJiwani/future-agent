@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(1);
     if (error) return Response.json({ ok: false, error: error.message }, { status: 200 });
-    const drill = (data && data[0] && (data[0] as any).data?.drill) || null;
+    type RoutineRow = { data?: { drill?: Record<string, unknown> }; created_at?: string };
+    const drill = (data && data[0] && (data[0] as RoutineRow).data?.drill) || null;
     if (!drill) return Response.json({ ok: false, error: 'routine_not_found' }, { status: 200 });
 
     // Insert a new routine with the new name
@@ -37,4 +38,3 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: msg }, { status: 200 });
   }
 }
-

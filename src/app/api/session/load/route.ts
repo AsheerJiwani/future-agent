@@ -21,11 +21,11 @@ export async function POST(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(1);
     if (error) return Response.json({ ok: false, error: error.message }, { status: 200 });
-    const session = (data && data[0] && (data[0] as any).data) || {};
+    type SessionRow = { data?: Record<string, unknown>; created_at?: string };
+    const session = (data && data[0] && (data[0] as SessionRow).data) || {};
     return Response.json({ ok: true, session });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
     return Response.json({ ok: false, error: msg }, { status: 200 });
   }
 }
-

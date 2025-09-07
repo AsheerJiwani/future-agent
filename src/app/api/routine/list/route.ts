@@ -23,11 +23,11 @@ export async function POST(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(30);
     if (error) return Response.json({ ok: false, error: error.message }, { status: 200 });
-    const routines = (data || []).map((r: any) => (r?.data || {}));
+    type RoutineRow = { data?: { name?: string; drill?: Record<string, unknown> }; created_at?: string };
+    const routines = (data || []).map((r: RoutineRow) => (r?.data || {}));
     return Response.json({ ok: true, routines });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
     return Response.json({ ok: false, error: msg }, { status: 200 });
   }
 }
-

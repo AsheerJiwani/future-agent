@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
     if (error) return Response.json({ ok: false, error: error.message }, { status: 200 });
 
     const agg: Record<string, number> = {};
-    const items = (data || []).map((r: any) => (r as { data?: Record<string, unknown> })?.data || {});
+    type SkillRow = { data?: Record<string, unknown> };
+    const items = (data || []).map((r: SkillRow) => (r?.data || {}));
     for (const it of items) {
       const s = String(it.skill || '');
       const d = Number(it.delta || 0);

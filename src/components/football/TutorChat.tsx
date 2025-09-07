@@ -68,9 +68,9 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
               grade: lastThrow.grade,
               windowScore: lastThrow.windowScore,
               catchWindowScore: lastThrow.catchWindowScore,
-              heldVsBreakMs: (lastThrow as any)?.heldVsBreakMs,
+              heldVsBreakMs: lastThrow.heldVsBreakMs,
               throwArea: lastThrow.throwArea,
-              firstOpenId: (lastThrow as any)?.firstOpenId,
+              firstOpenId: lastThrow.firstOpenId,
               target: lastThrow.target,
             }
           })

@@ -69,4 +69,6 @@ export type ThrowSummary = {
   grade?: string;
   catchWindowScore?: number;
   catchSepYds?: number;
+  heldVsBreakMs?: number;
+  firstOpenId?: ReceiverID;
 };
