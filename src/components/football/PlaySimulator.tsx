@@ -1346,10 +1346,15 @@ setManExtraRoles({ blitzers, spy });
       setLevInfo(levMeta);
       setLevAdjust(adjMeta);
       
-      // Handle auto-snap after motion
+      // Handle auto-snap after motion - ensure alignment is settled first
       if (autoSnapAfterMotionRef.current && phase === 'pre') {
         autoSnapAfterMotionRef.current = false;
-        startSnap();
+        // Use requestAnimationFrame to ensure motion alignment is fully processed
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            startSnap();
+          });
+        });
       }
     }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2624,11 +2629,18 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       const durMs = Math.max(800, Math.min(3500, Math.round((yards / eff) * 1000)));
       animateAlign(motionRid as ReceiverID, cur, end, durMs, A, () => {
         setMotionBusy(false);
-        if (snapOnMotion) {
-          autoSnapAfterMotionRef.current = true;
-          setMotionBoost({ rid: motionRid as ReceiverID, untilT: 0.12, mult: 1.18 });
-        }
         setMotionLockRid(motionRid as ReceiverID);
+        
+        if (snapOnMotion) {
+          // CRITICAL: Ensure motion alignment is fully settled before auto-snap
+          // This prevents receiver "glitching" during snap-on-motion
+          setTimeout(() => {
+            setMotionBoost({ rid: motionRid as ReceiverID, untilT: 0.12, mult: 1.18 });
+            autoSnapAfterMotionRef.current = true;
+            // Trigger route rebuild which will detect autoSnapAfterMotionRef and call startSnap()
+            setPhase('pre'); // Force a rebuild cycle
+          }, 50); // Small delay to ensure animation state is settled
+        }
       });
     } catch {
       setMotionBusy(false);
@@ -3533,7 +3545,11 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           <select
             className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
             value={motionRid}
-            onChange={(e) => setMotionRid(e.target.value as ReceiverID)}
+            onChange={(e) => {
+              // PERFORMANCE: Use requestAnimationFrame to avoid blocking UI
+              const value = e.target.value as ReceiverID;
+              requestAnimationFrame(() => setMotionRid(value));
+            }}
             disabled={motionBusy || phase !== 'pre'}
           >
             <option value="">Receiver…</option>
@@ -3660,7 +3676,11 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
               <select
                 className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
                 value={audTarget}
-                onChange={(e) => setAudTarget(e.target.value as ReceiverID)}
+                onChange={(e) => {
+                  // PERFORMANCE: Use requestAnimationFrame to avoid blocking UI
+                  const value = e.target.value as ReceiverID;
+                  requestAnimationFrame(() => setAudTarget(value));
+                }}
               >
                 <option value="">Receiver…</option>
                 {selectableReceivers.map((r) => (
@@ -3673,7 +3693,11 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
               <select
                 className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
                 value={audRoute}
-                onChange={(e) => setAudRoute(e.target.value as RouteKeyword)}
+                onChange={(e) => {
+                  // PERFORMANCE: Use requestAnimationFrame to avoid blocking UI
+                  const value = e.target.value as RouteKeyword;
+                  requestAnimationFrame(() => setAudRoute(value));
+                }}
               >
                 <option value="">Route…</option>
                 {ROUTE_MENU.map((r) => (
