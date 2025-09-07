@@ -830,10 +830,15 @@ export default function PlaySimulator({
     window.addEventListener('set-formation', onSetFormation as EventListener);
     function onSetStar(e: Event) {
       try {
-        const ce = e as CustomEvent<{ rid?: ReceiverID | '' }>;
-        const rid = (ce.detail?.rid ?? '') as (ReceiverID | '');
+        const ce = e as CustomEvent<{ rid?: ReceiverID | '' | string | null | undefined }>;
+        const raw = ce.detail?.rid ?? '';
+        // Accept only known receiver ids or blank; ignore anything else to avoid crashes
+        const valid: Set<string> = new Set(["", "X", "Z", "SLOT", "TE", "RB"]);
+        const rid = (typeof raw === 'string' && valid.has(raw)) ? (raw as ReceiverID | '') : '';
         setStarRid(rid);
-      } catch {}
+      } catch {
+        // Swallow to keep UI resilient if a malformed event fires
+      }
     }
     window.addEventListener('set-star', onSetStar as EventListener);
     return () => {
@@ -927,19 +932,39 @@ export default function PlaySimulator({
   const [showTips, setShowTips] = useState<boolean>(false);
 
   // Compute top open receiver now (non-blockers, pre-decision)
-  const topOpenNow = useMemo(() => {
-    if (phase !== 'post' || decision || ballFlying) return null;
-    const rids: ReceiverID[] = ["X","Z","SLOT","TE","RB"].filter(r=>!(r==='TE' && teBlock) && !(r==='RB' && rbBlock)) as ReceiverID[];
-    let bestRid: ReceiverID | null = null;
-    let bestScore = -1;
-    for (const rid of rids) {
-      const info = computeReceiverOpenness(rid, t);
-      if (info.score > bestScore) { bestScore = info.score; bestRid = rid; }
+  // Memoized with reduced computation frequency
+  const [cachedTopOpen, setCachedTopOpen] = useState<{ rid: ReceiverID; score: number; area: string } | null>(null);
+  const lastTopOpenUpdate = useRef<number>(0);
+  
+  useEffect(() => {
+    if (phase !== 'post' || decision || ballFlying) {
+      setCachedTopOpen(null);
+      return;
     }
-    if (!bestRid) return null;
-    const area = classifyThrowArea(wrPosSafe(bestRid, t));
-    return { rid: bestRid, score: bestScore, area: area.key } as { rid: ReceiverID; score: number; area: string };
+    
+    // Throttle expensive computation to every 100ms
+    const now = performance.now();
+    if (now - lastTopOpenUpdate.current < 100) return;
+    lastTopOpenUpdate.current = now;
+    
+    requestAnimationFrame(() => {
+      const rids: ReceiverID[] = ["X","Z","SLOT","TE","RB"].filter(r=>!(r==='TE' && teBlock) && !(r==='RB' && rbBlock)) as ReceiverID[];
+      let bestRid: ReceiverID | null = null;
+      let bestScore = -1;
+      for (const rid of rids) {
+        const info = computeReceiverOpenness(rid, t);
+        if (info.score > bestScore) { bestScore = info.score; bestRid = rid; }
+      }
+      if (!bestRid) {
+        setCachedTopOpen(null);
+        return;
+      }
+      const area = classifyThrowArea(wrPosSafe(bestRid, t));
+      setCachedTopOpen({ rid: bestRid, score: bestScore, area: area.key });
+    });
   }, [phase, decision, ballFlying, teBlock, rbBlock, t, coverage, align, O]);
+  
+  const topOpenNow = cachedTopOpen;
 
   const canThrowNow = useMemo(
   () => phase === "post" && !ballFlying && !decision && t < 0.999,
@@ -1450,24 +1475,28 @@ setManExtraRoles({ blitzers, spy });
     let p = posOnPathLenScaled(path, s);
     // Star receiver: intelligent zone float into space when not open and route is carrying into coverage
     if (starRid && id === starRid && (ZONE_COVERAGES.has(coverage) || MATCH_COVERAGES.has(coverage))) {
-      // Find nearest defender using defenderTarget (non-recursive wrPos)
-      let nearestId: DefenderID | null = null;
-      let best = Number.POSITIVE_INFINITY;
-      for (const did of DEFENDER_IDS) {
-        const dp = defenderTarget(coverage, did, tt);
-        const yds = distYds(p, dp);
-        if (yds < best) { best = yds; nearestId = did; }
-      }
-      // If tight (e.g., <3 yds), drift laterally away from nearest defender and slightly toward MOF
-      if (nearestId && best < 3.0) {
-        const dp = defenderTarget(coverage, nearestId, tt);
-        const dirX = Math.sign(p.x - dp.x) || (p.x < qbX() ? -1 : 1);
-        const driftYds = Math.min(1.6, Math.max(0.4, (3.0 - best) * 0.6));
-        const centerPull = (qbX() - p.x) / XPX; // yards toward MOF
-        const centerW = 0.25; // small weight toward MOF
-        const dx = xAcross(driftYds * dirX + centerPull * centerW);
-        const newX = Math.max(xAcross(4), Math.min(xAcross(FIELD_WIDTH_YDS - 4), p.x + dx));
-        p = { x: newX, y: p.y };
+      try {
+        // Find nearest defender using defenderTarget (non-recursive wrPos)
+        let nearestId: DefenderID | null = null;
+        let best = Number.POSITIVE_INFINITY;
+        for (const did of DEFENDER_IDS) {
+          const dp = defenderTarget(coverage, did, tt);
+          const yds = distYds(p, dp);
+          if (yds < best) { best = yds; nearestId = did; }
+        }
+        // If tight (e.g., <3 yds), drift laterally away from nearest defender and slightly toward MOF
+        if (nearestId && best < 3.0) {
+          const dp = defenderTarget(coverage, nearestId, tt);
+          const dirX = Math.sign(p.x - dp.x) || (p.x < qbX() ? -1 : 1);
+          const driftYds = Math.min(1.6, Math.max(0.4, (3.0 - best) * 0.6));
+          const centerPull = (qbX() - p.x) / XPX; // yards toward MOF
+          const centerW = 0.25; // small weight toward MOF
+          const dx = xAcross(driftYds * dirX + centerPull * centerW);
+          const newX = Math.max(xAcross(4), Math.min(xAcross(FIELD_WIDTH_YDS - 4), p.x + dx));
+          p = { x: newX, y: p.y };
+        }
+      } catch {
+        // If anything goes sideways, just return the normal route position
       }
     }
     return p;
@@ -1632,14 +1661,22 @@ setManExtraRoles({ blitzers, spy });
   useEffect(() => { if (phase !== 'post') setDlive(Dstart); }, [Dstart, phase]);
   useEffect(() => { lastTRef.current = t; }, [t]);
 
-  // Throttle overlay recomputation during motion to keep FPS high
+  // Optimized overlay recomputation with better throttling
   useEffect(() => {
     if (!showDefense) return;
     let raf = 0;
     let last = performance.now();
-    const budgetMs = motionBusy ? 90 : 140;
+    const budgetMs = motionBusy ? 120 : 200; // Increased intervals for better performance
     const loop = (now: number) => {
-      if (now - last >= budgetMs) { setOverlayTick((v) => v + 1); last = now; }
+      if (now - last >= budgetMs) { 
+        // Use requestIdleCallback when available for smoother performance
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(() => setOverlayTick((v) => v + 1), { timeout: 50 });
+        } else {
+          setOverlayTick((v) => v + 1);
+        }
+        last = now; 
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -1663,17 +1700,28 @@ setManExtraRoles({ blitzers, spy });
   }
 
   // Update openness every frame while play is live
+  // Throttled openness computation to reduce expensive calculations
+  const lastOpennessUpdateRef = useRef<number>(0);
   useEffect(() => {
     if (phase !== "post") {
       setOpenness((prev) => ({ ...prev, X: { score: 0, sepYds: 0, nearest: null }, Z: { score: 0, sepYds: 0, nearest: null }, SLOT: { score: 0, sepYds: 0, nearest: null }, TE: { score: 0, sepYds: 0, nearest: null }, RB: { score: 0, sepYds: 0, nearest: null } }));
       return;
     }
-    const infoX = computeReceiverOpenness("X", t);
-    const infoZ = computeReceiverOpenness("Z", t);
-    const infoS = computeReceiverOpenness("SLOT", t);
-    const infoT = computeReceiverOpenness("TE", t);
-    const infoR = computeReceiverOpenness("RB", t);
-    setOpenness({ X: infoX, Z: infoZ, SLOT: infoS, TE: infoT, RB: infoR });
+    
+    // Throttle openness calculations to every 50ms for better performance
+    const now = performance.now();
+    if (now - lastOpennessUpdateRef.current < 50) return;
+    lastOpennessUpdateRef.current = now;
+    
+    // Batch all openness calculations
+    requestAnimationFrame(() => {
+      const infoX = computeReceiverOpenness("X", t);
+      const infoZ = computeReceiverOpenness("Z", t);
+      const infoS = computeReceiverOpenness("SLOT", t);
+      const infoT = computeReceiverOpenness("TE", t);
+      const infoR = computeReceiverOpenness("RB", t);
+      setOpenness({ X: infoX, Z: infoZ, SLOT: infoS, TE: infoT, RB: infoR });
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, phase, coverage, recSpeed, defSpeed, O, Dstart, blockedDefenders]);
 
@@ -2579,6 +2627,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
   }
 
   function startSnap() {
+    // Immediate state updates for responsive UI
     setT(0);
     setDecision(null);
     setGrade(null);
@@ -2588,49 +2637,60 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     setCatchAt(null);
     setCaught(false);
     setThrowMeta(null);
-    // New deterministic roll for this play
     setPlayId((p) => p + 1);
     setRngSeed((s) => mixSeed(s, Date.now() >>> 0));
-    safeTrack('snap', { conceptId, coverage, formation });
     setDrillInfo(null);
-    try {
-      const meta = buildSnapMeta();
-      const payload = {
-        conceptId,
-        coverage,
-        formation,
-        playId: playId + 1,
-        rngSeed,
-        c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
-        press: meta.press,
-        roles: meta.roles,
-        leverage: meta.leverage,
-      };
-      void fetch('/api/snap-log', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': userId ?? '' }, body: JSON.stringify(payload) });
-    } catch {}
-    // Log leverage context for AI
-    setAiLog((log) => log.concat([{ playId: playId + 1, coverage, formation, leverage: levInfo, adjustments: levAdjust }]));
-    setPhase("pre");
-    queueMicrotask(() => setPhase("post"));
-    // Clear motion lock for the next pre-snap sequence
     setMotionLockRid(null);
     setLastCatchInfo(null);
+    
+    // Immediate phase transition
+    setPhase("pre");
+    queueMicrotask(() => setPhase("post"));
+    
+    // Defer expensive operations to avoid blocking UI
+    requestAnimationFrame(() => {
+      safeTrack('snap', { conceptId, coverage, formation });
+      // Non-blocking API call
+      setTimeout(() => {
+        try {
+          const meta = buildSnapMeta();
+          const payload = {
+            conceptId,
+            coverage,
+            formation,
+            playId,
+            rngSeed,
+            c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
+            press: meta.press,
+            roles: meta.roles,
+            leverage: meta.leverage,
+          };
+          fetch('/api/snap-log', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': userId ?? '' }, body: JSON.stringify(payload) }).catch(() => {});
+        } catch {}
+      }, 0);
+      
+      // Log leverage context for AI (non-blocking)
+      setAiLog((log) => log.concat([{ playId, coverage, formation, leverage: levInfo, adjustments: levAdjust }]));
+    });
   }
 
   function hardReset() {
-    setPhase("pre");
-    setT(0);
-    setDecision(null);
-    setGrade(null);
-    setExplain(null);
-    setBallFlying(false);
-    setBallT(0);
-    setCatchAt(null);
-    setCaught(false);
-    setThrowMeta(null);
-    setMotionLockRid(null);
-    setDrillInfo(null);
-    setLastCatchInfo(null);
+    // Batch state updates for instant response
+    requestAnimationFrame(() => {
+      setPhase("pre");
+      setT(0);
+      setDecision(null);
+      setGrade(null);
+      setExplain(null);
+      setBallFlying(false);
+      setBallT(0);
+      setCatchAt(null);
+      setCaught(false);
+      setThrowMeta(null);
+      setMotionLockRid(null);
+      setDrillInfo(null);
+      setLastCatchInfo(null);
+    });
   }
   function startThrow(to: ReceiverID) {
   // Blocked targets can’t receive throws
@@ -2669,10 +2729,16 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
   safeTrack('throw', { target: to, t: Number(t.toFixed(2)), area: area.key, depthYds: area.depthYds });
 }
 
-  // Ball follows the single play clock (no extra RAF)
+  // Optimized ball animation with reduced computation
+  const lastBallUpdate = useRef<number>(0);
   useEffect(() => {
     if (!ballFlying || !throwMeta) return;
 
+    // Throttle ball animation for smoother performance
+    const now = performance.now();
+    if (now - lastBallUpdate.current < 16) return; // ~60fps max
+    lastBallUpdate.current = now;
+    
     const rel = Math.max(0, Math.min(1, (t - throwMeta.tStart) / throwMeta.frac));
     const eased = rel < 0.5 ? 2 * rel * rel : -1 + (4 - 2 * rel) * rel;
     setBallT(eased);
@@ -2689,14 +2755,18 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       } catch {}
       setThrowMeta(null);
       setCaught(true);
+      
+      // Defer expensive operations to avoid blocking UI
       if (decision) {
-        try {
-          const ci = computeReceiverOpenness(decision, t);
-          setLastCatchInfo({ rid: decision, t, score: ci.score, sep: ci.sepYds });
-        } catch {}
+        setTimeout(() => {
+          try {
+            const ci = computeReceiverOpenness(decision, t);
+            setLastCatchInfo({ rid: decision, t, score: ci.score, sep: ci.sepYds });
+          } catch {}
+          gradeDecision(decision);
+        }, 0);
       }
       if (soundOn) playCatchPop();
-      if (decision) void gradeDecision(decision);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, ballFlying, throwMeta, soundOn, playCatchPop, decision]);
