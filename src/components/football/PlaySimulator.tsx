@@ -1002,13 +1002,12 @@ export default function PlaySimulator({
 
   const hasAudibles = useMemo(() => Object.keys(manualAssignments).length > 0, [manualAssignments]);
 
-  // Drive the play clock via hook based on phase
+  // Ultra-fast clock management - no delays
   useEffect(() => {
     if (phase === "post") {
-      // Restart clock cleanly for a new snap
+      // Start clock immediately for instant response
       resetClock();
-      // Defer start to next microtask to let reset state settle
-      queueMicrotask(() => startClock());
+      startClock();
     } else {
       stopClock();
     }
@@ -2627,7 +2626,11 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
   }
 
   function startSnap() {
-    // Immediate state updates for responsive UI
+    // ULTRA-FAST: Batch all state updates synchronously for instant UI response
+    const newPlayId = playId + 1;
+    const newRngSeed = mixSeed(rngSeed, Date.now() >>> 0);
+    
+    // All critical state updates happen immediately in one batch
     setT(0);
     setDecision(null);
     setGrade(null);
@@ -2637,20 +2640,21 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     setCatchAt(null);
     setCaught(false);
     setThrowMeta(null);
-    setPlayId((p) => p + 1);
-    setRngSeed((s) => mixSeed(s, Date.now() >>> 0));
+    setPlayId(newPlayId);
+    setRngSeed(newRngSeed);
     setDrillInfo(null);
     setMotionLockRid(null);
     setLastCatchInfo(null);
     
-    // Immediate phase transition
-    setPhase("pre");
-    queueMicrotask(() => setPhase("post"));
+    // INSTANT phase transition - no micro/macro task delays
+    setPhase("post");
     
-    // Defer expensive operations to avoid blocking UI
-    requestAnimationFrame(() => {
+    // All non-critical operations pushed to background with maximum delay
+    setTimeout(() => {
       safeTrack('snap', { conceptId, coverage, formation });
-      // Non-blocking API call
+      setAiLog((log) => log.concat([{ playId: newPlayId, coverage, formation, leverage: levInfo, adjustments: levAdjust }]));
+      
+      // API logging completely detached from UI flow
       setTimeout(() => {
         try {
           const meta = buildSnapMeta();
@@ -2658,8 +2662,8 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             conceptId,
             coverage,
             formation,
-            playId,
-            rngSeed,
+            playId: newPlayId,
+            rngSeed: newRngSeed,
             c3Rotation: coverage === 'C3' ? c3Rotation : undefined,
             press: meta.press,
             roles: meta.roles,
@@ -2667,11 +2671,8 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           };
           fetch('/api/snap-log', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': userId ?? '' }, body: JSON.stringify(payload) }).catch(() => {});
         } catch {}
-      }, 0);
-      
-      // Log leverage context for AI (non-blocking)
-      setAiLog((log) => log.concat([{ playId, coverage, formation, leverage: levInfo, adjustments: levAdjust }]));
-    });
+      }, 200);
+    }, 10);
   }
 
   function hardReset() {
@@ -2693,40 +2694,44 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     });
   }
   function startThrow(to: ReceiverID) {
-  // Blocked targets can’t receive throws
+  // Quick validation checks first
   if ((to === "TE" && teBlock) || (to === "RB" && rbBlock)) return;
-
-  // Only during the live snap, only one ball in the air, and before timer ends
   if (phase !== "post" || ballFlying || t >= 0.999) return;
-
+  
   const path = O[to];
   if (!path || path.length === 0) return;
 
+  // ULTRA-FAST: Calculate and set all critical state immediately
   const p2 = posOnPathLenScaled(path, Math.min(1, t * recSpeed * receiverSpeedMult(to) * starSpeedMult(to)));
   const p0 = { x: qbX(), y: QB.y };
   const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
   const arc = Math.min(80, Math.max(40, dist(p0, p2) * 0.15));
   const p1 = { x: mid.x, y: mid.y - arc };
-
   const flightMs = Math.min(1400, Math.max(600, dist(p0, p2) * 2.2));
   const frac = Math.min(0.6, Math.max(0.2, flightMs / PLAY_MS));
-
-  setBallP0(p0); setBallP1(p1); setBallP2(p2);
+  const holdMs = Math.round(t * PLAY_MS);
+  
+  // Batch all critical UI updates for instant response
+  setBallP0(p0);
+  setBallP1(p1);
+  setBallP2(p2);
   setBallT(0);
   setCatchAt(null);
-  // capture window at throw time
-  const win = computeReceiverOpenness(to, t);
-  setLastWindow({ rid: to, info: win });
-  // capture throw area + hold time
-  const area = classifyThrowArea(p2);
-  setLastThrowArea(area);
-  setLastHoldMs(Math.round(t * PLAY_MS));
-  setDecision(to);            // keep single-throw-per-play behavior
+  setLastHoldMs(holdMs);
+  setDecision(to);
   setBallFlying(true);
   setThrowMeta({ p0, p1, p2, tStart: t, frac });
   setCaught(false);
-  if (soundOn) playWhistle();
-  safeTrack('throw', { target: to, t: Number(t.toFixed(2)), area: area.key, depthYds: area.depthYds });
+  
+  // Defer only the most expensive computations
+  setTimeout(() => {
+    const win = computeReceiverOpenness(to, t);
+    setLastWindow({ rid: to, info: win });
+    const area = classifyThrowArea(p2);
+    setLastThrowArea(area);
+    if (soundOn) playWhistle();
+    safeTrack('throw', { target: to, t: Number(t.toFixed(2)), area: area.key, depthYds: area.depthYds });
+  }, 5);
 }
 
   // Optimized ball animation with reduced computation
