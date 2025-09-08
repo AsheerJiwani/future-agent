@@ -413,7 +413,7 @@ export default function Page() {
         <section id="about" className="mt-16 glass rounded-3xl p-6 md:p-8">
           <h3 className="text-lg font-semibold mb-2">About</h3>
           <p className="text-white/70">
-            Three vibes: a dreamy site background, a star-lit Futurecasting AI, a bright Hoops Tutor, and a crisp Football Coach.
+            An interactive experience brought to you by Asheer.
           </p>
         </section>
 

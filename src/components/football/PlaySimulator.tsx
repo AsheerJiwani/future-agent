@@ -979,8 +979,6 @@ export default function PlaySimulator({
     "DIG","POST",
     "SLANT","WHEEL","CHECK",
   ];
-  // Tutor tips toggle (lightweight real-time hints)
-  const [showTips, setShowTips] = useState<boolean>(false);
 
   // Compute top open receiver now (non-blockers, pre-decision)
   // Memoized with reduced computation frequency
@@ -3104,9 +3102,6 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             </select>
           </label>
           <label className="flex items-center gap-2 text-white/70 text-xs">
-            <input type="checkbox" checked={showTips} onChange={(e)=>setShowTips(e.target.checked)} /> Tutor Tips
-          </label>
-          <label className="flex items-center gap-2 text-white/70 text-xs">
             <span>Star</span>
             <select className="bg-white/10 text-white text-xs rounded-md px-2 py-1" value={starRid ?? ''} onChange={(e)=>setStarRid((e.target.value || '') as ReceiverID | '')}>
               <option value="">—</option>
@@ -3264,19 +3259,6 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           {/* Defense Overlay: pre-snap plan (throttled) */}
           {showDefense && defenseOverlay}
 
-          {/* Tutor tips: lightweight, real-time suggestion */}
-          {showTips && topOpenNow && (
-            (() => {
-              const x = 10, y = 10;
-              const text = `Now: ${topOpenNow.rid} ${(topOpenNow.score*100).toFixed(0)}% · ${topOpenNow.area}`;
-              return (
-                <g>
-                  <rect x={x} y={y} width={170} height={22} rx={6} fill="rgba(0,0,0,0.45)" stroke="rgba(255,255,255,0.25)" />
-                  <text x={x+8} y={y+15} className="text-[10px]" fill="rgba(255,255,255,0.95)" style={{ paintOrder: 'stroke' }}>{text}</text>
-                </g>
-              );
-            })()
-          )}
 
           {/* Route paths (offense) */}
           <g fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={2}>

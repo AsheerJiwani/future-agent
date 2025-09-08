@@ -337,12 +337,21 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
   // TRADITIONAL MODE: Original layout
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-3 md:p-4 backdrop-blur-lg">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs uppercase tracking-wide text-white/60">AI Football Tutor</div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-xs uppercase tracking-wide text-white/60 font-semibold">🤖 AI Football Tutor</div>
         <div className="flex items-center gap-3 text-xs text-white/70">
-          <label className="flex items-center gap-1"><input type="checkbox" checked={audiblesOn} onChange={(e)=>setAudiblesOn(e.target.checked)} /> Audible Suggestions</label>
-          <label className="flex items-center gap-1"><input type="checkbox" checked={tutor} onChange={(e)=>setTutor(e.target.checked)} /> Play Tutor</label>
-          <label className="flex items-center gap-1"><input type="checkbox" checked={quizAfter} onChange={(e)=>setQuizAfter(e.target.checked)} /> Quiz after reps</label>
+          <label className="flex items-center gap-1 cursor-pointer hover:text-white transition-colors">
+            <input type="checkbox" checked={audiblesOn} onChange={(e)=>setAudiblesOn(e.target.checked)} className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" /> 
+            <span>Audible Suggestions</span>
+          </label>
+          <label className="flex items-center gap-1 cursor-pointer hover:text-white transition-colors">
+            <input type="checkbox" checked={tutor} onChange={(e)=>setTutor(e.target.checked)} className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" /> 
+            <span>Tutor Tips</span>
+          </label>
+          <label className="flex items-center gap-1 cursor-pointer hover:text-white transition-colors">
+            <input type="checkbox" checked={quizAfter} onChange={(e)=>setQuizAfter(e.target.checked)} className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" /> 
+            <span>Quiz after reps</span>
+          </label>
         </div>
       </div>
       {/* Suggested coverage */}
