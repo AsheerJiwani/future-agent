@@ -658,13 +658,20 @@ export default function PlaySimulator({
 
   // Defender starts (dynamic, strength-aware)
   const [Dstart, setDstart] = useState<Record<DefenderID, Pt>>(D_ALIGN);
-  // Live defender positions (lifted above openness/useMemo to avoid TDZ on first render)
+  // Live defender positions with velocity tracking for smooth movement
   const [Dlive, setDlive] = useState<Record<DefenderID, Pt>>(Dstart);
+  const [Dvelocity, setDvelocity] = useState<Record<DefenderID, Pt>>({} as Record<DefenderID, Pt>);
+  const [DlastTargets, setDlastTargets] = useState<Record<DefenderID, Pt>>(Dstart);
+  const [DzoneAssignments, setDzoneAssignments] = useState<Record<DefenderID, { primary: ReceiverID | null, zone: string, priority: number }>>({} as Record<DefenderID, { primary: ReceiverID | null, zone: string, priority: number }>);
+  const [DstableTargets, setDstableTargets] = useState<Record<DefenderID, Pt>>(Dstart);
   const lastTRef = useRef<number>(0);
+  const lastUpdateTimeRef = useRef<number>(0);
+  const lastZoneUpdateRef = useRef<number>(0);
   const [overlayTick, setOverlayTick] = useState(0);
   // Speeds
   const [recSpeed, setRecSpeed] = useState(1.0); // 0.7–1.5
   const [defSpeed, setDefSpeed] = useState(0.95); // 0.7–1.5
+  const [ballSpeed, setBallSpeed] = useState(1.0); // 0.5–3.0 (50% to 300%)
 
   // Sounds + notes
   const [soundOn, setSoundOn] = useState(true);
@@ -841,6 +848,35 @@ export default function PlaySimulator({
     window.addEventListener('apply-audible', onApplyAudible as EventListener);
     window.addEventListener('apply-motion', onApplyMotion as EventListener);
     window.addEventListener('start-snap', onStartSnapNow as EventListener);
+    // Hard reset event handler
+    function onHardReset() {
+      try { hardReset(); } catch {}
+    }
+    window.addEventListener('hard-reset', onHardReset as EventListener);
+    // Ball speed change event handler
+    function onBallSpeedChange(e: Event) {
+      try {
+        const ce = e as CustomEvent<{ speed?: number }>;
+        const speed = ce.detail?.speed;
+        if (typeof speed === 'number' && speed >= 0.5 && speed <= 3.0) {
+          setBallSpeed(speed);
+        }
+      } catch {}
+    }
+    window.addEventListener('ball-speed-change', onBallSpeedChange as EventListener);
+    // Throw targets event handler
+    function onThrowToReceiver(e: Event) {
+      try {
+        const ce = e as CustomEvent<{ rid?: ReceiverID }>;
+        const rid = ce.detail?.rid;
+        if (!rid) return;
+        // Reuse existing throw logic
+        startThrow(rid as ReceiverID);
+      } catch {
+        // swallow to keep UI resilient
+      }
+    }
+    window.addEventListener('throw-to-receiver', onThrowToReceiver as EventListener);
     function onSetFireZone(e: Event) {
       const ce = e as CustomEvent<{ on?: boolean; preset?: FZPreset }>;
       if (typeof ce.detail?.on === 'boolean') setFireZoneOn(ce.detail.on);
@@ -899,6 +935,9 @@ export default function PlaySimulator({
       window.removeEventListener('apply-audible', onApplyAudible as EventListener);
       window.removeEventListener('apply-motion', onApplyMotion as EventListener);
       window.removeEventListener('start-snap', onStartSnapNow as EventListener);
+      window.removeEventListener('hard-reset', onHardReset as EventListener);
+      window.removeEventListener('ball-speed-change', onBallSpeedChange as EventListener);
+      window.removeEventListener('throw-to-receiver', onThrowToReceiver as EventListener);
       window.removeEventListener('set-firezone', onSetFireZone as EventListener);
       window.removeEventListener('adaptive-drill', onAdaptiveDrill as EventListener);
       window.removeEventListener('rep-result', onRepResult as EventListener);
@@ -1634,74 +1673,233 @@ setManExtraRoles({ blitzers, spy });
     return anchor;
   }
 
+  // Zone assignment calculation (runs at 25ms for ultra-smooth performance)
   useEffect(() => {
-    const dtMs = Math.max(0, (t - (lastTRef.current || 0)) * PLAY_MS);
-    const k = 0.0036; // base smoothing constant (~responsive but stable)
-    const roleFactor = (id: DefenderID): number => {
-      switch (id) {
-        case 'FS':
-        case 'SS':
-          return 0.8; // glide more
-        case 'CB_L':
-        case 'CB_R':
-        case 'NICKEL':
-          return 1.0; // baseline
-        case 'MIKE':
-        case 'SAM':
-        case 'WILL':
-          return 1.35; // snappier underneath
+    const now = performance.now();
+    if (now - lastZoneUpdateRef.current < 1) return; // Update zone assignments every 100ms
+    lastZoneUpdateRef.current = now;
+    
+    if (!ZONE_COVERAGES.has(coverage)) return;
+    
+    // Calculate NFL-realistic zone assignments and responsibilities
+    const calculateZoneAssignments = (): Record<DefenderID, { primary: ReceiverID | null, zone: string, priority: number }> => {
+      const assignments = {} as Record<DefenderID, { primary: ReceiverID | null, zone: string, priority: number }>;
+      const sr = strongIsRight();
+      
+      // Get receiver positions for threat assessment
+      const receivers = (['X', 'Z', 'SLOT', 'TE', 'RB'] as ReceiverID[]).map(rid => ({
+        id: rid,
+        pos: wrPos(rid, t),
+        depth: yDepthYds(wrPos(rid, t))
+      }));
+      
+      // Zone responsibility mapping based on coverage
+      if (coverage === 'C3') {
+        // Cover 3: Deep thirds, underneath zones
+        assignments['FS'] = { primary: null, zone: 'deep_middle', priority: 1 };
+        assignments['CB_L'] = { primary: null, zone: 'deep_left', priority: 1 };
+        assignments['CB_R'] = { primary: null, zone: 'deep_right', priority: 1 };
+        assignments['SS'] = { primary: null, zone: 'strong_hook', priority: 2 };
+        assignments['MIKE'] = { primary: null, zone: 'middle_hook', priority: 2 };
+        assignments['NICKEL'] = { primary: null, zone: 'slot_underneath', priority: 3 };
+        assignments['SAM'] = { primary: null, zone: 'strong_flat', priority: 3 };
+        assignments['WILL'] = { primary: null, zone: 'weak_flat', priority: 3 };
+        
+        // Assign primary threats in each zone
+        receivers.forEach(rcv => {
+          if (rcv.depth > 12) { // Deep threats
+            if (rcv.pos.x < qbX() - 60) assignments['CB_L'].primary = rcv.id;
+            else if (rcv.pos.x > qbX() + 60) assignments['CB_R'].primary = rcv.id;
+            else assignments['FS'].primary = rcv.id;
+          } else if (rcv.depth > 6) { // Intermediate
+            if (Math.abs(rcv.pos.x - qbX()) < 40) assignments['MIKE'].primary = rcv.id;
+            else if (sr && rcv.pos.x > qbX()) assignments['SS'].primary = rcv.id;
+          }
+        });
+      } else if (coverage === 'C2') {
+        // Cover 2: Deep halves, underneath zones
+        assignments['FS'] = { primary: null, zone: 'deep_left_half', priority: 1 };
+        assignments['SS'] = { primary: null, zone: 'deep_right_half', priority: 1 };
+        assignments['CB_L'] = { primary: null, zone: 'left_underneath', priority: 2 };
+        assignments['CB_R'] = { primary: null, zone: 'right_underneath', priority: 2 };
+        assignments['MIKE'] = { primary: null, zone: 'middle_hook', priority: 2 };
+        assignments['NICKEL'] = { primary: null, zone: 'slot_coverage', priority: 3 };
+      }
+      
+      return assignments;
+    };
+    
+    const newAssignments = calculateZoneAssignments();
+    setDzoneAssignments(newAssignments);
+    
+    // Calculate stable target positions based on zone assignments
+    const stableTargets = {} as Record<DefenderID, Pt>;
+    for (const id of DEFENDER_IDS) {
+      const assignment = newAssignments[id];
+      if (!assignment) continue;
+      
+      let zoneCenter: Pt;
+      const qbPos = { x: qbX(), y: QB.y };
+      
+      // NFL zone positioning based on assignment
+      switch (assignment.zone) {
+        case 'deep_middle':
+          zoneCenter = { x: qbPos.x, y: yUp(25) };
+          break;
+        case 'deep_left':
+          zoneCenter = { x: qbPos.x - 80, y: yUp(25) };
+          break;
+        case 'deep_right':
+          zoneCenter = { x: qbPos.x + 80, y: yUp(25) };
+          break;
+        case 'deep_left_half':
+          zoneCenter = { x: qbPos.x - 50, y: yUp(20) };
+          break;
+        case 'deep_right_half':
+          zoneCenter = { x: qbPos.x + 50, y: yUp(20) };
+          break;
+        case 'strong_hook':
+        case 'middle_hook':
+          zoneCenter = { x: qbPos.x + (assignment.zone === 'strong_hook' ? 30 : 0), y: yUp(12) };
+          break;
+        case 'left_underneath':
+          zoneCenter = { x: qbPos.x - 60, y: yUp(8) };
+          break;
+        case 'right_underneath':
+          zoneCenter = { x: qbPos.x + 60, y: yUp(8) };
+          break;
+        case 'slot_underneath':
+        case 'slot_coverage':
+          zoneCenter = { x: qbPos.x + 25, y: yUp(6) };
+          break;
+        case 'strong_flat':
+          zoneCenter = { x: qbPos.x + 70, y: yUp(3) };
+          break;
+        case 'weak_flat':
+          zoneCenter = { x: qbPos.x - 70, y: yUp(3) };
+          break;
         default:
-          return 1.0;
+          zoneCenter = Dstart[id] ?? D_ALIGN[id];
+      }
+      
+      // Adjust position based on primary threat
+      if (assignment.primary) {
+        const threat = wrPos(assignment.primary, t);
+        // Move toward threat but stay within zone boundaries
+        const threatWeight = 0.2;
+        zoneCenter = {
+          x: zoneCenter.x + (threat.x - zoneCenter.x) * threatWeight,
+          y: zoneCenter.y + (threat.y - zoneCenter.y) * threatWeight
+        };
+      }
+      
+      stableTargets[id] = zoneCenter;
+    }
+    
+    setDstableTargets(stableTargets);
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, phase, coverage, align, O]);
+
+  // High-performance movement system with zone stability
+  useEffect(() => {
+    const now = performance.now();
+    const deltaTime = Math.min(50, now - lastUpdateTimeRef.current) / 1000;
+    lastUpdateTimeRef.current = now;
+    
+    if (deltaTime <= 0) return;
+    
+    const roleFactor = (id: DefenderID): number => {
+      const assignment = DzoneAssignments[id];
+      if (!assignment) return 1.0;
+      
+      // Different agility based on zone responsibility
+      switch (assignment.priority) {
+        case 1: return 0.8; // Deep coverage - more deliberate
+        case 2: return 1.0; // Intermediate - baseline
+        case 3: return 1.2; // Underneath - quick reactions
+        default: return 1.0;
       }
     };
-    const next: Record<DefenderID, Pt> = { ...Dlive };
+
+    const nextPositions: Record<DefenderID, Pt> = { ...Dlive };
+    const nextVelocities: Record<DefenderID, Pt> = { ...Dvelocity };
+    const nextTargets: Record<DefenderID, Pt> = { ...DlastTargets };
+    
     for (const id of DEFENDER_IDS) {
-      const from = Dlive[id] ?? Dstart[id] ?? D_ALIGN[id];
-      const to = defenderTarget(coverage, id, t);
-      let spd = Math.max(0.5, Math.min(1.6, defSpeed * defenderSpeedMult(id)));
-      // Speed caps: DBs <= 90% WR/RB speed; LBs <= 90% TE speed
-      const isDB = id === 'CB_L' || id === 'CB_R' || id === 'NICKEL' || id === 'FS' || id === 'SS';
-      const isLB = id === 'SAM' || id === 'MIKE' || id === 'WILL';
-      const wrRbCap = recSpeed * 1.0 * 0.90;
-      const teCap = recSpeed * receiverSpeedMult('TE') * 0.90; // ~= 0.81 * recSpeed
-      if (isDB) spd = Math.min(spd, wrRbCap);
-      if (isLB) spd = Math.min(spd, teCap);
-      // Closing-speed reduction when separation already large in man coverage
-      if (MAN_COVERAGES.has(coverage) && isDB) {
-        // Determine actual man assignment (MABLE-aware)
-        const sr = strongIsRight();
-        const threeS = sr ? (right3() ?? null) : (left3() ?? null);
-        const oneS = sr ? (right1() ?? 'Z') : (left1() ?? 'X');
-        const twoS = sr ? (right2() ?? 'SLOT') : (left2() ?? 'SLOT');
-        let assigned: ReceiverID | null = null;
-        if (id === 'CB_L') assigned = 'X';
-        if (id === 'CB_R') assigned = 'Z';
-        if (id === 'NICKEL') assigned = 'SLOT';
-        if (id === 'SS') assigned = 'TE';
-        if (threeS) {
-          if (id === (sr ? 'CB_R' : 'CB_L')) assigned = oneS;
-          if (id === 'NICKEL') assigned = twoS;
-          // MIKE handled elsewhere; DBs only here
-        }
-        if (assigned) {
-          const rp = wrPos(assigned, t);
-          const sep = distYds(rp, from);
-          const excess = Math.max(0, sep - 3.5);
-          const closeFactor = Math.max(0.6, 1.0 - 0.08 * excess); // down to 0.6 beyond ~5 yds
-          spd *= closeFactor;
-          // Slight additional difficulty closing on the star receiver in man
-          if (starRid && assigned === starRid) {
-            spd *= 0.92;
-          }
-        }
+      const current = Dlive[id] ?? Dstart[id] ?? D_ALIGN[id];
+      const currentVel = Dvelocity[id] ?? { x: 0, y: 0 };
+      
+      // Use stable zone-based target or fallback to original logic
+      let target: Pt;
+      if (ZONE_COVERAGES.has(coverage) && DstableTargets[id]) {
+        target = DstableTargets[id];
+      } else {
+        target = defenderTarget(coverage, id, t);
       }
-      const aBase = 1 - Math.exp(-k * dtMs * spd * roleFactor(id));
-      const alpha = Math.max(0.05, Math.min(0.40, aBase));
-      next[id] = { x: from.x + (to.x - from.x) * alpha, y: from.y + (to.y - from.y) * alpha };
+      
+      const lastTarget = DlastTargets[id] ?? target;
+      
+      // Calculate movement parameters
+      let maxSpeed = Math.max(0.5, Math.min(1.6, defSpeed * defenderSpeedMult(id)));
+      const isDB = ['CB_L', 'CB_R', 'NICKEL', 'FS', 'SS'].includes(id);
+      const isLB = ['SAM', 'MIKE', 'WILL'].includes(id);
+      
+      if (isDB) maxSpeed = Math.min(maxSpeed, recSpeed * 0.90);
+      if (isLB) maxSpeed = Math.min(maxSpeed, recSpeed * 0.81);
+      
+      maxSpeed *= roleFactor(id);
+      
+      // Zone-aware movement with stability
+      const pixelsPerSecond = maxSpeed * ((XPX + YPX) / 2);
+      const dx = target.x - current.x;
+      const dy = target.y - current.y;
+      const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+      
+      // More conservative target change detection for zones
+      const isZone = ZONE_COVERAGES.has(coverage);
+      const changeThreshold = isZone ? 25 : 15; // Larger threshold for zones
+      const targetDx = target.x - lastTarget.x;
+      const targetDy = target.y - lastTarget.y;
+      const targetChanged = Math.sqrt(targetDx * targetDx + targetDy * targetDy) > changeThreshold;
+      
+      let desiredVelX = 0, desiredVelY = 0;
+      
+      if (distanceToTarget > 3) {
+        const dirX = dx / distanceToTarget;
+        const dirY = dy / distanceToTarget;
+        const desiredSpeed = Math.min(pixelsPerSecond, distanceToTarget * (isZone ? 2 : 4));
+        desiredVelX = dirX * desiredSpeed;
+        desiredVelY = dirY * desiredSpeed;
+      }
+      
+      // Smoother acceleration for zones
+      const accel = isZone ? (targetChanged ? 600 : 400) : (targetChanged ? 1200 : 800);
+      const velDamping = isZone ? 0.90 : 0.85; // Higher damping for zones
+      
+      let newVelX = currentVel.x * velDamping + (desiredVelX - currentVel.x) * Math.min(1, accel * deltaTime);
+      let newVelY = currentVel.y * velDamping + (desiredVelY - currentVel.y) * Math.min(1, accel * deltaTime);
+      
+      const velMag = Math.sqrt(newVelX * newVelX + newVelY * newVelY);
+      if (velMag > pixelsPerSecond) {
+        newVelX = (newVelX / velMag) * pixelsPerSecond;
+        newVelY = (newVelY / velMag) * pixelsPerSecond;
+      }
+      
+      const newX = current.x + newVelX * deltaTime;
+      const newY = current.y + newVelY * deltaTime;
+      
+      nextPositions[id] = { x: newX, y: newY };
+      nextVelocities[id] = { x: newVelX, y: newVelY };
+      nextTargets[id] = target;
     }
-    setDlive(next);
+    
+    setDlive(nextPositions);
+    setDvelocity(nextVelocities);
+    setDlastTargets(nextTargets);
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, phase, coverage, align, O, defSpeed, fireZoneOn, fzPreset]);
+  }, [t, phase, coverage, align, O, defSpeed, DstableTargets, DzoneAssignments]);
 
   useEffect(() => { if (phase !== 'post') setDlive(Dstart); }, [Dstart, phase]);
   useEffect(() => { lastTRef.current = t; }, [t]);
@@ -2493,6 +2691,19 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     let gradeStr = 'OK';
     let explainStr = '';
     try {
+      // Enhanced coaching analysis data
+      const allReceivers: ReceiverID[] = ['X', 'Z', 'SLOT', 'TE', 'RB'];
+      const receiverAnalysis = allReceivers.map(rid => {
+        try {
+          const openness = computeReceiverOpenness(rid, t);
+          return { receiver: rid, score: openness.score, separation: openness.sepYds };
+        } catch {
+          return { receiver: rid, score: 0, separation: 0 };
+        }
+      }).sort((a, b) => b.score - a.score);
+      
+      const coverageDescription = identifyCoverage(coverage);
+      
       const res = await fetch("/api/football-grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2511,6 +2722,10 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           firstOpenId,
           firstOpenMs,
           throwArea: lastThrowArea?.key,
+          // Enhanced coaching data (as per Claude.md guidelines)
+          coverageDescription,
+          receiverAnalysis,
+          progressionAnalysis: analyzeProgression(to, t)
         })
       });
       const data: { grade?: string; rationale?: string; coachingTip?: string } = await res.json();
@@ -2739,6 +2954,235 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     }, 10);
   }
 
+  // NFL-Level Catch Outcome Calculation (as per Claude.md guidelines)
+  function calculateCatchOutcome(catchPoint: Pt, _receiverPos: Pt, targetReceiver: ReceiverID | null) {
+    if (!targetReceiver) {
+      return { caught: false, incompleteReason: "No target receiver" };
+    }
+    
+    // Find nearest defender to catch point
+    let nearestDefender: DefenderID | null = null;
+    let nearestDistance = Infinity;
+    
+    for (const defenderId of DEFENDER_IDS) {
+      const defPos = Dlive[defenderId] ?? Dstart[defenderId] ?? D_ALIGN[defenderId];
+      const distance = Math.sqrt((defPos.x - catchPoint.x) ** 2 + (defPos.y - catchPoint.y) ** 2);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestDefender = defenderId;
+      }
+    }
+    
+    // Convert pixel distance to yards for realistic evaluation
+    const defenderSeparationYards = nearestDistance / ((XPX + YPX) / 2) * FIELD_WIDTH_YDS / XPX;
+    
+    // NFL-realistic catch probability based on separation and receiver skill
+    let baseCatchProbability = 0.85; // Base catch rate for NFL receivers
+    
+    // Receiver skill modifiers
+    if (targetReceiver === starRid) baseCatchProbability += 0.10; // Star receiver bonus
+    if (targetReceiver === 'TE') baseCatchProbability += 0.05; // TEs typically reliable
+    if (targetReceiver === 'RB') baseCatchProbability -= 0.05; // RBs slightly less reliable on passes
+    
+    // Defender proximity impact
+    if (defenderSeparationYards < 1) {
+      baseCatchProbability *= 0.30; // Heavy contest
+    } else if (defenderSeparationYards < 2) {
+      baseCatchProbability *= 0.60; // Moderate contest
+    } else if (defenderSeparationYards < 3) {
+      baseCatchProbability *= 0.80; // Light contest
+    }
+    // Separation > 3 yards = no penalty (open receiver)
+    
+    // Ball speed impact (faster balls harder to catch under pressure)
+    if (defenderSeparationYards < 2 && ballSpeed > 1.5) {
+      baseCatchProbability *= 0.85; // Fast ball under pressure
+    }
+    
+    // Random outcome with weighted probability
+    const catchRoll = Math.random();
+    const caught = catchRoll < baseCatchProbability;
+    
+    if (!caught) {
+      // Determine incomplete reason based on circumstances
+      let incompleteReason = "Drop";
+      if (defenderSeparationYards < 1.5) {
+        incompleteReason = Math.random() < 0.6 ? "Pass breakup" : "Hit as caught";
+      } else if (defenderSeparationYards < 2.5) {
+        incompleteReason = "Deflection";
+      }
+      
+      return { 
+        caught: false, 
+        incompleteReason,
+        defenderSeparation: defenderSeparationYards,
+        nearestDefender 
+      };
+    }
+    
+    // For caught passes, determine if receiver was hit and type of hit
+    const wasHit = defenderSeparationYards < 2;
+    let hitType: 'driven_back' | 'voluntary_retreat' | null = null;
+    let forwardProgress: Pt | null = null;
+    let tackleSpot: Pt | null = null;
+    
+    if (wasHit) {
+      // Simulate forward progress vs being driven back
+      const driveBackChance = defenderSeparationYards < 1 ? 0.7 : 0.3;
+      hitType = Math.random() < driveBackChance ? 'driven_back' : 'voluntary_retreat';
+      
+      if (hitType === 'driven_back') {
+        // Mark forward progress (furthest point before being driven back)
+        forwardProgress = catchPoint;
+        tackleSpot = { 
+          x: catchPoint.x, 
+          y: catchPoint.y + (Math.random() - 0.5) * 20 // Driven back 0-10 pixels
+        };
+      } else {
+        // Voluntary retreat - tackle at slightly different spot
+        tackleSpot = { 
+          x: catchPoint.x + (Math.random() - 0.5) * 15, 
+          y: catchPoint.y + (Math.random() - 0.5) * 15 
+        };
+      }
+    }
+    
+    return { 
+      caught: true, 
+      wasHit, 
+      hitType, 
+      forwardProgress, 
+      tackleSpot,
+      defenderSeparation: defenderSeparationYards,
+      nearestDefender 
+    };
+  }
+
+  // Enhanced AI Coaching Feedback System (as per Claude.md guidelines)
+  function identifyCoverage(coverage: CoverageID): string {
+    const coverageMap: Record<CoverageID, string> = {
+      'C0': 'Cover 0 (All-Out Man) - Pure man coverage, no deep safety help',
+      'C1': 'Cover 1 (Man-Free) - Man coverage with single high safety',
+      'C2': 'Cover 2 (Zone) - Two deep safeties, CBs jam/release to flats',
+      'TAMPA2': 'Tampa 2 - Cover 2 with MIKE running middle pole',
+      'C3': 'Cover 3 (Zone) - Three deep (CB/FS), four underneath',
+      'C4': 'Cover 4 (Quarters) - Four deep, pattern-match on verticals', 
+      'QUARTERS': 'Quarters (Match) - Pattern-match rules on verticals',
+      'PALMS': 'Palms (2-Read) - CB/Safety switch based on #2 route',
+      'C6': 'Cover 6 (Quarter-Quarter-Half) - Split field coverage',
+      'C9': 'Cover 9 (3-Match) - Match rules rotate to trips side'
+    };
+    return coverageMap[coverage] || coverage;
+  }
+
+  function analyzeProgression(targetReceiver: ReceiverID, throwTime: number): string {
+    const receivers: ReceiverID[] = ['X', 'Z', 'SLOT', 'TE', 'RB'];
+    const openReceivers: Array<{rid: ReceiverID, score: number, sep: number}> = [];
+    
+    // Analyze all receivers at throw time
+    for (const rid of receivers) {
+      try {
+        const openness = computeReceiverOpenness(rid, throwTime);
+        if (openness.score >= 0.6) {
+          openReceivers.push({
+            rid, 
+            score: openness.score, 
+            sep: openness.sepYds
+          });
+        }
+      } catch {
+        continue;
+      }
+    }
+    
+    // Sort by openness score
+    openReceivers.sort((a, b) => b.score - a.score);
+    
+    if (openReceivers.length === 0) {
+      return "No receivers had clear separation - good coverage by defense.";
+    }
+    
+    const bestOption = openReceivers[0];
+    if (bestOption.rid === targetReceiver) {
+      return `✓ Correct read - ${targetReceiver} was best option (${bestOption.sep.toFixed(1)}yd sep).`;
+    } else {
+      const alternatives = openReceivers.filter(r => r.rid !== targetReceiver).slice(0, 2);
+      if (alternatives.length > 0) {
+        const altText = alternatives.map(r => `${r.rid} (${r.sep.toFixed(1)}yd)`).join(', ');
+        return `Consider: ${altText} had better separation than ${targetReceiver}.`;
+      }
+      return `Target ${targetReceiver} was acceptable but not optimal choice.`;
+    }
+  }
+
+  function generateImmediateCoachingFeedback(
+    catchResult: any,
+    coverage: CoverageID, 
+    targetReceiver: ReceiverID,
+    throwTime: number,
+    receiverInfo: { score: number; sepYds: number }
+  ): string {
+    
+    const coverageId = identifyCoverage(coverage);
+    const progression = analyzeProgression(targetReceiver, throwTime);
+    
+    let feedback = `${coverageId.split(' -')[0]} Coverage. `;
+    
+    if (catchResult.wasHit) {
+      const hitType = catchResult.hitType === 'driven_back' ? 'driven back' : 'maintained balance';
+      feedback += `Hit immediately, ${hitType} (${catchResult.defenderSeparation?.toFixed(1)}yd sep). `;
+      
+      if (catchResult.defenderSeparation < 2) {
+        feedback += "Tight window - consider quicker release or check-down. ";
+      }
+    } else if (catchResult.defenderSeparation > 3) {
+      feedback += `Clean catch - ${catchResult.defenderSeparation.toFixed(1)}yd separation. `;
+      if (receiverInfo.score > 0.8) {
+        feedback += "Excellent read. ";
+      }
+    }
+    
+    feedback += progression;
+    
+    return feedback;
+  }
+
+  function generateIncompletePassFeedback(
+    catchResult: any,
+    coverage: CoverageID, 
+    targetReceiver: ReceiverID,
+    throwTime: number,
+    _receiverInfo: { score: number; sepYds: number }
+  ): string {
+    
+    const coverageId = identifyCoverage(coverage);
+    const progression = analyzeProgression(targetReceiver, throwTime);
+    
+    let feedback = `Incomplete vs ${coverageId.split(' -')[0]}. `;
+    
+    if (catchResult.incompleteReason) {
+      if (catchResult.incompleteReason.includes('Deflected')) {
+        feedback += `Deflected by defender (${catchResult.defenderSeparation?.toFixed(1)}yd sep) - `;
+        if (catchResult.defenderSeparation < 1.5) {
+          feedback += "throw earlier or find different target. ";
+        } else {
+          feedback += "unlucky break, good throw. ";
+        }
+      } else if (catchResult.incompleteReason.includes('Dropped')) {
+        feedback += `Dropped by ${targetReceiver} - good throw, receiver error. `;
+      } else if (catchResult.incompleteReason.includes('Contested')) {
+        feedback += `Contested catch failed (${catchResult.defenderSeparation?.toFixed(1)}yd sep) - `;
+        feedback += "consider safer option or throw earlier. ";
+      } else {
+        feedback += `${catchResult.incompleteReason} (${catchResult.defenderSeparation?.toFixed(1)}yd sep). `;
+      }
+    }
+    
+    feedback += progression;
+    
+    return feedback;
+  }
+
   function hardReset() {
     // Batch state updates for instant response
     requestAnimationFrame(() => {
@@ -2771,8 +3215,12 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
   const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
   const arc = Math.min(80, Math.max(40, dist(p0, p2) * 0.15));
   const p1 = { x: mid.x, y: mid.y - arc };
-  const flightMs = Math.min(1400, Math.max(600, dist(p0, p2) * 2.2));
-  const frac = Math.min(0.6, Math.max(0.2, flightMs / PLAY_MS));
+  // Calculate realistic flight time based on NFL QB arm strength (29.3333 yards/sec)
+  const distanceYards = dist(p0, p2) / ((XPX + YPX) / 2); // Convert pixels to approximate yards
+  const baseFlightTimeMs = (distanceYards / 29.3333) * 1000; // NFL QB speed in ms
+  const adjustedFlightTimeMs = baseFlightTimeMs / ballSpeed; // Apply speed modifier
+  const flightMs = Math.min(1400, Math.max(300, adjustedFlightTimeMs));
+  const frac = Math.min(0.6, Math.max(0.15, flightMs / PLAY_MS));
   const holdMs = Math.round(t * PLAY_MS);
   
   // Batch all critical UI updates for instant response
@@ -2814,16 +3262,76 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
 
     if (rel >= 1 && ballFlying) {
       setBallFlying(false);
-      setCatchAt(throwMeta.p2);
-      // Auto-select next-play hash based on catch spot (nearest hash)
-      try {
-        const c = throwMeta.p2;
-        const dL = Math.abs(c.x - HASH_L);
-        const dR = Math.abs(c.x - HASH_R);
-        setHashSide(dL <= dR ? 'L' : 'R');
-      } catch {}
+      
+      // NFL Ball Spotting Rules Implementation
+      const catchPoint = throwMeta.p2;
+      const receiverPosition = decision ? wrPos(decision, t) : catchPoint;
+      
+      // Calculate catch probability based on defender proximity and timing
+      const catchResult = calculateCatchOutcome(catchPoint, receiverPosition, decision);
+      
+      if (catchResult.caught) {
+        setCatchAt(catchPoint);
+        setCaught(true);
+        
+        // Forward Progress Rules (as per Claude.md guidelines)
+        let ballSpot = catchPoint;
+        if (catchResult.wasHit && catchResult.hitType === 'driven_back') {
+          // Driven back by defender => mark furthest forward point before being pushed back
+          ballSpot = catchResult.forwardProgress || catchPoint;
+        } else if (catchResult.wasHit && catchResult.hitType === 'voluntary_retreat') {
+          // Voluntary retreat => mark actual tackle spot
+          ballSpot = catchResult.tackleSpot || catchPoint;
+        }
+        
+        // Hash Rules (as per Claude.md guidelines)
+        let nextHash: 'L' | 'R';
+        const spotX = ballSpot.x;
+        
+        // End inside hashes => spot there; end outside => bring to nearest hash
+        if (spotX >= HASH_L && spotX <= HASH_R) {
+          // Between hashes - spot exactly where caught
+          nextHash = Math.abs(spotX - HASH_L) <= Math.abs(spotX - HASH_R) ? 'L' : 'R';
+        } else {
+          // Outside hashes - bring to nearest hash
+          nextHash = spotX < HASH_L ? 'L' : 'R';
+        }
+        
+        setHashSide(nextHash);
+        
+        // Enhanced AI Coaching Feedback (as per Claude.md guidelines)
+        if (decision) {
+          const coachingFeedback = generateImmediateCoachingFeedback(
+            catchResult, 
+            coverage, 
+            decision, 
+            t, 
+            computeReceiverOpenness(decision, t)
+          );
+          setExplain(coachingFeedback);
+        } else {
+          setExplain("Catch completed but no target identified");
+        }
+        
+      } else {
+        // Incomplete pass scenarios - Enhanced coaching feedback
+        setCatchAt(null);
+        setCaught(false);
+        if (decision) {
+          const incompleteFeedback = generateIncompletePassFeedback(
+            catchResult, 
+            coverage, 
+            decision, 
+            t, 
+            computeReceiverOpenness(decision, t)
+          );
+          setExplain(incompleteFeedback);
+        } else {
+          setExplain("Incomplete: No target receiver");
+        }
+      }
+      
       setThrowMeta(null);
-      setCaught(true);
       
       // CRITICAL: Execute immediately for AI Tutor functionality
       if (decision) {
@@ -3481,18 +3989,82 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             );
             })}
 
-          {/* Ball path & ball */}
+          {/* Enhanced Ball Flight Animation */}
           {ballFlying && (
             <>
+              {/* Flight path - full trajectory */}
               <path
                 d={`M ${ballP0.x} ${ballP0.y} Q ${ballP1.x} ${ballP1.y} ${ballP2.x} ${ballP2.y}`}
-                stroke="rgba(255,255,255,0.6)"
-                strokeDasharray="6 6"
+                stroke="rgba(255,255,255,0.4)"
+                strokeDasharray="8 4"
+                strokeWidth={2}
                 fill="none"
+                opacity={0.7}
               />
+              
+              {/* Active flight line - shows current trajectory */}
+              <path
+                d={`M ${ballP0.x} ${ballP0.y} Q ${ballP1.x} ${ballP1.y} ${ballP2.x} ${ballP2.y}`}
+                stroke="rgba(255,165,0,0.9)"
+                strokeWidth={3}
+                fill="none"
+                opacity={Math.max(0.3, 1 - ballT)}
+                style={{
+                  filter: 'drop-shadow(0px 0px 3px rgba(255,165,0,0.5))'
+                }}
+              />
+              
+              {/* Ball with realistic motion blur effect */}
               {(() => {
                 const bp = qBezier(ballP0, ballP1, ballP2, ballT);
-                return <circle cx={bp.x} cy={bp.y} r={5} fill="#f59e0b" stroke="white" strokeWidth={1} />;
+                const speed = ballSpeed;
+                const blurRadius = Math.min(8, speed * 3);
+                
+                return (
+                  <g>
+                    {/* Motion blur trail */}
+                    {ballT > 0.1 && (
+                      <circle 
+                        cx={qBezier(ballP0, ballP1, ballP2, Math.max(0, ballT - 0.05)).x} 
+                        cy={qBezier(ballP0, ballP1, ballP2, Math.max(0, ballT - 0.05)).y} 
+                        r={4} 
+                        fill="rgba(245,158,11,0.3)" 
+                      />
+                    )}
+                    {ballT > 0.2 && (
+                      <circle 
+                        cx={qBezier(ballP0, ballP1, ballP2, Math.max(0, ballT - 0.1)).x} 
+                        cy={qBezier(ballP0, ballP1, ballP2, Math.max(0, ballT - 0.1)).y} 
+                        r={3} 
+                        fill="rgba(245,158,11,0.2)" 
+                      />
+                    )}
+                    
+                    {/* Main ball */}
+                    <circle 
+                      cx={bp.x} 
+                      cy={bp.y} 
+                      r={6} 
+                      fill="#f59e0b" 
+                      stroke="white" 
+                      strokeWidth={2}
+                      style={{
+                        filter: `drop-shadow(0px 2px ${blurRadius}px rgba(245,158,11,0.4))`
+                      }}
+                    />
+                    
+                    {/* Speed indicator glow */}
+                    <circle 
+                      cx={bp.x} 
+                      cy={bp.y} 
+                      r={8 + speed * 2} 
+                      fill="none" 
+                      stroke="rgba(255,165,0,0.3)" 
+                      strokeWidth={1}
+                      opacity={speed > 1 ? 0.6 : 0.3}
+                    />
+                  </g>
+                );
               })()}
             </>
           )}
@@ -3506,126 +4078,133 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           )}
         </svg>
 
-        {/* Controls */}
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          {phase === "pre" ? (
-            <button onClick={startSnap} className="px-3 py-2 rounded-xl bg-emerald-500/90 text-white">
-              Snap
+        {/* Controls - Only show in fullScreen mode */}
+        {fullScreen && (
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {phase === "pre" ? (
+                <button onClick={startSnap} className="px-3 py-2 rounded-xl bg-emerald-500/90 text-white">
+                  Snap
+                </button>
+              ) : (
+                <button onClick={hardReset} className="px-3 py-2 rounded-xl bg-white/10 text-white">
+                  Reset
+                </button>
+              )}
+
+              <div className="flex items-center gap-2 ml-1">
+                <span className="text-white/60 text-xs">Time</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.floor(t * 100)}
+                  onChange={(e) => seek(Number(e.target.value) / 100)}
+                  disabled={ballFlying || phase !== "post"}
+                />
+              </div>
+
+              {/* Speed sliders */}
+              <div className="flex items-center gap-2 ml-2">
+                <span className="text-white/60 text-xs">WR Speed</span>
+                <input
+                  type="range"
+                  min={60}
+                  max={140}
+                  value={Math.round(recSpeed * 100)}
+                  onChange={(e) => setRecSpeed(Number(e.target.value) / 100)}
+                  title={`${(recSpeed * 100).toFixed(0)}%`}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-white/60 text-xs">DEF Speed</span>
+                <input
+                  type="range"
+                  min={60}
+                  max={140}
+                  value={Math.round(defSpeed * 100)}
+                  onChange={(e) => setDefSpeed(Number(e.target.value) / 100)}
+                  title={`${(defSpeed * 100).toFixed(0)}%`}
+                />
+              </div>
+
+              <label className="ml-auto flex items-center gap-2 text-white/70 text-xs">
+                <input type="checkbox" checked={soundOn} onChange={() => setSoundOn((s) => !s)} /> Sound
+              </label>
+            </div>
+
+            {/* (removed duplicate audible quick row to avoid double Apply buttons) */}
+
+            {/* Pass-pro toggles */}
+            <div className="flex items-center gap-3 ml-2">
+              <label className="flex items-center gap-2 text-white/70 text-xs">
+                <input type="checkbox" checked={teBlock} onChange={() => setTeBlock((v) => !v)} />
+                TE pass-pro
+              </label>
+              <label className="flex items-center gap-2 text-white/70 text-xs">
+                <input type="checkbox" checked={rbBlock} onChange={() => setRbBlock((v) => !v)} />
+                RB pass-pro
+              </label>
+            </div>
+          </>
+        )}
+
+        {/* Motion controls - Only show in fullScreen mode */}
+        {fullScreen && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 ml-2">
+            <div className="text-white/60 text-xs">Motion</div>
+            <select
+              className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
+              value={motionRid}
+              onChange={(e) => {
+                // PERFORMANCE: Use requestAnimationFrame to avoid blocking UI
+                const value = e.target.value as ReceiverID;
+                startTransition(() => setMotionRid(value));
+              }}
+              disabled={motionBusy || phase !== 'pre'}
+            >
+              <option value="">Receiver…</option>
+              {(["X","Z","SLOT","TE","RB"] as ReceiverID[]).map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+            <select
+              className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
+              value={motionType}
+              onChange={(e) => setMotionType(e.target.value as 'jet'|'short'|'across')}
+              disabled={motionBusy || phase !== 'pre'}
+            >
+              <option value="jet">Jet</option>
+              <option value="short">Short</option>
+              <option value="across">Across</option>
+            </select>
+            <select
+              className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
+              value={motionDir}
+              onChange={(e) => setMotionDir(e.target.value as 'left'|'right')}
+              disabled={motionBusy || phase !== 'pre'}
+            >
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+            <label className="flex items-center gap-2 text-white/70 text-xs">
+              <input type="checkbox" checked={snapOnMotion} onChange={(e)=>setSnapOnMotion(e.target.checked)} disabled={motionBusy || phase !== 'pre'} /> Snap on motion
+            </label>
+            <button
+              onClick={applyMotionNow}
+              disabled={!motionRid || motionBusy || phase !== 'pre'}
+              className="px-3 py-2 rounded-xl bg-emerald-400 text-black font-semibold disabled:opacity-60"
+              title="Animate motion before snap"
+            >
+              Move
             </button>
-          ) : (
-            <button onClick={hardReset} className="px-3 py-2 rounded-xl bg-white/10 text-white">
-              Reset
-            </button>
-          )}
-
-          <div className="flex items-center gap-2 ml-1">
-            <span className="text-white/60 text-xs">Time</span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.floor(t * 100)}
-              onChange={(e) => seek(Number(e.target.value) / 100)}
-              disabled={ballFlying || phase !== "post"}
-            />
+            {motionBusy && <div className="text-white/60 text-xs">Motioning…</div>}
           </div>
+        )}
 
-          {/* Speed sliders */}
-          <div className="flex items-center gap-2 ml-2">
-            <span className="text-white/60 text-xs">WR Speed</span>
-            <input
-              type="range"
-              min={60}
-              max={140}
-              value={Math.round(recSpeed * 100)}
-              onChange={(e) => setRecSpeed(Number(e.target.value) / 100)}
-              title={`${(recSpeed * 100).toFixed(0)}%`}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-white/60 text-xs">DEF Speed</span>
-            <input
-              type="range"
-              min={60}
-              max={140}
-              value={Math.round(defSpeed * 100)}
-              onChange={(e) => setDefSpeed(Number(e.target.value) / 100)}
-              title={`${(defSpeed * 100).toFixed(0)}%`}
-            />
-          </div>
-
-          <label className="ml-auto flex items-center gap-2 text-white/70 text-xs">
-            <input type="checkbox" checked={soundOn} onChange={() => setSoundOn((s) => !s)} /> Sound
-          </label>
-        </div>
-
-        {/* (removed duplicate audible quick row to avoid double Apply buttons) */}
-
-        {/* Pass-pro toggles */}
-        <div className="flex items-center gap-3 ml-2">
-          <label className="flex items-center gap-2 text-white/70 text-xs">
-            <input type="checkbox" checked={teBlock} onChange={() => setTeBlock((v) => !v)} />
-            TE pass-pro
-          </label>
-          <label className="flex items-center gap-2 text-white/70 text-xs">
-            <input type="checkbox" checked={rbBlock} onChange={() => setRbBlock((v) => !v)} />
-            RB pass-pro
-          </label>
-        </div>
-
-        {/* Motion controls */}
-        <div className="mt-2 flex flex-wrap items-center gap-2 ml-2">
-          <div className="text-white/60 text-xs">Motion</div>
-          <select
-            className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
-            value={motionRid}
-            onChange={(e) => {
-              // PERFORMANCE: Use requestAnimationFrame to avoid blocking UI
-              const value = e.target.value as ReceiverID;
-              startTransition(() => setMotionRid(value));
-            }}
-            disabled={motionBusy || phase !== 'pre'}
-          >
-            <option value="">Receiver…</option>
-            {(["X","Z","SLOT","TE","RB"] as ReceiverID[]).map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-          <select
-            className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
-            value={motionType}
-            onChange={(e) => setMotionType(e.target.value as 'jet'|'short'|'across')}
-            disabled={motionBusy || phase !== 'pre'}
-          >
-            <option value="jet">Jet</option>
-            <option value="short">Short</option>
-            <option value="across">Across</option>
-          </select>
-          <select
-            className="bg-white/10 text-white text-xs md:text-sm rounded-md px-2 py-2"
-            value={motionDir}
-            onChange={(e) => setMotionDir(e.target.value as 'left'|'right')}
-            disabled={motionBusy || phase !== 'pre'}
-          >
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-          </select>
-          <label className="flex items-center gap-2 text-white/70 text-xs">
-            <input type="checkbox" checked={snapOnMotion} onChange={(e)=>setSnapOnMotion(e.target.checked)} disabled={motionBusy || phase !== 'pre'} /> Snap on motion
-          </label>
-          <button
-            onClick={applyMotionNow}
-            disabled={!motionRid || motionBusy || phase !== 'pre'}
-            className="px-3 py-2 rounded-xl bg-emerald-400 text-black font-semibold disabled:opacity-60"
-            title="Animate motion before snap"
-          >
-            Move
-          </button>
-          {motionBusy && <div className="text-white/60 text-xs">Motioning…</div>}
-        </div>
-
-        {/* Throw targets + Audible */}
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        {/* Throw targets + Audible - Only show in fullScreen mode */}
+        {fullScreen && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
         {throwButtons.map(to => (
             <button
             key={to}
@@ -3760,7 +4339,8 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
               </button>
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         {/* Result + audible note */}
         {(decision || grade || explain || audibleNote) && (
