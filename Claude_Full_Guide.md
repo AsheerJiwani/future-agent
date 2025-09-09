@@ -55,6 +55,132 @@ Long-term: perspectives for WR, RB, DB/LB with role-specific coaching.
   - `RCB: deep right third` | `Nickel: curl-flat left` | `Will: man on RB` | `FS: post middle third`
 - Prevent overlapping zones; ensure every deep/under zone is owned; preserve rush integrity.
 
+## Pocket & Line Play (OL/DL) — Canon
+
+> This section defines how the **pass pocket** looks/behaves, plus pre-snap setups and post-snap actions for every OL/DL, including **Center double-team & scan** rules. Use this to drive both animation and collision/engagement logic.
+
+### 1 Pocket Concept (what “real” should feel like)
+- **Shape:** A convex, elliptical **envelope** centered on the QB’s depth. Tackles shape the **arc** on the edges; interior (C/LG/RG) forms the **apex** in front of the QB.
+- **Dynamic:** The envelope **breathes**—it expands briefly on the set, then **compresses gradually** under pressure.
+- **Contain:** Tackles keep rushers **outside the arc**; guards/center stop direct **A/B-gap** displacement.
+- **Outcome constraint:** A **single defender** breaches the pocket **first**; a second might arrive but **staggered**.  
+  - **Target sack timing:** **3–10s** after snap. (Tune per play speed, protection, and QB depth; default 2.8–4.0s feel fast, >6s rare.)
+
+**Implementation hooks**
+- Maintain a `pocketEnvelope` (SVG path or Canvas poly) recomputed each tick from OL set points and QB position.
+- Apply a **pressure factor** that narrows the envelope ~10–25% over time as DLs win leverage.
+
+---
+
+### 2 Pre-Snap Setup (by position & formation)
+
+#### QB alignment
+- **Dropback:** Under center at LOS pre-snap; perform **3- or 5-step** drop (≈1.2s / 1.8s) to reach launch depth.
+- **Shotgun:** Pre-aligned **5–7 yards** behind LOS; small settle step only.
+
+#### RB alignment (depends on QB)
+- **Dropback:** RB **behind QB** at ≈**7y** depth, centered unless formation calls offset.
+- **Shotgun:** RB **offset**: ≈ **(QB depth + 1–1.5y)** and **1.5–2y lateral** (left or right).
+
+#### OL base splits & stance
+- **Positions:** LT–LG–C–RG–RT on LOS; slight stagger for tackles.
+- **Set landmarks (conceptual, to seed animations):**
+  - **Tackles:** Kick to an **outside arc** (wider, deeper set angle).
+  - **Guards:** Shorter set, vertical anchor inside.
+  - **Center:** Quick vertical set; eyes up for help/scan.
+
+#### DL fronts (examples)
+- **4-down:** EDGE(LEO)/DE outside, 3-tech/1-tech inside.
+- **Odd/over/under:** Respect declared **A/B/C gap** rush lanes.
+
+---
+
+### 3 Protection Schemes (assignment logic)
+
+> Encode assignments so animations and collision checks read the same source of truth.
+
+- **Man:**  
+  LT↔EDGE, LG↔DT, C↔NT/most dangerous A, RG↔DT, RT↔EDGE.  
+  RB/TE as configured (chip/stay/release).
+- **Slide Left / Slide Right:**  
+  Line steps to call; each OL owns the **near gap** in slide direction. **Backside tackle** often man on EDGE.
+- **Half-Slide (L/R):**  
+  Slide on call side; **backside** (G/T) play **man**.
+- **Max Protect:**  
+  TE and/or RB stay; TE helps tackle on his side; RB **scans inside→out** (LB → DB).
+
+---
+
+### 4 Center Rules — Double-Team & Scan (authoritative)
+- **ID & declare:** Center identifies the **MIKE** / primary threat pre-snap (internal; no UI required).
+- **Dual read:** On snap, Center takes **near A-gap** threat; if light, he **helps** (double-team) the **most stressed guard**.
+- **Help rules (priority):**
+  1. Aid whichever guard is losing **vertical push** fastest.
+  2. If both stable, **scan** to RB’s side for an **A→B** inside threat.
+  3. If a **stunt/twist** occurs, pass off penetrator, **catch the looper**.
+- **Release:** If an LB green-dogs (adds late), Center can **peel** to pickup per scan side.
+
+**Simplified sim logic**
+- For each tick, compute per-OL **stress** (DL leverage, depth loss). Center picks the **max-stress neighbor** to assist unless an A-gap threat exceeds a threshold.
+
+---
+
+### 5 Post-Snap Actions & Animations
+
+#### Offensive Line (each LT/LG/C/RG/RT)
+- **Set:** Move to **set point** based on scheme; face threat.
+- **Engage:** Once in contact radius, reduce DL forward speed by an **engagement factor**.
+- **Mirror & anchor:** Tackles widen & ride outside arc; guards set vertical anchor; Center applies help/scan rules above.
+- **Pass-off (stunts):** If penetrator crosses face and a looper replaces, **handoff** assignment; update animation target and engagement.
+- **Recover:** If displaced, re-anchor toward pocket boundary rather than straight line back (prevents teleporting).
+
+#### RB / TE (when blocking)
+- **RB scan (inside→out):** A-gap threat → B/C → EDGE leak. If no LB blitz, may attach to nearest unengaged DL on his side.
+- **TE chip:** Brief chip on EDGE then either **release** (if not Max Protect) or **stay** and fit outside of tackle.
+
+#### Defensive Line (each EDGE/DT/NT/DE)
+- **Lane & angle:** Rush along assigned **gap lane** (A/B/C) toward the **pocket envelope**, not the QB directly.
+- **Leverage build:** Gain depth; convert speed-to-power; try to **cross face** (inside) or **win edge** (outside).
+- **Stunts (if called):** Penetrator goes first, looper wraps; use simple timing offsets (≈150–300ms).
+- **Win scheduling (deterministic-random):**  
+  - Assign each DL a `winTime = base + rand(±variance)`; apply a **first-to-win bias** to one rusher (often the best EDGE).  
+  - At `winTime`, reduce engagement factor → **shed** → target QB.
+
+---
+
+### 6 Breach & Sack Rules
+
+- **Breach condition:** DL center point crosses **pocket envelope** boundary on a vector that intersects the QB’s launch lane.
+- **Sack condition:** DL enters `sackRadius` (~**0.8y**) around QB. Trigger **SACK** event, stop ticks, spot ball via hash/forward-progress rules.
+- **Arrival cardinality:** Enforce **one DL at a time**; allow a rare **second** within ≥**400ms** stagger.
+- **Timing envelope:** **3–10s** from snap to sack.  
+  - Use play tempo/protection to bias earlier (quick game) vs later (max-protect, good help).
+
+---
+
+### 7 Tuning & Telemetry (for realism)
+
+- **Pocket width at set:** Tackle-to-tackle ≈ **16–18y** (field units), compress 10–25% by 3–4s under pressure.
+- **DL push speeds:** engaged 3–4 y/s; free 5–6 y/s.
+- **OL lateral:** 2.5–3.5 y/s; anchor reduces DL displacement rate.
+- **Win schedule defaults:** `base=2600ms, variance=±500ms, firstBias=0.2–0.4`.  
+- **Stunts:** looper delay 150–300ms; pass-off succeeds if both OL not max-stressed.
+- **Metrics to log:** first breach time, sack time, helper (C) assists count, RB/TE pickup success, max pocket compression.
+
+---
+
+### 8 Acceptance Criteria (UI + Sim)
+- On **snap**, OL & DL start moving within **≤100ms**.
+- The **pocket envelope** is drawn and **changes shape** over time; tackles keep width, interior resists depth.
+- **Center help** visibly shifts: double-team when a guard is stressed; otherwise scan to the call side.
+- **RB/TE** behavior matches protection: RB scans I→O; TE chips or stays by call.
+- Exactly **one DL breaches first**; second arrival (if any) is **staggered**.
+- **Sacks occur between 3–10s** post-snap across scenarios.
+- No console errors; animations are smooth; positions remain physically plausible (no teleports).
+
+> For code organization: drive everything from an **assignment matrix** (scheme → OL/DL responsibilities), a **win scheduler** (per-DL), and a **pocket envelope** calculator tied to QB depth (dropback vs shotgun). Animations (SVG/Canvas) should read these same data to stay in sync with physics.
+
+
 ## Playwright MCP — Comprehensive Usage
 > Use this when you need depth. After reading, return to **[Claude.md](./Claude.md)** for the short loop.
 
