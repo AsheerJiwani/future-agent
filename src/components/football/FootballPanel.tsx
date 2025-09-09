@@ -55,14 +55,17 @@ export default function FootballPanel() {
   // State variables (keeping existing ones)
   const [conceptId, setConceptId] = useState<FootballConceptId>(CONCEPTS[0].id);
   const [coverage, setCoverage] = useState<CoverageID>("C3");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [mode, setMode] = useState<"teach" | "quiz">("teach");
   const [snapshot, setSnapshot] = useState<PlaySnapshot | undefined>(undefined);
   const [snapMeta, setSnapMeta] = useState<SnapMeta | undefined>(undefined);
   const [lastThrow, setLastThrow] = useState<ThrowSummary | undefined>(undefined);
   const [adaptiveOn, setAdaptiveOn] = useState<boolean>(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [starRid, setStarRid] = useState<""|"X"|"Z"|"SLOT"|"TE"|"RB">("");
   const [sessionInfo, setSessionInfo] = useState<{ streak: number; recs?: Array<{ skill: string; coverage: string; reason: string }> }>({ streak: 0 });
   const [userId, setUserId] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lastDrill, setLastDrill] = useState<{
     prev: { coverage: CoverageID; formation?: 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT' };
     suggestion: {
@@ -72,9 +75,12 @@ export default function FootballPanel() {
       fireZone?: { on: boolean; preset?: 'NICKEL'|'SAM'|'WILL' };
     };
   } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [autoRun, setAutoRun] = useState<{ on: boolean; left: number }>({ on: false, left: 0 });
   const autoRunRef = useRef<{ on: boolean; left: number }>({ on: false, left: 0 });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [routines, setRoutines] = useState<Array<{ name: string; drill: { coverage?: CoverageID; formation?: 'TRIPS_RIGHT'|'DOUBLES'|'BUNCH_LEFT'; motions?: Array<{ rid: 'X'|'Z'|'SLOT'|'TE'|'RB'; type?: 'jet'|'short'|'across'; dir?: 'left'|'right' }>; fireZone?: { on: boolean; preset?: 'NICKEL'|'SAM'|'WILL' } } }>>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [routineName, setRoutineName] = useState<string>('');
   
   // Bottom control state
@@ -145,6 +151,7 @@ export default function FootballPanel() {
   }, [userId]);
 
   // Auto rep running functionality
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function runReps(n: number) {
     setAutoRun({ on: true, left: n });
     autoRunRef.current = { on: true, left: n };

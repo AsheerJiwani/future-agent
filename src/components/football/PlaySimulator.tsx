@@ -53,7 +53,7 @@ const LOS_YDS = 20; // Line of scrimmage 20 yards from bottom goal line
 const QB = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS) };
 
 // Enhanced QB position based on formation and dropback progression
-const getQBPosition = (isShotgun: boolean, isPostSnap: boolean = false, timeElapsed: number = 0, formation: FormationName = "TRIPS_RIGHT") => {
+const getQBPosition = (isShotgun: boolean, isPostSnap: boolean = false, timeElapsed: number = 0) => {
   // Shotgun: QB starts 5-7 yards behind LOS
   // Under center: QB starts at LOS, then drops back 3/5/7 steps
   const baseY = isShotgun ? yUp(LOS_YDS + 7) : yUp(LOS_YDS);
@@ -549,19 +549,19 @@ const formationCache = new Map<string, AlignMap>();
 const numberingCache = new Map<string, Numbering>();
 // const routeCache = new Map<string, RouteMap>();
 
-// Debounced state update pattern for preventing rapid-fire updates
-const debounceMap = new Map<string, NodeJS.Timeout>();
-function debouncedUpdate(key: string, updateFn: () => void, delay = 16) {
-  const existing = debounceMap.get(key);
-  if (existing) clearTimeout(existing);
-  
-  const timeout = setTimeout(() => {
-    updateFn();
-    debounceMap.delete(key);
-  }, delay);
-  
-  debounceMap.set(key, timeout);
-}
+// Debounced state update pattern for preventing rapid-fire updates (unused for now)
+// const debounceMap = new Map<string, NodeJS.Timeout>();
+// function debouncedUpdate(key: string, updateFn: () => void, delay = 16) {
+//   const existing = debounceMap.get(key);
+//   if (existing) clearTimeout(existing);
+//   
+//   const timeout = setTimeout(() => {
+//     updateFn();
+//     debounceMap.delete(key);
+//   }, delay);
+//   
+//   debounceMap.set(key, timeout);
+// }
 
 function getCachedFormation(formationName: FormationName, hashSide: 'L'|'R', customAlign: AlignMap | null): AlignMap {
   if (customAlign) return customAlign;
@@ -910,11 +910,11 @@ export default function PlaySimulator({
   const [teBlock, setTeBlock] = useState(false);
   const [rbBlock, setRbBlock] = useState(false);
   const [shotgun, setShotgun] = useState(false);
-  const [qbPos, setQbPos] = useState(() => getQBPosition(isShotgun, false, 0, formation));
+  const [qbPos, setQbPos] = useState(() => getQBPosition(isShotgun, false, 0));
 
   // Update QB position when formation/shotgun changes or time progresses
   useEffect(() => {
-    setQbPos(getQBPosition(isShotgun, phase === 'post', t, formation));
+    setQbPos(getQBPosition(isShotgun, phase === 'post', t));
   }, [isShotgun, phase, t, formation]);
 
   // Update RB position in formation when shotgun changes
@@ -1186,6 +1186,7 @@ export default function PlaySimulator({
       window.removeEventListener('set-formation', onSetFormation as EventListener);
       window.removeEventListener('set-star', onSetStar as EventListener);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [O, recSpeed, decision, seek, customAlign, formation, motionBusy]);
   useEffect(() => {
     setUserId(getOrCreateUserId());
@@ -1291,9 +1292,10 @@ export default function PlaySimulator({
       const area = classifyThrowArea(wrPosSafe(bestRid, t));
       setCachedTopOpen({ rid: bestRid, score: bestScore, area: area.key });
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, decision, ballFlying, teBlock, rbBlock, t, coverage, align, O]);
   
-  const topOpenNow = cachedTopOpen;
+  // const topOpenNow = cachedTopOpen;
 
   const canThrowNow = useMemo(
   () => phase === "post" && !ballFlying && !decision && t < 0.999,
@@ -1755,6 +1757,7 @@ setManExtraRoles({ blitzers, spy });
     const r = rngRef.current.nextFloat();
     const rot: C3Rotation = r < 0.5 ? 'SKY' : r < 0.85 ? 'BUZZ' : 'CLOUD_STRONG';
     setC3Rotation(rot);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, coverage, c3RotationMode, lastMotion, align, numbering]);
 
   // (Dlive/lastTRef/overlayTick are defined earlier to avoid TDZ)
@@ -2683,7 +2686,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
 
     // --- Free player (FS) in C1: MOF with backside help in MABLE ---
     if (cover === "C1" && id === "FS") {
-        const sr = strongIsRight();
+        // const sr = strongIsRight();
         const hasL3 = !!left3();
         const hasR3 = !!right3();
         if (hasL3 || hasR3) {
@@ -2777,7 +2780,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       // Defensive Line: Enhanced pass rush with breakthrough system
       if (id === 'DE_L' || id === 'DE_R' || id === 'DT_L' || id === 'DT_R') {
         // Get current QB position for dynamic rush tracking
-        const currentQBPos = getQBPosition(isShotgun, true, tt, formation);
+        const currentQBPos = getQBPosition(isShotgun, true, tt);
         
         // Check for breakthrough (deterministic one DL will eventually win)
         const currentBreakthrough = calculateBreakthrough(tt, protectionScheme, defSpeed);
@@ -3495,6 +3498,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     coverage: CoverageID, 
     targetReceiver: ReceiverID,
     throwTime: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _receiverInfo: { score: number; sepYds: number }
   ): string {
     
@@ -3556,7 +3560,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
   const p2 = posOnPathLenScaled(path, Math.min(1, t * recSpeed * receiverSpeedMult(to) * starSpeedMult(to)));
   
   // Use current QB position (accounts for dropback)
-  const currentQBPos = getQBPosition(isShotgun, phase === 'post', t, formation);
+  const currentQBPos = getQBPosition(isShotgun, phase === 'post', t);
   const p0 = { x: qbX(), y: currentQBPos.y };
   
   const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
@@ -4141,7 +4145,6 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
                   <g onClick={async ()=>{
                     try {
                       const defaultName = `${drillInfo.coverage || 'C?'} ${drillInfo.formation || ''} ${drillInfo.fireZone?.on ? 'FZ' : ''}`.trim() || 'Routine';
-                      // eslint-disable-next-line no-alert
                       const name = typeof window !== 'undefined' ? (window.prompt('Name this drill routine:', defaultName) || '').trim() : defaultName;
                       if (!name) return;
                       await fetch('/api/routine/save', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': userId ?? '' }, body: JSON.stringify({ routine: { name, drill: { coverage: drillInfo.coverage, formation: drillInfo.formation, motions: drillInfo.motions, fireZone: drillInfo.fireZone } } }) });
