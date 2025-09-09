@@ -208,12 +208,12 @@ let QB_X_DYNAMIC: number = xAcross(FIELD_WIDTH_YDS / 2);
 const qbX = () => QB_X_DYNAMIC;
 const isLeftOfQB = (p: Pt) => p.x < qbX();
 const outSign = (p: Pt) => (isLeftOfQB(p) ? -1 : +1);
-const inSign = (p: Pt) => (isLeftOfQB(p) ? +1 : -1);
+// const inSign = (p: Pt) => (isLeftOfQB(p) ? +1 : -1);
 
 const SIDELINE_MARGIN = 4;
 const HASH_L = xAcross(HASH_FROM_SIDELINE_YDS);
 const HASH_R = xAcross(FIELD_WIDTH_YDS - HASH_FROM_SIDELINE_YDS);
-const oppositeHashX = (s: Pt) => (isLeftOfQB(s) ? HASH_R : HASH_L);
+// const oppositeHashX = (s: Pt) => (isLeftOfQB(s) ? HASH_R : HASH_L);
 const sidelineX = (s: Pt, off = SIDELINE_MARGIN) =>
   isLeftOfQB(s) ? xAcross(off) : xAcross(FIELD_WIDTH_YDS - off);
 
@@ -547,7 +547,7 @@ function computeNumbering(align: AlignMap): Numbering {
 /* --------- PERFORMANCE: Memoization Caches for Ultra-Fast Rendering --------- */
 const formationCache = new Map<string, AlignMap>();
 const numberingCache = new Map<string, Numbering>();
-const routeCache = new Map<string, RouteMap>();
+// const routeCache = new Map<string, RouteMap>();
 
 // Debounced state update pattern for preventing rapid-fire updates
 const debounceMap = new Map<string, NodeJS.Timeout>();
@@ -741,9 +741,9 @@ const ZONES = {
 };
 
 // Defender id list (used by openness, wrPosSafe, etc.) — keep above first usage to avoid TDZ
-const DEFENDER_IDS: DefenderID[] = [
-  "CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL", "DE_L", "DE_R", "DT_L", "DT_R"
-];
+// const DEFENDER_IDS: DefenderID[] = [
+//   "CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL", "DE_L", "DE_R", "DT_L", "DT_R"
+// ];
 
 // Get active defenders based on offensive personnel (11 total)
 function getActiveDefenders(formation: FormationName): DefenderID[] {
@@ -755,7 +755,7 @@ function getActiveDefenders(formation: FormationName): DefenderID[] {
 }
 
 const OL_IDS: OffensiveLineID[] = ["LT", "LG", "C", "RG", "RT"];
-const DL_IDS: DefenderID[] = ["DE_L", "DE_R", "DT_L", "DT_R"];
+// const DL_IDS: DefenderID[] = ["DE_L", "DE_R", "DT_L", "DT_R"];
 
 // Enhanced protection schemes and breakthrough system
 type ProtectionScheme = 'SLIDE_LEFT' | 'SLIDE_RIGHT' | 'HALF_SLIDE_LEFT' | 'HALF_SLIDE_RIGHT' | 'MAX_PROTECT' | 'MAN_PROTECT';
@@ -862,7 +862,7 @@ export default function PlaySimulator({
       RB: (A0.RB.x < QB.x)
     };
     setRouteOrient(orient0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conceptId, formation]);
   const [numbering, setNumbering] = useState<Numbering>(() => getCachedNumbering(FORMATIONS[formation]));
 
@@ -898,10 +898,10 @@ export default function PlaySimulator({
   const [starRid, setStarRid] = useState<ReceiverID | "">("");
   
   // New state for enhanced OL/DL mechanics
-  const [protectionScheme, setProtectionScheme] = useState<ProtectionScheme>('MAN_PROTECT');
-  const [isShotgun, setIsShotgun] = useState<boolean>(false);
-  const [breakthrough, setBreakthrough] = useState<BreakthroughResult | null>(null);
-  const [olDlEngagement, setOlDlEngagement] = useState<Record<string, { ol: OffensiveLineID; dl: DefenderID; intensity: number }>>({});
+  const [protectionScheme] = useState<ProtectionScheme>('MAN_PROTECT');
+  const [isShotgun] = useState<boolean>(false);
+  // const [breakthrough, setBreakthrough] = useState<BreakthroughResult | null>(null);
+  // const [olDlEngagement, setOlDlEngagement] = useState<Record<string, { ol: OffensiveLineID; dl: DefenderID; intensity: number }>>({});
 
   // --- Blocking state (success odds: TE 90%, RB 70%)
   type Blocker = "TE" | "RB";
@@ -962,7 +962,7 @@ export default function PlaySimulator({
   // push current QB X to helpers used above
   QB_X_DYNAMIC = hashSide === 'L' ? HASH_L : HASH_R;
   const [showNearest, setShowNearest] = useState<boolean>(false);
-  const [lastCatchInfo, setLastCatchInfo] = useState<{ rid: ReceiverID; t: number; score: number; sep: number } | null>(null);
+  // const [lastCatchInfo, setLastCatchInfo] = useState<{ rid: ReceiverID; t: number; score: number; sep: number } | null>(null);
   const [motionBoost, setMotionBoost] = useState<{ rid: ReceiverID | null; untilT: number; mult: number }>({ rid: null, untilT: 0, mult: 1.0 });
   const [manLagProfile, setManLagProfile] = useState<Partial<Record<DefenderID, { lagFrac: number; amp: number }>>>({});
 
@@ -2807,7 +2807,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         
         if (id === 'DE_L' || id === 'DE_R') {
           // Defensive Ends: External rush with contain, creating pocket "U" shape
-          let rushMove = currentBreakthrough?.rushMove || 'SPEED';
+          const rushMove = currentBreakthrough?.rushMove || 'SPEED';
           let rushPoint: Pt;
           
           if (isBreakthroughPlayer && rushMove === 'SPEED') {
@@ -2826,7 +2826,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           return approach(start, rushPoint, rushSpeed, rushAccuracy);
         } else {
           // Defensive Tackles: Interior rush creating pocket pressure
-          let rushMove = currentBreakthrough?.rushMove || 'POWER';
+          const rushMove = currentBreakthrough?.rushMove || 'POWER';
           let rushPoint: Pt;
           
           if (isBreakthroughPlayer) {
@@ -3266,7 +3266,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     setRngSeed(newRngSeed);
     setDrillInfo(null);
     setMotionLockRid(null);
-    setLastCatchInfo(null);
+    // setLastCatchInfo(null);
     
     // INSTANT phase transition - no micro/macro task delays
     setPhase("post");
@@ -3459,11 +3459,11 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
   }
 
   function generateImmediateCoachingFeedback(
-    catchResult: any,
+    catchResult: { wasHit?: boolean; hitType?: string | null; defenderSeparation?: number; incompleteReason?: string },
     coverage: CoverageID, 
     targetReceiver: ReceiverID,
     throwTime: number,
-    receiverInfo: { score: number; sepYds: number }
+    _receiverInfo: { score: number; sepYds: number }
   ): string {
     
     const coverageId = identifyCoverage(coverage);
@@ -3475,12 +3475,12 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       const hitType = catchResult.hitType === 'driven_back' ? 'driven back' : 'maintained balance';
       feedback += `Hit immediately, ${hitType} (${catchResult.defenderSeparation?.toFixed(1)}yd sep). `;
       
-      if (catchResult.defenderSeparation < 2) {
+      if (catchResult.defenderSeparation && catchResult.defenderSeparation < 2) {
         feedback += "Tight window - consider quicker release or check-down. ";
       }
-    } else if (catchResult.defenderSeparation > 3) {
-      feedback += `Clean catch - ${catchResult.defenderSeparation.toFixed(1)}yd separation. `;
-      if (receiverInfo.score > 0.8) {
+    } else if (catchResult.defenderSeparation && catchResult.defenderSeparation > 3) {
+      feedback += `Clean catch - ${catchResult.defenderSeparation?.toFixed(1)}yd separation. `;
+      if (_receiverInfo.score > 0.8) {
         feedback += "Excellent read. ";
       }
     }
@@ -3491,7 +3491,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
   }
 
   function generateIncompletePassFeedback(
-    catchResult: any,
+    catchResult: { incompleteReason?: string; defenderSeparation?: number },
     coverage: CoverageID, 
     targetReceiver: ReceiverID,
     throwTime: number,
@@ -3505,8 +3505,8 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     
     if (catchResult.incompleteReason) {
       if (catchResult.incompleteReason.includes('Deflected')) {
-        feedback += `Deflected by defender (${catchResult.defenderSeparation?.toFixed(1)}yd sep) - `;
-        if (catchResult.defenderSeparation < 1.5) {
+        feedback += `Deflected by defender (${catchResult.defenderSeparation?.toFixed(1) || 'close'}yd sep) - `;
+        if (catchResult.defenderSeparation && catchResult.defenderSeparation < 1.5) {
           feedback += "throw earlier or find different target. ";
         } else {
           feedback += "unlucky break, good throw. ";
@@ -3541,7 +3541,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       setThrowMeta(null);
       setMotionLockRid(null);
       setDrillInfo(null);
-      setLastCatchInfo(null);
+      // setLastCatchInfo(null);
     });
   }
   function startThrow(to: ReceiverID) {
@@ -3694,8 +3694,8 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       // CRITICAL: Execute immediately for AI Tutor functionality
       if (decision) {
         try {
-          const ci = computeReceiverOpenness(decision, t);
-          setLastCatchInfo({ rid: decision, t, score: ci.score, sep: ci.sepYds });
+          // const ci = computeReceiverOpenness(decision, t);
+          // setLastCatchInfo({ rid: decision, t, score: ci.score, sep: ci.sepYds });
         } catch {}
         // Must call gradeDecision immediately to ensure onThrowGraded fires for AI Tutor
         gradeDecision(decision);
