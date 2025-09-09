@@ -35,8 +35,8 @@ const FIELD_LENGTH_YDS = 120;
 const FIELD_WIDTH_YDS = 53.333333;
 const HASH_FROM_SIDELINE_YDS = 70.75 / 3;
 
-const PX_W = 900;
-const PX_H = 520;
+const PX_W = 720; // Reduced width to fit three-column layout better
+const PX_H = 480; // Optimized height for complete 120-yard field visibility
 
 const XPX = PX_W / FIELD_WIDTH_YDS;
 const YPX = PX_H / FIELD_LENGTH_YDS;
@@ -48,8 +48,68 @@ function yDepthYds(p: Pt): number {
   return (PX_H - p.y) / YPX;
 }
 
-// QB at bottom-middle, ~12 yds from GL
-const QB = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(12) };
+// QB at field center width, positioned based on LOS (Line of Scrimmage at 20-yard line)
+const LOS_YDS = 20; // Line of scrimmage 20 yards from bottom goal line
+const QB = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS) };
+
+// Enhanced QB position based on formation and dropback progression
+const getQBPosition = (isShotgun: boolean, isPostSnap: boolean = false, timeElapsed: number = 0, formation: FormationName = "TRIPS_RIGHT") => {
+  // Shotgun: QB starts 5-7 yards behind LOS
+  // Under center: QB starts at LOS, then drops back 3/5/7 steps
+  const baseY = isShotgun ? yUp(LOS_YDS + 7) : yUp(LOS_YDS);
+  
+  if (!isPostSnap) return { x: QB.x, y: baseY };
+  
+  // QB dropback progression with NFL-realistic timing
+  if (isShotgun) {
+    // Shotgun: minimal dropback, more lateral movement in pocket
+    const pocketMovement = Math.sin(timeElapsed * 2) * 0.5; // Subtle pocket movement
+    return { 
+      x: QB.x + xAcross(pocketMovement), 
+      y: baseY + yUp(Math.min(2, timeElapsed * 1.5))
+    };
+  } else {
+    // Under center: traditional 3/5/7 step drops
+    const dropSteps = timeElapsed < 1.0 ? 3 : timeElapsed < 2.0 ? 5 : 7;
+    const dropYards = dropSteps * 1.2; // ~1.2 yards per step
+    const dropProgress = Math.min(1, timeElapsed / 2.0);
+    const currentDrop = dropYards * dropProgress;
+    
+    return { x: QB.x, y: baseY + yUp(currentDrop) };
+  }
+};
+
+// Enhanced RB position based on formation and blocking assignments
+const getRBPosition = (isShotgun: boolean, formation: FormationName, align: AlignMap, isBlocking: boolean = false, isPostSnap: boolean = false, timeElapsed: number = 0) => {
+  if (isShotgun) {
+    // Shotgun: RB offset and deeper than QB
+    const lateralOffset = formation === "TRIPS_RIGHT" ? -3.5 : 3.5;
+    const baseDepth = 18.5; // 1.5 yards deeper than QB
+    
+    if (isBlocking && isPostSnap) {
+      // RB steps up to help with protection
+      const protectionStep = Math.min(2, timeElapsed * 3);
+      return { 
+        x: QB.x + xAcross(lateralOffset * 0.7), 
+        y: yUp(baseDepth - protectionStep) 
+      };
+    }
+    
+    return { x: QB.x + xAcross(lateralOffset), y: yUp(baseDepth) };
+  } else {
+    // Under center: RB behind QB, ready for handoff or protection
+    const baseX = QB.x + xAcross(formation === "TRIPS_RIGHT" ? -1.5 : 1.5);
+    const baseY = yUp(7); // 5 yards behind LOS
+    
+    if (isBlocking && isPostSnap) {
+      // RB steps up for pass protection
+      const protectionStep = Math.min(3, timeElapsed * 2.5);
+      return { x: baseX, y: baseY - yUp(protectionStep) };
+    }
+    
+    return { x: baseX, y: baseY };
+  }
+};
 
 /* --------- Types --------- */
 type DefenderID =
@@ -60,7 +120,18 @@ type DefenderID =
   | "SS"
   | "SAM"
   | "MIKE"
-  | "WILL";
+  | "WILL"
+  | "DE_L"
+  | "DE_R"
+  | "DT_L"
+  | "DT_R";
+
+type OffensiveLineID =
+  | "LT"
+  | "LG" 
+  | "C"
+  | "RG"
+  | "RT";
 
 // (Actor type removed)
 
@@ -569,14 +640,93 @@ function buildConceptRoutes(
 
 /* --------- Zone landmarks --------- */
 const D_ALIGN: Record<DefenderID, Pt> = {
-  CB_L: { x: xAcross(8), y: yUp(16.5) },
-  CB_R: { x: xAcross(FIELD_WIDTH_YDS - 8), y: yUp(16.5) },
-  NICKEL: { x: xAcross(FIELD_WIDTH_YDS - 18), y: yUp(17) },
-  SAM: { x: xAcross(20), y: yUp(22) },
-  MIKE: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(22) },
-  WILL: { x: xAcross(FIELD_WIDTH_YDS - 20), y: yUp(22) },
-  FS: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(35) },
-  SS: { x: xAcross(FIELD_WIDTH_YDS / 2 - 12), y: yUp(32) },
+  CB_L: { x: xAcross(8), y: yUp(LOS_YDS - 3.5) },
+  CB_R: { x: xAcross(FIELD_WIDTH_YDS - 8), y: yUp(LOS_YDS - 3.5) },
+  NICKEL: { x: xAcross(FIELD_WIDTH_YDS - 18), y: yUp(LOS_YDS - 3) },
+  SAM: { x: xAcross(20), y: yUp(LOS_YDS + 2) },
+  MIKE: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS + 2) },
+  WILL: { x: xAcross(FIELD_WIDTH_YDS - 20), y: yUp(LOS_YDS + 2) },
+  FS: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS + 15) },
+  SS: { x: xAcross(FIELD_WIDTH_YDS / 2 - 12), y: yUp(LOS_YDS + 12) },
+  DE_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 9), y: yUp(LOS_YDS - 0.5) },
+  DE_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 9), y: yUp(LOS_YDS - 0.5) },
+  DT_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 3), y: yUp(LOS_YDS - 0.5) },
+  DT_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 3), y: yUp(LOS_YDS - 0.5) }
+};
+
+// Base Offensive Line positions (will be adjusted dynamically for pocket)
+const OL_ALIGN: Record<OffensiveLineID, Pt> = {
+  LT: { x: xAcross(FIELD_WIDTH_YDS / 2 - 6), y: yUp(LOS_YDS) },
+  LG: { x: xAcross(FIELD_WIDTH_YDS / 2 - 3), y: yUp(LOS_YDS) },
+  C: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS) },
+  RG: { x: xAcross(FIELD_WIDTH_YDS / 2 + 3), y: yUp(LOS_YDS) },
+  RT: { x: xAcross(FIELD_WIDTH_YDS / 2 + 6), y: yUp(LOS_YDS) }
+};
+
+// Enhanced OL positions that form realistic NFL pocket
+const getOLPosition = (olId: OffensiveLineID, qbPosition: Pt, isPostSnap: boolean, timeElapsed: number, 
+                     protection: ProtectionScheme = 'MAN_PROTECT', isShotgun: boolean = false) => {
+  const basePos = OL_ALIGN[olId];
+  
+  if (!isPostSnap) return basePos;
+  
+  // NFL pocket formation - forms upside-down "U" around QB
+  const pocketDepth = Math.min(isShotgun ? 2 : 4, timeElapsed * 1.8);
+  const pocketY = basePos.y + yUp(pocketDepth);
+  
+  // Enhanced Center blocking logic for double teams and LB pickup
+  let xAdjust = 0;
+  let yAdjust = 0;
+  
+  if (olId === 'C') {
+    // Center-specific logic: double team or LB pickup
+    if (timeElapsed > 0.8) {
+      // After initial engagement, Center can:
+      // 1. Help with double team on DT
+      // 2. Pick up blitzing LB (MIKE most common)
+      // 3. Slide to help with breakthrough
+      
+      // Check for MIKE LB blitz (common interior blitz)
+      const mikeBlitzLikely = protection === 'MAX_PROTECT' || Math.random() > 0.7;
+      
+      if (mikeBlitzLikely) {
+        // Center steps up to pick up MIKE LB
+        yAdjust = -1.5; // Step forward to meet LB
+        xAdjust = 0; // Stay centered
+      } else {
+        // Double team help - step toward nearest DT
+        const helpSide = Math.random() > 0.5 ? 'L' : 'R';
+        xAdjust = helpSide === 'L' ? -1.2 : 1.2;
+        yAdjust = -0.5; // Step up slightly for leverage
+      }
+    }
+  } else {
+    // Regular OL protection scheme adjustments
+    switch (protection) {
+      case 'SLIDE_LEFT':
+        xAdjust = olId === 'RT' ? -1 : olId === 'RG' ? -0.5 : olId === 'LT' ? 0.5 : 0;
+        break;
+      case 'SLIDE_RIGHT':
+        xAdjust = olId === 'LT' ? 1 : olId === 'LG' ? 0.5 : olId === 'RT' ? -0.5 : 0;
+        break;
+      case 'HALF_SLIDE_LEFT':
+        xAdjust = ['RG', 'RT'].includes(olId) ? -0.5 : 0;
+        break;
+      case 'HALF_SLIDE_RIGHT':
+        xAdjust = ['LG', 'LT'].includes(olId) ? 0.5 : 0;
+        break;
+    }
+  }
+  
+  // Create pocket "U" shape - wider at the top, narrower near QB
+  const distanceFromCenter = Math.abs(basePos.x - QB.x);
+  const pocketArc = distanceFromCenter * 0.15; // More pronounced arc
+  const pocketWidth = Math.max(0.8, 1 - (pocketDepth * 0.1)); // Pocket narrows as it deepens
+  
+  return {
+    x: basePos.x + xAcross(xAdjust) * pocketWidth,
+    y: pocketY - yUp(pocketArc) + yUp(yAdjust)
+  };
 };
 
 const ZONES = {
@@ -592,8 +742,68 @@ const ZONES = {
 
 // Defender id list (used by openness, wrPosSafe, etc.) — keep above first usage to avoid TDZ
 const DEFENDER_IDS: DefenderID[] = [
-  "CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL"
+  "CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "WILL", "DE_L", "DE_R", "DT_L", "DT_R"
 ];
+
+// Get active defenders based on offensive personnel (11 total)
+function getActiveDefenders(formation: FormationName): DefenderID[] {
+  const hasSlot = formation === "TRIPS_RIGHT" || formation === "BUNCH_LEFT";
+  const base_defense: DefenderID[] = ["CB_L", "CB_R", "FS", "SS", "SAM", "MIKE", "WILL", "DE_L", "DE_R", "DT_L", "DT_R"];
+  const nickel_defense: DefenderID[] = ["CB_L", "CB_R", "NICKEL", "FS", "SS", "SAM", "MIKE", "DE_L", "DE_R", "DT_L", "DT_R"];
+  
+  return hasSlot ? nickel_defense : base_defense;
+}
+
+const OL_IDS: OffensiveLineID[] = ["LT", "LG", "C", "RG", "RT"];
+const DL_IDS: DefenderID[] = ["DE_L", "DE_R", "DT_L", "DT_R"];
+
+// Enhanced protection schemes and breakthrough system
+type ProtectionScheme = 'SLIDE_LEFT' | 'SLIDE_RIGHT' | 'HALF_SLIDE_LEFT' | 'HALF_SLIDE_RIGHT' | 'MAX_PROTECT' | 'MAN_PROTECT';
+type RushMove = 'POWER' | 'SPEED' | 'INSIDE' | 'STUNT';
+type BreakthroughResult = {
+  defender: DefenderID;
+  timeToQB: number; // seconds until reaching QB
+  rushMove: RushMove;
+};
+
+// Deterministic breakthrough system - one DL will always break through
+const calculateBreakthrough = (timeElapsed: number, protection: ProtectionScheme, dlSpeed: number = 1.0): BreakthroughResult | null => {
+  // Choose which DL breaks through based on protection scheme and time
+  const baseBreakthroughTime = protection === 'MAX_PROTECT' ? 4.5 : protection.includes('SLIDE') ? 3.2 : 2.8;
+  const adjustedTime = baseBreakthroughTime / dlSpeed;
+  
+  if (timeElapsed < adjustedTime) return null;
+  
+  // Select breakthrough defender based on protection weakness
+  let defender: DefenderID;
+  let rushMove: RushMove;
+  
+  switch (protection) {
+    case 'SLIDE_LEFT':
+      defender = 'DE_R';
+      rushMove = 'SPEED';
+      break;
+    case 'SLIDE_RIGHT':
+      defender = 'DE_L';
+      rushMove = 'SPEED';
+      break;
+    case 'HALF_SLIDE_LEFT':
+      defender = Math.random() > 0.5 ? 'DT_R' : 'DE_R';
+      rushMove = 'INSIDE';
+      break;
+    case 'HALF_SLIDE_RIGHT':
+      defender = Math.random() > 0.5 ? 'DT_L' : 'DE_L';
+      rushMove = 'INSIDE';
+      break;
+    default:
+      // MAN_PROTECT: most likely DT up the middle
+      defender = Math.random() > 0.6 ? 'DT_L' : 'DT_R';
+      rushMove = 'POWER';
+  }
+  
+  const timeToQB = Math.max(0.5, adjustedTime - timeElapsed + 1.0);
+  return { defender, timeToQB, rushMove };
+};
 
 /* --------- Coverage families --------- */
 const MAN_COVERAGES   = new Set<CoverageID>(["C0","C1"]);
@@ -686,6 +896,12 @@ export default function PlaySimulator({
   const [catchAt, setCatchAt] = useState<Pt | null>(null);
   // Star receiver (user-chosen)
   const [starRid, setStarRid] = useState<ReceiverID | "">("");
+  
+  // New state for enhanced OL/DL mechanics
+  const [protectionScheme, setProtectionScheme] = useState<ProtectionScheme>('MAN_PROTECT');
+  const [isShotgun, setIsShotgun] = useState<boolean>(false);
+  const [breakthrough, setBreakthrough] = useState<BreakthroughResult | null>(null);
+  const [olDlEngagement, setOlDlEngagement] = useState<Record<string, { ol: OffensiveLineID; dl: DefenderID; intensity: number }>>({});
 
   // --- Blocking state (success odds: TE 90%, RB 70%)
   type Blocker = "TE" | "RB";
@@ -693,6 +909,23 @@ export default function PlaySimulator({
 
   const [teBlock, setTeBlock] = useState(false);
   const [rbBlock, setRbBlock] = useState(false);
+  const [shotgun, setShotgun] = useState(false);
+  const [qbPos, setQbPos] = useState(() => getQBPosition(isShotgun, false, 0, formation));
+
+  // Update QB position when formation/shotgun changes or time progresses
+  useEffect(() => {
+    setQbPos(getQBPosition(isShotgun, phase === 'post', t, formation));
+  }, [isShotgun, phase, t, formation]);
+
+  // Update RB position in formation when shotgun changes
+  useEffect(() => {
+    const baseAlign = FORMATIONS[formation];
+    const newAlign = {
+      ...baseAlign,
+      RB: getRBPosition(shotgun, formation, baseAlign)
+    };
+    setAlign(newAlign);
+  }, [shotgun, formation]);
 
   const [, setBlockAssignments] = useState<BlockMap>({});
   const [blockedDefenders, setBlockedDefenders] = useState<Set<DefenderID>>(new Set());
@@ -766,6 +999,14 @@ export default function PlaySimulator({
       case "WILL":
         // Cover TEs/RBs: 90% of TE speed (0.90)
         return 0.81;
+      case "DE_L":
+      case "DE_R":
+        // Defensive Ends: Pass rush/contain, slower than LBs
+        return 0.75;
+      case "DT_L":
+      case "DT_R":
+        // Defensive Tackles: Interior rush, slowest defenders
+        return 0.65;
       default:
         return 0.85; // Default safe cap
     }
@@ -1135,7 +1376,7 @@ export default function PlaySimulator({
   const forceStrong = (typeof cbTechnique !== "undefined") && cbTechnique === "pressStrong";
 
   const active: Record<DefenderID, boolean> = {
-    CB_L: false, CB_R: false, NICKEL: false, FS: false, SS: false, SAM: false, MIKE: false, WILL: false
+    CB_L: false, CB_R: false, NICKEL: false, FS: false, SS: false, SAM: false, MIKE: false, WILL: false, DE_L: false, DE_R: false, DT_L: false, DT_R: false
   };
   if (isMan) {
     if (forceBoth) {
@@ -1563,7 +1804,7 @@ setManExtraRoles({ blitzers, spy });
         // Find nearest defender using defenderTarget (non-recursive wrPos)
         let nearestId: DefenderID | null = null;
         let best = Number.POSITIVE_INFINITY;
-        for (const did of DEFENDER_IDS) {
+        for (const did of getActiveDefenders(formation)) {
           const dp = defenderTarget(coverage, did, tt);
           const yds = distYds(p, dp);
           if (yds < best) { best = yds; nearestId = did; }
@@ -1734,7 +1975,7 @@ setManExtraRoles({ blitzers, spy });
     
     // Calculate stable target positions based on zone assignments
     const stableTargets = {} as Record<DefenderID, Pt>;
-    for (const id of DEFENDER_IDS) {
+    for (const id of getActiveDefenders(formation)) {
       const assignment = newAssignments[id];
       if (!assignment) continue;
       
@@ -1826,7 +2067,7 @@ setManExtraRoles({ blitzers, spy });
     const nextVelocities: Record<DefenderID, Pt> = { ...Dvelocity };
     const nextTargets: Record<DefenderID, Pt> = { ...DlastTargets };
     
-    for (const id of DEFENDER_IDS) {
+    for (const id of getActiveDefenders(formation)) {
       const current = Dlive[id] ?? Dstart[id] ?? D_ALIGN[id];
       const currentVel = Dvelocity[id] ?? { x: 0, y: 0 };
       
@@ -1931,7 +2172,7 @@ setManExtraRoles({ blitzers, spy });
     const rp = wrPosSafe(rid, tt);
     let bestYds = Infinity;
     let nearest: DefenderID | null = null;
-    for (const did of DEFENDER_IDS) {
+    for (const did of getActiveDefenders(formation)) {
       const dp = Math.abs(tt - t) < 1e-4 ? (Dlive[did] ?? Dstart[did] ?? D_ALIGN[did]) : defenderTarget(coverage, did, tt);
       const yds = distYds(rp, dp);
       if (yds < bestYds) { bestYds = yds; nearest = did; }
@@ -2010,7 +2251,13 @@ setManExtraRoles({ blitzers, spy });
   const MIKE: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yBacker };
   const WILL: Pt = { x: ssRight ? xAcross(FIELD_WIDTH_YDS - 20) : xAcross(20), y: yBacker };
 
-  return { CB_L, CB_R, NICKEL, FS, SS, SAM, MIKE, WILL };
+  // Defensive Line - 4 players aligned based on formation strength
+  const DE_L: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2 - 9), y: yUp(9.5) };
+  const DE_R: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2 + 9), y: yUp(9.5) };
+  const DT_L: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2 - 3), y: yUp(9.5) };
+  const DT_R: Pt = { x: xAcross(FIELD_WIDTH_YDS / 2 + 3), y: yUp(9.5) };
+
+  return { CB_L, CB_R, NICKEL, FS, SS, SAM, MIKE, WILL, DE_L, DE_R, DT_L, DT_R };
 }
 
 
@@ -2048,6 +2295,8 @@ setManExtraRoles({ blitzers, spy });
         if (id === "MIKE") return HOOK;
         if (id === "SAM")  return sr ? off(L.CURL, +0.5) : off(R.CURL, -0.5);
         if (id === "WILL") return sr ? off(R.CURL, -0.5) : off(L.CURL, +0.5);
+        // Defensive Line: Rush the passer at snap position
+        if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") return D_ALIGN[id];
         return D_ALIGN[id];
       }
       case "C2": {
@@ -2059,6 +2308,8 @@ setManExtraRoles({ blitzers, spy });
         if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
         if (id === "SAM")    return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
         if (id === "WILL")   return sr ? off(L.CURL, +3.0) : off(R.CURL, -3.0);
+        // Defensive Line: Rush the passer at snap position
+        if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") return D_ALIGN[id];
         return D_ALIGN[id];
       }
       case "TAMPA2": {
@@ -2070,6 +2321,8 @@ setManExtraRoles({ blitzers, spy });
         if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
         if (id === "SAM")    return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
         if (id === "WILL")   return sr ? off(L.CURL, +3.0) : off(R.CURL, -3.0);
+        // Defensive Line: Rush the passer at snap position
+        if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") return D_ALIGN[id];
         return D_ALIGN[id];
       }
       case "C4":
@@ -2082,6 +2335,8 @@ setManExtraRoles({ blitzers, spy });
         if (id === "SAM")  return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
         if (id === "WILL") return sr ? off(R.CURL, -1.0) : off(L.CURL, +1.0);
         if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+        // Defensive Line: Rush the passer at snap position
+        if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") return D_ALIGN[id];
         return D_ALIGN[id];
       }
       case "PALMS": {
@@ -2093,6 +2348,8 @@ setManExtraRoles({ blitzers, spy });
         if (id === "SAM")  return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
         if (id === "WILL") return sr ? off(R.CURL, -1.0) : off(L.CURL, +1.0);
         if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+        // Defensive Line: Rush the passer at snap position
+        if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") return D_ALIGN[id];
         return D_ALIGN[id];
       }
       case "C6": {
@@ -2105,6 +2362,8 @@ setManExtraRoles({ blitzers, spy });
         if (id === "SAM")  return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
         if (id === "WILL") return sr ? off(R.CURL, -1.0) : off(L.CURL, +1.0);
         if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+        // Defensive Line: Rush the passer at snap position
+        if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") return D_ALIGN[id];
         return D_ALIGN[id];
       }
       case "C9": {
@@ -2122,6 +2381,8 @@ setManExtraRoles({ blitzers, spy });
         if (id === "SAM")  return sr ? off(L.CURL, +1.0) : off(R.CURL, -1.0);
         if (id === "WILL") return sr ? off(R.CURL, -1.0) : off(L.CURL, +1.0);
         if (id === "NICKEL") return sr ? off(R.CURL, -1.5) : off(L.CURL, +1.5);
+        // Defensive Line: Rush the passer at snap position
+        if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") return D_ALIGN[id];
         return D_ALIGN[id];
       }
       default: {
@@ -2133,6 +2394,8 @@ setManExtraRoles({ blitzers, spy });
         if (id === "WILL") return sr ? off(ZONES.CURL_RIGHT, -0.5) : off(ZONES.CURL_LEFT, +0.5);
         if (id === "MIKE") return ZONES.HOOK_MID;
         if (id === "NICKEL") return sr ? off(ZONES.CURL_RIGHT, -1.5) : off(ZONES.CURL_LEFT, +1.5);
+        // Defensive Line: Rush the passer at snap position
+        if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") return D_ALIGN[id];
         return D_ALIGN[id];
       }
     }
@@ -2509,6 +2772,86 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         const f = Math.min(1, effT * 1.2); // ramp a bit quicker than clock
         const target: Pt = { x: hook.x + (pole.x - hook.x) * f, y: hook.y + (pole.y - hook.y) * f };
         return approach(start, target, 0.30, 0.55);
+      }
+
+      // Defensive Line: Enhanced pass rush with breakthrough system
+      if (id === 'DE_L' || id === 'DE_R' || id === 'DT_L' || id === 'DT_R') {
+        // Get current QB position for dynamic rush tracking
+        const currentQBPos = getQBPosition(isShotgun, true, tt, formation);
+        
+        // Check for breakthrough (deterministic one DL will eventually win)
+        const currentBreakthrough = calculateBreakthrough(tt, protectionScheme, defSpeed);
+        
+        // Enhanced OL/DL engagement and jockeying mechanics
+        if (tt < 0.5) {
+          // Pre-engagement phase: DL and OL line up and prepare
+          const jockeyDistance = Math.sin(tt * 8) * 0.3; // Subtle pre-snap movement
+          const adjustedStart = { 
+            x: start.x + xAcross(jockeyDistance), 
+            y: start.y + yUp(jockeyDistance * 0.5) 
+          };
+          
+          // Move toward initial engagement point
+          const olEngagePoint = getOLPosition('C', currentQBPos, true, tt, protectionScheme, isShotgun); // Center as reference
+          const engageX = id === 'DE_L' ? olEngagePoint.x - xAcross(4) : 
+                         id === 'DE_R' ? olEngagePoint.x + xAcross(4) : 
+                         id === 'DT_L' ? olEngagePoint.x - xAcross(1.5) : olEngagePoint.x + xAcross(1.5);
+          
+          return approach(adjustedStart, { x: engageX, y: start.y + yUp(0.5) }, 0.8, 0.95);
+        }
+        
+        // Post-engagement: realistic pocket battle
+        const isBreakthroughPlayer = currentBreakthrough?.defender === id;
+        const rushSpeed = isBreakthroughPlayer ? 0.4 : 0.25; // Breakthrough player is faster
+        const rushAccuracy = isBreakthroughPlayer ? 0.95 : 0.8;
+        
+        if (id === 'DE_L' || id === 'DE_R') {
+          // Defensive Ends: External rush with contain, creating pocket "U" shape
+          let rushMove = currentBreakthrough?.rushMove || 'SPEED';
+          let rushPoint: Pt;
+          
+          if (isBreakthroughPlayer && rushMove === 'SPEED') {
+            // Speed rush: outside path to QB
+            const sideMultiplier = id === 'DE_L' ? -1 : 1;
+            rushPoint = { 
+              x: currentQBPos.x + xAcross(3 * sideMultiplier), 
+              y: currentQBPos.y 
+            };
+          } else {
+            // Contain rush: maintain pocket integrity while advancing
+            const containX = id === 'DE_L' ? currentQBPos.x - xAcross(2.5) : currentQBPos.x + xAcross(2.5);
+            rushPoint = { x: containX, y: currentQBPos.y + yUp(1) };
+          }
+          
+          return approach(start, rushPoint, rushSpeed, rushAccuracy);
+        } else {
+          // Defensive Tackles: Interior rush creating pocket pressure
+          let rushMove = currentBreakthrough?.rushMove || 'POWER';
+          let rushPoint: Pt;
+          
+          if (isBreakthroughPlayer) {
+            if (rushMove === 'INSIDE') {
+              // Inside rush directly at QB
+              rushPoint = { x: currentQBPos.x, y: currentQBPos.y };
+            } else {
+              // Power rush with slight angle
+              const sideMultiplier = id === 'DT_L' ? -0.5 : 0.5;
+              rushPoint = { 
+                x: currentQBPos.x + xAcross(sideMultiplier), 
+                y: currentQBPos.y + yUp(0.5) 
+              };
+            }
+          } else {
+            // Non-breakthrough DT: pressure but slower advance, maintain pocket shape
+            const lateralOffset = (Math.random() - 0.5) * xAcross(2);
+            rushPoint = { 
+              x: currentQBPos.x + lateralOffset,
+              y: currentQBPos.y + yUp(2)
+            };
+          }
+          
+          return approach(start, rushPoint, rushSpeed, rushAccuracy);
+        }
       }
       // Curl/flat droppers midpoint for a beat before driving
       let p = approach(start, anchor, 0.35, 0.6);
@@ -2964,7 +3307,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
     let nearestDefender: DefenderID | null = null;
     let nearestDistance = Infinity;
     
-    for (const defenderId of DEFENDER_IDS) {
+    for (const defenderId of getActiveDefenders(formation)) {
       const defPos = Dlive[defenderId] ?? Dstart[defenderId] ?? D_ALIGN[defenderId];
       const distance = Math.sqrt((defPos.x - catchPoint.x) ** 2 + (defPos.y - catchPoint.y) ** 2);
       if (distance < nearestDistance) {
@@ -3211,12 +3554,27 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
 
   // ULTRA-FAST: Calculate and set all critical state immediately
   const p2 = posOnPathLenScaled(path, Math.min(1, t * recSpeed * receiverSpeedMult(to) * starSpeedMult(to)));
-  const p0 = { x: qbX(), y: QB.y };
+  
+  // Use current QB position (accounts for dropback)
+  const currentQBPos = getQBPosition(isShotgun, phase === 'post', t, formation);
+  const p0 = { x: qbX(), y: currentQBPos.y };
+  
   const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
-  const arc = Math.min(80, Math.max(40, dist(p0, p2) * 0.15));
+  
+  // Enhanced arc calculation based on ball speed and distance
+  const distancePx = dist(p0, p2);
+  const baseArc = distancePx * 0.15;
+  // Faster ball speed = flatter trajectory (less arc)
+  const speedArcModifier = 1 / ballSpeed; // Higher speed = lower arc
+  const arc = Math.min(120, Math.max(20, baseArc * speedArcModifier));
   const p1 = { x: mid.x, y: mid.y - arc };
+  
+  // Accurate distance calculation in yards
+  const distanceXYds = Math.abs(p2.x - p0.x) / XPX;
+  const distanceYYds = Math.abs(p2.y - p0.y) / YPX;
+  const distanceYards = Math.sqrt(distanceXYds * distanceXYds + distanceYYds * distanceYYds);
+  
   // Calculate realistic flight time based on NFL QB arm strength (29.3333 yards/sec)
-  const distanceYards = dist(p0, p2) / ((XPX + YPX) / 2); // Convert pixels to approximate yards
   const baseFlightTimeMs = (distanceYards / 29.3333) * 1000; // NFL QB speed in ms
   const adjustedFlightTimeMs = baseFlightTimeMs / ballSpeed; // Apply speed modifier
   const flightMs = Math.min(1400, Math.max(300, adjustedFlightTimeMs));
@@ -3354,9 +3712,26 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       for (let yds = 0; yds <= FIELD_LENGTH_YDS; yds += 5) {
         const y = yUp(yds);
         let sw = 1.2;
-        if (yds % 10 === 0) sw = 2;
-        if (yds === 0 || yds === 120) sw = 3.2;
-        if (yds === 10 || yds === 110) sw = 3;
+        let opacity = 0.25;
+        
+        // Enhanced line weights and opacity for better hierarchy
+        if (yds % 10 === 0) {
+          sw = 2.5;
+          opacity = 0.4;
+        }
+        if (yds === 0 || yds === 120) {
+          sw = 4; // End lines more prominent
+          opacity = 0.8;
+        }
+        if (yds === 10 || yds === 110) {
+          sw = 3.5; // Goal lines
+          opacity = 0.7;
+        }
+        if (yds === 60) {
+          sw = 3; // Midfield line
+          opacity = 0.5;
+        }
+        
         lines.push(
           <line
             key={`yl-${yds}`}
@@ -3364,9 +3739,9 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             x2={PX_W}
             y1={y}
             y2={y}
-            stroke="rgba(255,255,255,0.65)"
+            stroke="rgba(255,255,255,0.9)"
             strokeWidth={sw}
-            opacity={yds % 5 === 0 ? 0.25 : 0.2}
+            opacity={opacity}
           />
         );
       }
@@ -3376,31 +3751,73 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       const marks: JSX.Element[] = [];
       const xHashL = xAcross(HASH_FROM_SIDELINE_YDS);
       const xHashR = xAcross(FIELD_WIDTH_YDS - HASH_FROM_SIDELINE_YDS);
-      const hh = 6;
+      
+      // NFL regulation: each hash mark is 24 inches long (2 feet)
+      const hashLength = xAcross(2); // 2 yards converted to pixels
+      const hashWidth = 1.5;
+      
+      // Draw hash marks every yard from 11-109 (avoiding end zones)
       for (let y = 11; y <= 109; y++) {
         const yy = yUp(y);
+        const opacity = y % 5 === 0 ? 0.9 : 0.7; // More prominent every 5 yards
+        const strokeWidth = y % 5 === 0 ? 2 : hashWidth; // Thicker every 5 yards
+        
+        // Left hash marks
         marks.push(
           <line
             key={`hl-${y}`}
-            x1={xHashL - hh}
-            x2={xHashL + hh}
+            x1={xHashL - hashLength / 2}
+            x2={xHashL + hashLength / 2}
             y1={yy}
             y2={yy}
-            stroke="rgba(255,255,255,0.8)"
-            strokeWidth={1.2}
+            stroke="rgba(255,255,255,0.95)"
+            strokeWidth={strokeWidth}
+            opacity={opacity}
           />
         );
+        
+        // Right hash marks
         marks.push(
           <line
             key={`hr-${y}`}
-            x1={xHashR - hh}
-            x2={xHashR + hh}
+            x1={xHashR - hashLength / 2}
+            x2={xHashR + hashLength / 2}
             y1={yy}
             y2={yy}
-            stroke="rgba(255,255,255,0.8)"
-            strokeWidth={1.2}
+            stroke="rgba(255,255,255,0.95)"
+            strokeWidth={strokeWidth}
+            opacity={opacity}
           />
         );
+        
+        // Add small tick marks every yard between 5-yard lines
+        if (y % 5 !== 0) {
+          const tickLength = xAcross(0.5); // Small tick marks
+          // Left side ticks
+          marks.push(
+            <line
+              key={`tl-${y}`}
+              x1={5}
+              x2={5 + tickLength}
+              y1={yy}
+              y2={yy}
+              stroke="rgba(255,255,255,0.6)"
+              strokeWidth={1}
+            />
+          );
+          // Right side ticks  
+          marks.push(
+            <line
+              key={`tr-${y}`}
+              x1={PX_W - 5 - tickLength}
+              x2={PX_W - 5}
+              y1={yy}
+              y2={yy}
+              stroke="rgba(255,255,255,0.6)"
+              strokeWidth={1}
+            />
+          );
+        }
       }
       return <>{marks}</>;
     };
@@ -3479,6 +3896,34 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         <YardLines />
         <HashMarks />
         <YardNumbers />
+        {/* End zone text */}
+        <text
+          x={PX_W / 2}
+          y={yUp(115)}
+          fill="rgba(255,255,255,0.8)"
+          stroke="rgba(0,0,0,0.3)"
+          strokeWidth={1}
+          fontSize={14}
+          fontWeight="bold"
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          TOUCHDOWN
+        </text>
+        <text
+          x={PX_W / 2}
+          y={yUp(5)}
+          fill="rgba(255,255,255,0.8)"
+          stroke="rgba(0,0,0,0.3)"
+          strokeWidth={1}
+          fontSize={14}
+          fontWeight="bold"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          transform={`rotate(180 ${PX_W / 2} ${yUp(5)})`}
+        >
+          TOUCHDOWN
+        </text>
       </>
     );
   };
@@ -3493,7 +3938,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
   const defenseOverlay = useMemo(() => {
     return (
       <g>
-        {(['CB_L','CB_R','NICKEL','FS','SS','SAM','MIKE','WILL'] as DefenderID[]).map((did) => {
+        {getActiveDefenders(formation).map((did) => {
           const startP = Dstart[did] ?? D_ALIGN[did];
           const isMan = MAN_COVERAGES.has(coverage);
           const isZone = ZONE_COVERAGES.has(coverage);
@@ -3665,7 +4110,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         </div>
       </div>
 
-      <div className="relative mx-auto w-full max-w-[960px]">
+      <div className="relative w-full">
         <svg viewBox={`0 0 ${PX_W} ${PX_H}`} className="w-full rounded-xl">
           {drawField()}
           {/* Drill banner (applied by Adaptive Next Drill) */}
@@ -3776,10 +4221,23 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           </g>
 
           {/* QB */}
-          <circle cx={qbX()} cy={QB.y} r={7} fill="#fbbf24" />
-          <text x={qbX() + 10} y={QB.y + 4} className="fill-white/85 text-[10px]">
+          <circle cx={qbPos.x} cy={qbPos.y} r={7} fill="#fbbf24" />
+          <text x={qbPos.x + 10} y={qbPos.y + 4} className="fill-white/85 text-[10px]">
             QB
           </text>
+
+          {/* Offensive Line */}
+          {OL_IDS.map(olId => {
+            const pos = getOLPosition(olId, qbPos, phase === 'post', t, protectionScheme, isShotgun);
+            return (
+              <g key={`ol-${olId}`}>
+                <circle cx={pos.x} cy={pos.y} r={6} fill="#10b981" />
+                <text x={pos.x - 6} y={pos.y - 12} className="fill-white/85 text-[8px]">
+                  {olId}
+                </text>
+              </g>
+            );
+          })}
 
           {/* On-field coverage tooltip (top-center) + legend */}
           {(() => {
@@ -3873,8 +4331,26 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
                       : "#a78bfa"
                   }
                 />
+                {/* Star receiver highlight */}
                 {starRid === rid && (
                   <circle cx={p.x} cy={p.y} r={9} fill="none" stroke="#fcd34d" strokeWidth={2.2} />
+                )}
+                {/* Active throw target highlight */}
+                {decision === rid && (
+                  <>
+                    <circle cx={p.x} cy={p.y} r={11} fill="none" stroke="#ff4444" strokeWidth={3} opacity={0.8}>
+                      <animate attributeName="r" values="11;13;11" dur="1.2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1.2s" repeatCount="indefinite" />
+                    </circle>
+                    <circle cx={p.x} cy={p.y} r={8} fill="rgba(255,68,68,0.2)" />
+                  </>
+                )}
+                {/* Best open receiver pulse */}
+                {cachedTopOpen?.rid === rid && cachedTopOpen.score > 0.7 && decision !== rid && (
+                  <circle cx={p.x} cy={p.y} r={10} fill="none" stroke="#00ff88" strokeWidth={2} opacity={0.6}>
+                    <animate attributeName="r" values="10;12;10" dur="2s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite" />
+                  </circle>
                 )}
                 <text
                   x={p.x + dx}
@@ -3956,13 +4432,14 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           })}
 
           {/* Defense (computed live) */}
-          {DEFENDER_IDS.map(id => {
+          {getActiveDefenders(formation).map(id => {
             const p = defenderPos(coverage, id, t);
             const { dx, dy } = labelOffsetFor(id, p);
 
+            const isDL = id.startsWith('DE_') || id.startsWith('DT_');
             return (
                 <g key={id}>
-                <rect x={p.x - 6} y={p.y - 6} width={12} height={12} fill="#ef4444" opacity={0.95}/>
+                <rect x={p.x - 6} y={p.y - 6} width={12} height={12} fill={isDL ? "#7c2d12" : "#ef4444"} opacity={0.95}/>
                 <text x={p.x + dx} y={p.y + dy}
                         className="text-[9px]" fill="rgba(255,255,255,0.95)"
                         stroke="rgba(0,0,0,0.7)" strokeWidth={2} style={{ paintOrder: "stroke" }}>
@@ -4083,9 +4560,19 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           <>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {phase === "pre" ? (
-                <button onClick={startSnap} className="px-3 py-2 rounded-xl bg-emerald-500/90 text-white">
-                  Snap
-                </button>
+                <>
+                  <button onClick={startSnap} className="px-3 py-2 rounded-xl bg-emerald-500/90 text-white">
+                    Snap
+                  </button>
+                  <label className="ml-2 flex items-center gap-1">
+                    <input 
+                      type="checkbox" 
+                      checked={shotgun} 
+                      onChange={(e) => setShotgun(e.target.checked)} 
+                    />
+                    <span className="text-white/90">Shotgun</span>
+                  </label>
+                </>
               ) : (
                 <button onClick={hardReset} className="px-3 py-2 rounded-xl bg-white/10 text-white">
                   Reset
