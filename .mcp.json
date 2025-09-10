@@ -6,7 +6,26 @@
         "@playwright/mcp@latest",
         "--browser", "chromium",
         "--viewport-size", "1280,832",
-        "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "server",
+        "--allow-url",
+        "https://throwdeeppublishing.com/blogs/football-glossary/football-pass-routes-complete-guide",
+        "--allow-url",
+        "https://throwdeeppublishing.com/blogs/football-glossary/the-4-3-defense-the-complete-guide",
+        "--allow-url",
+        "https://throwdeeppublishing.com/blogs/football-glossary/the-3-4-defense-the-complete-guide",
+        "--allow-url",
+        "https://en.wikipedia.org/wiki/Zone_defense_in_American_football",
+        "--allow-url",
+        "https://www.bigblueview.com/2023/6/4/23742492/defensive-pass-coverage-terms-explained-glossary-of-terms",
+        "--allow-url",
+        "https://www.viqtorysports.com/understanding-defensive-techniques/",
+        "--allow-url",
+        "https://www.underarmour.com/en-us/t/playbooks/football/offensive-line-positions-in-football/",
+        "--allow-url",
+        "https://www.glazierclinics.com/football-coach-resources/helpful-offensive-line-blocking-schemes",
+        "--allow-url",
+        "https://www.draftblaster.com/nfl-schemes-offense/offensive-line-schemes-zone-man-angle/"
       ],
       "env": {
         "PLAYWRIGHT_BROWSERS_PATH": "0"
