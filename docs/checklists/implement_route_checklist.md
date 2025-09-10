@@ -1,0 +1,6 @@
+- [ ] Research route definition via routes_source.md (Throw Deep Publishing).
+- [ ] Extract schema fields.
+- [ ] Create/update JSON in `src/data/football/concepts/{route}.json`.
+- [ ] Register in catalog.ts + loadConcept.ts.
+- [ ] Add/adjust physics in PlaySimulator.tsx.
+- [ ] Verify with Playwright MCP → depth, break, DB interaction.

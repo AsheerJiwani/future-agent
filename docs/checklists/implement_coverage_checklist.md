@@ -1,0 +1,4 @@
+- [ ] Research coverage definition via defenses_source.md.
+- [ ] Extract schema fields.
+- [ ] Implement logic in PlaySimulator.tsx under applyCoverage(name).
+- [ ] Verify deep/underneath assignments with Playwright MCP.

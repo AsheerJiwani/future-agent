@@ -1,0 +1,5 @@
+- [ ] Start dev server (`pnpm dev`).
+- [ ] Playwright MCP: open http://localhost:3000
+- [ ] Navigate to Football Panel → Play Simulator.
+- [ ] Load concept, snap, collect A11y snapshot & timings.
+- [ ] Assert pass criteria from rule file.

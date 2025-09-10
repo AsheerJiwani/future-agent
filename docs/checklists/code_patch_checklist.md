@@ -1,0 +1,3 @@
+- [ ] Ensure changes limited to defined Implementation Handles.
+- [ ] Run full MCP UI verification.
+- [ ] Include MCP evidence in commit message.
