@@ -667,7 +667,7 @@ const OL_ALIGN: Record<OffensiveLineID, Pt> = {
 };
 
 // Enhanced DL rush mechanics with realistic NFL pass rush timing and OL hold-back (2-5s)
-const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, protection: ProtectionScheme = 'MAN_PROTECT') => {
+const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, protection: ProtectionScheme = 'MAN_PROTECT', dlSpeed: number = 1.0, playId: number = 0) => {
   const basePos = D_ALIGN[dlId];
   if (!['DE_L', 'DE_R', 'DT_L', 'DT_R'].includes(dlId)) return basePos;
   
@@ -705,23 +705,55 @@ const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, pr
     }
   }
   
-  // Phase 2: OL Engagement/Hold-back Phase (0.5-2.7s) - DL held by OL blocking
+  // Phase 2: OL Engagement/Hold-back Phase (0.5-2.7s) - DL "jockey" with OL blockers
   if (timeElapsed < PROTECTION_PHASE_END) {
     const engagementProgress = (timeElapsed - OL_ENGAGEMENT_TIME) / (PROTECTION_PHASE_END - OL_ENGAGEMENT_TIME);
     
-    // OL holds DL back - limited forward progress during this phase
-    const holdBackDistance = 0.5 + (engagementProgress * 1.5); // Only 2 yards max progress in 2.2s
-    const lateralMovement = isEdgeRusher 
-      ? (isLeftSide ? -0.5 : 0.5) * engagementProgress // Edge rushers try to go around
-      : (isLeftSide ? 0.2 : -0.2) * engagementProgress; // Interior rushers slight gap work
+    // Find the assigned OL blocker for this DL
+    let assignedBlocker: OffensiveLineID;
+    if (dlId === 'DE_L') assignedBlocker = 'LT';
+    else if (dlId === 'DE_R') assignedBlocker = 'RT';
+    else if (dlId === 'DT_L') assignedBlocker = 'LG';
+    else assignedBlocker = 'RG'; // DT_R
+    
+    // Get the current OL blocker position (they're dropping back into pass set)
+    const blockerPos = getOLPosition(assignedBlocker, qbPosition, true, timeElapsed, protection);
+    
+    // DL "jockeys" with OL - stays engaged but slightly behind the blocker
+    const jockeyDistance = 0.8 + (engagementProgress * 0.5); // Stay 0.8-1.3 yards behind blocker
+    const lateralJockey = isEdgeRusher 
+      ? (isLeftSide ? -0.3 : 0.3) * engagementProgress // Edge rushers try to get around
+      : (isLeftSide ? 0.1 : -0.1) * engagementProgress; // Interior rushers fight through gap
     
     return {
-      x: basePos.x + xAcross(lateralMovement),
-      y: basePos.y + yUp(holdBackDistance)
+      x: blockerPos.x + xAcross(lateralJockey),
+      y: blockerPos.y - yUp(jockeyDistance) // Stay behind the OL blocker
     };
   }
   
-  // Phase 3: Protection Breakdown (2.7s+) - DL breaks through OL protection
+  // Phase 3: Protection Breakdown (2.7s+) - Only scheduled DL breaks through, others continue jockeying
+  
+  // Check if this specific DL is scheduled to break through
+  const breakthrough = calculateBreakthrough(timeElapsed, protection, dlSpeed, playId);
+  const isBreakthroughDL = breakthrough && breakthrough.defender === dlId;
+  
+  if (!isBreakthroughDL) {
+    // Non-breakthrough DL continue jockeying with their blockers even after 2.7s
+    const assignedBlocker: OffensiveLineID = dlId === 'DE_L' ? 'LT' : dlId === 'DE_R' ? 'RT' : dlId === 'DT_L' ? 'LG' : 'RG';
+    const blockerPos = getOLPosition(assignedBlocker, qbPosition, true, timeElapsed, protection);
+    
+    const extendedJockey = 1.0 + Math.sin(timeElapsed * 1.5) * 0.2; // Continued jockeying with slight movement
+    const lateralStruggle = isEdgeRusher 
+      ? (isLeftSide ? -0.4 : 0.4) + Math.cos(timeElapsed * 2) * 0.1 // Edge rushers continue trying to get around
+      : (isLeftSide ? 0.2 : -0.2) + Math.sin(timeElapsed * 1.8) * 0.05; // Interior rushers continue gap battle
+    
+    return {
+      x: blockerPos.x + xAcross(lateralStruggle),
+      y: blockerPos.y - yUp(extendedJockey) // Stay engaged with blocker
+    };
+  }
+  
+  // Only the breakthrough DL gets to rush toward QB
   const breakdownTime = timeElapsed - PROTECTION_PHASE_END;
   const baseBreakthrough = 2.0; // Distance covered during hold-back phase
   
@@ -797,10 +829,10 @@ const getOLPosition = (olId: OffensiveLineID, qbPosition: Pt, isPostSnap: boolea
       
       // Enhanced DL positions with realistic rush paths and timing
       const currentDLPositions = {
-        DE_L: getDLPosition('DE_L', qbPosition, timeElapsed, protection),
-        DE_R: getDLPosition('DE_R', qbPosition, timeElapsed, protection),
-        DT_L: getDLPosition('DT_L', qbPosition, timeElapsed, protection),
-        DT_R: getDLPosition('DT_R', qbPosition, timeElapsed, protection)
+        DE_L: getDLPosition('DE_L', qbPosition, timeElapsed, protection, 1.0, 0),
+        DE_R: getDLPosition('DE_R', qbPosition, timeElapsed, protection, 1.0, 0),
+        DT_L: getDLPosition('DT_L', qbPosition, timeElapsed, protection, 1.0, 0),
+        DT_R: getDLPosition('DT_R', qbPosition, timeElapsed, protection, 1.0, 0)
       };
       
       const stress = calculateOLStress(currentOLPositions, currentDLPositions);
@@ -2124,10 +2156,10 @@ setManExtraRoles({ blitzers, spy });
     
     // Get current DL positions for pressure calculation using enhanced rush mechanics
     const currentDLPositions = {
-      DE_L: getDLPosition('DE_L', qbPos, timeElapsed, protectionScheme),
-      DE_R: getDLPosition('DE_R', qbPos, timeElapsed, protectionScheme),
-      DT_L: getDLPosition('DT_L', qbPos, timeElapsed, protectionScheme),
-      DT_R: getDLPosition('DT_R', qbPos, timeElapsed, protectionScheme)
+      DE_L: getDLPosition('DE_L', qbPos, timeElapsed, protectionScheme, defSpeed, playId),
+      DE_R: getDLPosition('DE_R', qbPos, timeElapsed, protectionScheme, defSpeed, playId),
+      DT_L: getDLPosition('DT_L', qbPos, timeElapsed, protectionScheme, defSpeed, playId),
+      DT_R: getDLPosition('DT_R', qbPos, timeElapsed, protectionScheme, defSpeed, playId)
     };
     
     // Calculate OL stress for pocket dynamics
@@ -2300,7 +2332,7 @@ setManExtraRoles({ blitzers, spy });
     
     // Handle DL pass rush movement (applies to all coverages) - use enhanced getDLPosition
     if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") {
-      return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, tt, protectionScheme);
+      return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, tt, protectionScheme, defSpeed, playId);
     }
     
     return anchor;
@@ -3168,7 +3200,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
 
       // Defensive Line: Enhanced pass rush with breakthrough system
       if (id === 'DE_L' || id === 'DE_R' || id === 'DT_L' || id === 'DT_R') {
-        return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, tt, protectionScheme);
+        return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, tt, protectionScheme, defSpeed, playId);
       }
       // Curl/flat droppers midpoint for a beat before driving
       let p = approach(start, anchor, 0.35, 0.6);
@@ -4593,7 +4625,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
               
               {/* DL positions and rush paths */}
               {['DE_L', 'DE_R', 'DT_L', 'DT_R'].map((dlId) => {
-                const dlPos = getDLPosition(dlId as DefenderID, qbPos, t, protectionScheme);
+                const dlPos = getDLPosition(dlId as DefenderID, qbPos, t, protectionScheme, defSpeed, playId);
                 const basePos = D_ALIGN[dlId as DefenderID];
                 return (
                   <g key={`dl-${dlId}`}>
