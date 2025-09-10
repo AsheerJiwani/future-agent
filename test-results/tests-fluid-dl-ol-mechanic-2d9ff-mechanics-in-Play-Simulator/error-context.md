@@ -1,0 +1,248 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: asheerjiwani.dev
+        - navigation [ref=e12]:
+          - link "Home" [ref=e13] [cursor=pointer]:
+            - /url: "#tabs"
+          - link "About" [ref=e14] [cursor=pointer]:
+            - /url: "#about"
+    - main [ref=e15]:
+      - generic [ref=e16]:
+        - heading "Interactive Labs" [level=1] [ref=e17]
+        - paragraph [ref=e18]: Pick a tile to open a full experience below.
+      - generic [ref=e19]:
+        - button "Futurecasting AI 50-year scenarios across markets, politics, tech." [ref=e20]:
+          - generic [ref=e21]:
+            - generic [ref=e22]: Futurecasting AI
+            - generic [ref=e23]: 50-year scenarios across markets, politics, tech.
+        - button "Hoops Tutor Learn plays, eras, and strategy—get quizzed as you go." [ref=e24]:
+          - generic [ref=e25]:
+            - generic [ref=e26]: Hoops Tutor
+            - generic [ref=e27]: Learn plays, eras, and strategy—get quizzed as you go.
+        - button "Football Playbook Coach Read plays vs coverages with QB-level tips." [expanded] [active] [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]: Football Playbook Coach
+            - generic [ref=e31]: Read plays vs coverages with QB-level tips.
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - generic [ref=e39]:
+                - generic [ref=e40]: Simulator — SMASH vs C3
+                - generic [ref=e41]:
+                  - generic [ref=e43]: "C3: SKY"
+                  - generic [ref=e44]:
+                    - checkbox "Show Defense" [ref=e45]
+                    - text: Show Defense
+                  - generic [ref=e46]:
+                    - checkbox "Dev Overlay" [ref=e47]
+                    - text: Dev Overlay
+                  - generic [ref=e48]:
+                    - checkbox "Pocket Envelope" [ref=e49]
+                    - text: Pocket Envelope
+                  - generic [ref=e50]:
+                    - generic [ref=e51]: Hash
+                    - combobox "Hash" [ref=e52]:
+                      - option "Left" [selected]
+                      - option "Right"
+                  - generic [ref=e53]:
+                    - generic [ref=e54]: Star
+                    - combobox "Star" [ref=e55]:
+                      - option "—" [selected]
+                      - option "X"
+                      - option "Z"
+                      - option "SLOT"
+                      - option "TE"
+                      - option "RB"
+                  - button "Copy Play" [ref=e56]
+                  - generic [ref=e57]: Formation
+                  - combobox [ref=e58]:
+                    - option "Trips Right (3x1)" [selected]
+                    - option "Doubles (2x2)"
+                    - option "Bunch Left"
+                  - button "AI Audible" [ref=e59]
+              - img [ref=e61]:
+                - generic [ref=e90]: "10"
+                - generic [ref=e91]: "10"
+                - generic [ref=e92]: "20"
+                - generic [ref=e93]: "20"
+                - generic [ref=e94]: "30"
+                - generic [ref=e95]: "30"
+                - generic [ref=e96]: "40"
+                - generic [ref=e97]: "40"
+                - generic [ref=e98]: "50"
+                - generic [ref=e99]: "50"
+                - generic [ref=e100]: "40"
+                - generic [ref=e101]: "40"
+                - generic [ref=e102]: "30"
+                - generic [ref=e103]: "30"
+                - generic [ref=e104]: "20"
+                - generic [ref=e105]: "20"
+                - generic [ref=e106]: "10"
+                - generic [ref=e107]: "10"
+                - generic [ref=e108]: TOUCHDOWN
+                - generic [ref=e109]: TOUCHDOWN
+                - generic [ref=e116]: QB
+                - generic [ref=e119]: LT
+                - generic [ref=e122]: LG
+                - generic [ref=e125]: C
+                - generic [ref=e128]: RG
+                - generic [ref=e131]: RT
+                - generic [ref=e132]:
+                  - generic [ref=e134]: "MOF: two-high"
+                  - generic [ref=e135]: "C3: SKY"
+                - generic [ref=e138]: X (#1 weak)
+                - generic [ref=e141]: Z (#1 strong)
+                - generic [ref=e144]: SLOT (#2 strong)
+                - generic [ref=e147]: TE (#3 strong)
+                - generic [ref=e150]: RB (#2 weak)
+                - generic [ref=e153]: CB_L
+                - generic [ref=e156]: CB_R
+                - generic [ref=e159]: NICKEL
+                - generic [ref=e162]: FS
+                - generic [ref=e165]: SS
+                - generic [ref=e168]: SAM
+                - generic [ref=e171]: MIKE
+                - generic [ref=e174]: DE_L
+                - generic [ref=e177]: DE_R
+                - generic [ref=e180]: DT_L
+                - generic [ref=e183]: DT_R
+            - generic [ref=e184]:
+              - generic [ref=e185]: Performance
+              - generic [ref=e186]:
+                - generic [ref=e187]: 🎯 Ready to train
+                - generic [ref=e188]: Make your first read to get started!
+          - generic [ref=e189]:
+            - generic [ref=e190]:
+              - generic [ref=e191]: NFL Defense Trainer
+              - generic [ref=e192]:
+                - generic [ref=e193]:
+                  - checkbox "AI Training" [ref=e194]
+                  - generic [ref=e195]: AI Training
+                - button "Run 5 Reps" [ref=e196]
+            - generic [ref=e197]:
+              - generic [ref=e198]:
+                - generic [ref=e199]: PLAY
+                - combobox [ref=e200]:
+                  - option "Smash" [selected]
+                  - option "Sail / Flood"
+                  - option "Mesh"
+                  - option "Stick (Quick)"
+                  - option "Dagger"
+                  - option "Four Verticals"
+                  - option "Y-Cross"
+                  - option "Shallow Cross"
+                  - option "Curl-Flat (Quick)"
+                  - option "Slant-Flat"
+                  - option "Spacing (Snag)"
+                  - option "Levels"
+                  - option "Mills (Post-Dig)"
+                  - option "Yankee (PA Cross-Post)"
+                  - option "Post-Wheel"
+                  - option "Stick-Nod (Stick-Go)"
+                  - option "Tunnel Screen"
+                  - option "Glance RPO"
+                  - option "Boot Flood (PA)"
+              - generic [ref=e201]:
+                - generic [ref=e202]: COVERAGE
+                - combobox [ref=e203]:
+                  - option "Cover 0"
+                  - option "Cover 1 (Man-Free)"
+                  - option "Cover 2"
+                  - option "Tampa 2"
+                  - option "Palms / 2-Read"
+                  - option "Cover 3" [selected]
+                  - option "Cover 4"
+                  - option "Quarters (Match)"
+                  - option "Cover 6 (QQH)"
+                  - option "Cover 9 (Match)"
+              - generic [ref=e204]:
+                - generic [ref=e205]: SNAP
+                - generic [ref=e207]:
+                  - button "Snap" [ref=e208]
+                  - generic [ref=e209]:
+                    - checkbox "Snap on Motion" [ref=e210]
+                    - generic [ref=e211]: Snap on Motion
+              - generic [ref=e212]:
+                - generic [ref=e213]: THROW
+                - generic [ref=e214]:
+                  - generic [ref=e215]: Target Receiver
+                  - generic [ref=e216]:
+                    - button "X" [ref=e217]
+                    - button "Z" [ref=e218]
+                    - button "SLOT" [ref=e219]
+                    - button "TE" [ref=e220]
+                    - button "RB" [ref=e221]
+              - generic [ref=e222]:
+                - generic [ref=e223]: MOTION
+                - generic [ref=e225]:
+                  - combobox [ref=e226]:
+                    - option "Select Receiver" [selected]
+                    - option "X"
+                    - option "Z"
+                    - option "SLOT"
+                    - option "TE"
+                  - generic [ref=e227]:
+                    - combobox [ref=e228]:
+                      - option "Across" [selected]
+                      - option "Jet"
+                      - option "Short"
+                    - combobox [ref=e229]:
+                      - option "Left" [selected]
+                      - option "Right"
+              - generic [ref=e230]:
+                - generic [ref=e231]: AUDIBLE
+                - generic [ref=e233]:
+                  - combobox [ref=e234]:
+                    - option "Select Receiver" [selected]
+                    - option "X"
+                    - option "Z"
+                    - option "SLOT"
+                    - option "TE"
+                  - combobox [ref=e235]:
+                    - option "Route Change" [selected]
+                    - option "SLANT"
+                    - option "FADE"
+                    - option "OUT"
+                    - option "COMEBACK"
+              - generic [ref=e236]:
+                - generic [ref=e237]: PASS PRO
+                - generic [ref=e239]:
+                  - generic [ref=e240]:
+                    - checkbox "TE Block" [ref=e241]
+                    - generic [ref=e242]: TE Block
+                  - generic [ref=e243]:
+                    - checkbox "RB Block" [ref=e244]
+                    - generic [ref=e245]: RB Block
+        - generic [ref=e248]:
+          - generic [ref=e249]:
+            - generic [ref=e250]: 🤖 AI Football Tutor
+            - generic [ref=e251]:
+              - generic [ref=e252] [cursor=pointer]:
+                - checkbox "Audible Suggestions" [checked] [ref=e253]
+                - generic [ref=e254] [cursor=pointer]: Audible Suggestions
+              - generic [ref=e255] [cursor=pointer]:
+                - checkbox "Tutor Tips" [checked] [ref=e256]
+                - generic [ref=e257] [cursor=pointer]: Tutor Tips
+              - generic [ref=e258] [cursor=pointer]:
+                - checkbox "Quiz after reps" [checked] [ref=e259]
+                - generic [ref=e260] [cursor=pointer]: Quiz after reps
+          - generic [ref=e262]:
+            - textbox "Ask about coverage, reads, or audibles…" [ref=e263]
+            - button "Send" [ref=e264]
+            - button "Snap" [ref=e265]
+            - button "@Break" [ref=e266]
+            - button "@Catch" [ref=e267]
+      - generic [ref=e268]:
+        - heading "About" [level=3] [ref=e269]
+        - paragraph [ref=e270]: An interactive experience brought to you by Asheer.
+      - generic [ref=e271]: © 2025 Asheer Jiwani · Exploratory only
+  - button "Open Next.js Dev Tools" [ref=e277] [cursor=pointer]:
+    - img [ref=e278] [cursor=pointer]
+  - alert [ref=e281]
+```

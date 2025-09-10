@@ -683,135 +683,170 @@ const OL_ALIGN: Record<OffensiveLineID, Pt> = {
 };
 
 // Enhanced DL rush mechanics with realistic NFL pass rush timing and OL hold-back (2-5s)
+// Fluid DL/OL mechanics with realistic NFL technique-specific movements and curved rush paths
 const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, protection: ProtectionScheme = 'MAN_PROTECT', dlSpeed: number = 1.0, playId: number = 0) => {
   const basePos = D_ALIGN[dlId];
   if (!['DE_L', 'DE_R', 'DT_L', 'DT_R'].includes(dlId)) return basePos;
   
-  // Critical timing based on research: 2.7s median sack time
-  const OL_ENGAGEMENT_TIME = 0.5; // Time for DL to reach OL contact
-  const PROTECTION_PHASE_END = 2.7; // When protection starts breaking down
+  // NFL timing constants from research
+  const SNAP_TO_CONTACT = 0.5; // DL reaches OL contact
+  const PROTECTION_PHASE_END = 2.7; // Critical threshold for pocket collapse
+  const PRESSURE_THRESHOLD = 3.0; // Exponential failure rate begins
   
   const isEdgeRusher = dlId === 'DE_L' || dlId === 'DE_R';
   const isLeftSide = dlId === 'DE_L' || dlId === 'DT_L';
   
-  // Phase 1: Get-off and initial rush (0.0-0.5s) - DL moves toward their assigned OL
-  if (timeElapsed < OL_ENGAGEMENT_TIME) {
-    const firstStepDistance = timeElapsed * 3; // Moderate approach to OL
+  // Technique-specific alignments (from research)
+  const technique = isEdgeRusher 
+    ? '9-TECH' // Wide edge rushers for pure speed
+    : '3-TECH'; // Interior pass rushers attacking B-gap
+  
+  // Phase 1: Snap to Contact (0.0-0.5s) - Fluid first step with technique-specific movement
+  if (timeElapsed < SNAP_TO_CONTACT) {
+    const snapProgress = timeElapsed / SNAP_TO_CONTACT;
+    const speed = dlSpeed * (isEdgeRusher ? 1.2 : 1.0); // Edge rushers faster
     
-    if (isEdgeRusher) {
-      // Edge rushers immediately rush toward outside tackles (LT/RT) upon snap - MUCH more aggressive
-      const targetTackle = isLeftSide ? 'LT' : 'RT';
-      const tacklePos = OL_ALIGN[targetTackle];
+    if (technique === '9-TECH') {
+      // 9-technique: Pure speed rush with curved path toward outside tackle
+      const assignedTackle = isLeftSide ? 'LT' : 'RT';
+      const tacklePos = getOLPosition(assignedTackle, qbPosition, true, timeElapsed, protection);
       
-      // Calculate direct path toward assigned tackle with aggressive speed
-      const rushProgress = Math.min(1.0, timeElapsed * 2.5); // Much faster rush - reach tackle in 0.4s
-      const xTarget = (tacklePos.x - basePos.x) * rushProgress; // Full lateral movement
-      const yTarget = (tacklePos.y - basePos.y) * rushProgress; // Full forward movement to OL position
+      // Curved rush path - not straight line, realistic bend around tackle
+      const rushAngle = isLeftSide ? -0.4 : 0.4; // Initial outside angle
+      const curveFactor = Math.sin(snapProgress * Math.PI * 0.5); // Smooth curve development
+      const speedBurst = snapProgress * speed * 1.1; // Explosive first step
       
       return {
-        x: basePos.x + xTarget,
-        y: basePos.y + yTarget
+        x: basePos.x + (tacklePos.x - basePos.x) * speedBurst * 0.7 + xAcross(rushAngle * curveFactor),
+        y: basePos.y + (tacklePos.y - basePos.y) * speedBurst
       };
     } else {
-      // Interior rushers go straight forward initially
-      return { 
-        x: basePos.x, 
-        y: basePos.y + yUp(firstStepDistance)
+      // 3-technique: Interior power rush targeting B-gap with gap control
+      const assignedGuard = dlId === 'DT_L' ? 'LG' : 'RG';
+      const guardPos = getOLPosition(assignedGuard, qbPosition, true, timeElapsed, protection);
+      
+      // B-gap attack with controlled power rush
+      const gapAngle = isLeftSide ? 0.2 : -0.2; // B-gap targeting
+      const powerStep = snapProgress * speed * 1.05; // Controlled power approach
+      
+      return {
+        x: basePos.x + (guardPos.x - basePos.x) * powerStep + xAcross(gapAngle * snapProgress),
+        y: basePos.y + (guardPos.y - basePos.y) * powerStep
       };
     }
   }
   
-  // Phase 2: OL Engagement/Hold-back Phase (0.5-2.7s) - DL "jockey" with OL blockers
+  // Phase 2: Engagement Phase (0.5-2.7s) - Realistic OL-DL jockeying with continuous fluid movement
   if (timeElapsed < PROTECTION_PHASE_END) {
-    const engagementProgress = (timeElapsed - OL_ENGAGEMENT_TIME) / (PROTECTION_PHASE_END - OL_ENGAGEMENT_TIME);
+    const engagementTime = timeElapsed - SNAP_TO_CONTACT;
+    const engagementProgress = engagementTime / (PROTECTION_PHASE_END - SNAP_TO_CONTACT);
     
-    // Find the assigned OL blocker for this DL
-    let assignedBlocker: OffensiveLineID;
-    if (dlId === 'DE_L') assignedBlocker = 'LT';
-    else if (dlId === 'DE_R') assignedBlocker = 'RT';
-    else if (dlId === 'DT_L') assignedBlocker = 'LG';
-    else assignedBlocker = 'RG'; // DT_R
-    
-    // Get the current OL blocker position (they're dropping back into pass set)
-    const blockerPos = getOLPosition(assignedBlocker, qbPosition, true, timeElapsed, protection);
-    
-    // DL "jockeys" with OL - stays engaged but slightly behind the blocker
-    const jockeyDistance = 0.8 + (engagementProgress * 0.5); // Stay 0.8-1.3 yards behind blocker
-    const lateralJockey = isEdgeRusher 
-      ? (isLeftSide ? -0.3 : 0.3) * engagementProgress // Edge rushers try to get around
-      : (isLeftSide ? 0.1 : -0.1) * engagementProgress; // Interior rushers fight through gap
-    
-    return {
-      x: blockerPos.x + xAcross(lateralJockey),
-      y: blockerPos.y + jockeyDistance * YPX // Stay behind the OL blocker (positive = downfield)
-    };
-  }
-  
-  // Phase 3: Protection Breakdown (2.7s+) - Only scheduled DL breaks through, others continue jockeying
-  
-  // Check if this specific DL is scheduled to break through
-  const breakthrough = calculateBreakthrough(timeElapsed, protection, dlSpeed, playId);
-  const isBreakthroughDL = breakthrough && breakthrough.defender === dlId;
-  
-  if (!isBreakthroughDL) {
-    // Non-breakthrough DL continue jockeying with their blockers even after 2.7s
+    // Get assigned blocker position with realistic pass set
     const assignedBlocker: OffensiveLineID = dlId === 'DE_L' ? 'LT' : dlId === 'DE_R' ? 'RT' : dlId === 'DT_L' ? 'LG' : 'RG';
     const blockerPos = getOLPosition(assignedBlocker, qbPosition, true, timeElapsed, protection);
     
-    const extendedJockey = 1.0 + Math.sin(timeElapsed * 1.5) * 0.2; // Continued jockeying with slight movement
-    const lateralStruggle = isEdgeRusher 
-      ? (isLeftSide ? -0.4 : 0.4) + Math.cos(timeElapsed * 2) * 0.1 // Edge rushers continue trying to get around
-      : (isLeftSide ? 0.2 : -0.2) + Math.sin(timeElapsed * 1.8) * 0.05; // Interior rushers continue gap battle
+    if (technique === '9-TECH') {
+      // Edge rusher: Speed-to-power conversion with realistic bend and hand fighting
+      const bendProgress = Math.min(1.0, engagementProgress * 1.4);
+      const handFighting = Math.sin(timeElapsed * 3.2) * 0.12; // Realistic hand fighting oscillation
+      
+      // Realistic edge rush bend - trying to get around tackle
+      const bendRadius = 1.4; // Realistic bend radius in yards
+      const bendAngle = (isLeftSide ? -1 : 1) * bendProgress * Math.PI * 0.35; // 63 degree max bend
+      
+      const bendX = Math.sin(bendAngle) * bendRadius;
+      const bendY = (1 - Math.cos(bendAngle)) * bendRadius * 0.8; // Upfield gain from bend
+      
+      // Continuous engagement with blocker while working edge
+      return {
+        x: blockerPos.x + xAcross(bendX + (isLeftSide ? -0.6 : 0.6) + handFighting),
+        y: blockerPos.y + (0.4 + bendY + Math.cos(timeElapsed * 2.8) * 0.1) * YPX // Fluid movement
+      };
+    } else {
+      // 3-technique interior: Power moves with realistic gap pressure and leverage battles
+      const powerProgress = engagementProgress * 0.9; // Gradual power development
+      const leverageBattle = Math.sin(timeElapsed * 3.5) * 0.08 + Math.cos(timeElapsed * 2.1) * 0.06; // Complex leverage fighting
+      const gapPenetration = powerProgress * 0.5; // Gradual B-gap pressure
+      
+      // Bull rush through B-gap with realistic struggle
+      const lateralFight = (isLeftSide ? 0.25 : -0.25) * powerProgress + leverageBattle;
+      
+      return {
+        x: blockerPos.x + xAcross(lateralFight),
+        y: blockerPos.y + (0.5 + gapPenetration) * YPX // Progressive gap control
+      };
+    }
+  }
+  
+  // Phase 3: Critical Threshold (2.7-3.0s) - Gradual pocket degradation with realistic pressure escalation
+  if (timeElapsed < PRESSURE_THRESHOLD) {
+    const criticalTime = timeElapsed - PROTECTION_PHASE_END;
+    const pressureIntensity = criticalTime / (PRESSURE_THRESHOLD - PROTECTION_PHASE_END);
     
-    return {
-      x: blockerPos.x + xAcross(lateralStruggle),
-      y: blockerPos.y + extendedJockey * YPX // Stay engaged with blocker (positive = downfield)
-    };
+    // Check breakthrough assignment for single-rusher system
+    const breakthrough = calculateBreakthrough(timeElapsed, protection, dlSpeed, playId);
+    const isBreakthroughDL = breakthrough && breakthrough.defender === dlId;
+    
+    if (!isBreakthroughDL) {
+      // Non-breakthrough DL: Escalating pressure but still contained by OL
+      const assignedBlocker: OffensiveLineID = dlId === 'DE_L' ? 'LT' : dlId === 'DE_R' ? 'RT' : dlId === 'DT_L' ? 'LG' : 'RG';
+      const blockerPos = getOLPosition(assignedBlocker, qbPosition, true, timeElapsed, protection);
+      
+      const pressureLeak = pressureIntensity * 0.4; // Gradual protection degradation
+      const desperateFighting = Math.sin(timeElapsed * 5.0) * 0.25 * pressureIntensity; // Intense late fighting
+      const technique_mod = technique === '9-TECH' ? 0.3 : 0.2; // Edge rushers get closer
+      
+      return {
+        x: blockerPos.x + xAcross((isLeftSide ? -technique_mod : technique_mod) * pressureIntensity + desperateFighting),
+        y: blockerPos.y + (0.7 - pressureLeak) * YPX // Gradual QB approach
+      };
+    }
   }
   
-  // Only the breakthrough DL gets to rush toward QB
-  const breakdownTime = timeElapsed - PROTECTION_PHASE_END;
-  const baseBreakthrough = 2.0; // Distance covered during hold-back phase
+  // Phase 4: Breakthrough Rush (3.0s+) - Realistic pursuit with technique-specific paths to QB
+  const breakthrough = calculateBreakthrough(timeElapsed, protection, dlSpeed, playId);
+  const isBreakthroughDL = breakthrough && breakthrough.defender === dlId;
   
-  // Calculate direct path toward QB after breaking through
-  const qbOffset = (qbPosition.x - basePos.x) / XPX;
-  
-  const breakthroughPath = { x: 0, y: 0 };
-  
-  if (isEdgeRusher) {
-    // Edge rushers: speed rush toward QB after breaking contain
-    const edgeArc = isLeftSide ? -0.8 : 0.8; // Wide rush path
-    const qbTarget = qbOffset * 0.4; // Target QB position
-    breakthroughPath.x = edgeArc + (qbTarget * breakdownTime * 0.5);
-    breakthroughPath.y = baseBreakthrough + (breakdownTime * 5.5); // Fast rush to QB
-  } else {
-    // Interior rushers: bull rush through pocket after winning
-    const interiorAngle = qbOffset * 0.3; // Slight angle toward QB
-    breakthroughPath.x = interiorAngle * breakdownTime * 0.3;
-    breakthroughPath.y = baseBreakthrough + (breakdownTime * 4.8); // Interior rush speed
+  if (isBreakthroughDL) {
+    const rushTime = timeElapsed - PROTECTION_PHASE_END;
+    
+    // Calculate realistic pursuit angle to QB position
+    const qbDx = qbPosition.x - basePos.x;
+    const qbDy = qbPosition.y - basePos.y;
+    const qbDistance = Math.sqrt(qbDx * qbDx + qbDy * qbDy);
+    const closingAngle = Math.atan2(qbDy, qbDx);
+    
+    if (technique === '9-TECH') {
+      // Edge rusher: Curved pursuit maintaining rush lane discipline
+      const pursuitSpeed = 6.5 * dlSpeed; // Realistic edge rush speed
+      const rushDistance = Math.min(qbDistance, rushTime * pursuitSpeed * YPX);
+      const pursuitCurve = Math.sin(rushTime * 1.2) * 0.15; // Slight pursuit curve
+      
+      return {
+        x: basePos.x + Math.cos(closingAngle) * rushDistance * 0.75 + xAcross(pursuitCurve),
+        y: basePos.y + Math.sin(closingAngle) * rushDistance
+      };
+    } else {
+      // Interior rusher: Direct bull rush maintaining gap integrity  
+      const rushProgress = Math.min(1.0, rushTime / 1.8); // Time to QB based on interior rush speed
+      
+      return {
+        x: basePos.x + qbDx * rushProgress,
+        y: basePos.y + qbDy * rushProgress
+      };
+    }
   }
   
-  // Protection scheme adjustments - affects hold-back effectiveness
-  const protectionModifier = { x: 0, y: 0 };
-  switch (protection) {
-    case 'SLIDE_LEFT':
-      if (dlId === 'DE_R') {
-        protectionModifier.y = 0.8; // Weaker protection on slide-away side
-      }
-      break;
-    case 'SLIDE_RIGHT':
-      if (dlId === 'DE_L') {
-        protectionModifier.y = 0.8; // Weaker protection on slide-away side
-      }
-      break;
-    case 'MAX_PROTECT':
-      protectionModifier.y = -1.2; // Stronger hold-back with extra protection
-      break;
-  }
+  // Fallback: Extended engagement with realistic late-game movement patterns
+  const assignedBlocker: OffensiveLineID = dlId === 'DE_L' ? 'LT' : dlId === 'DE_R' ? 'RT' : dlId === 'DT_L' ? 'LG' : 'RG';
+  const blockerPos = getOLPosition(assignedBlocker, qbPosition, true, timeElapsed, protection);
+  
+  const extendedFight = 0.9 + Math.sin(timeElapsed * 2.0) * 0.25 + Math.cos(timeElapsed * 1.6) * 0.15; // Complex late fighting
+  const lateralBattle = (isLeftSide ? -0.35 : 0.35) + Math.sin(timeElapsed * 2.4) * 0.2;
   
   return {
-    x: basePos.x + xAcross(breakthroughPath.x + protectionModifier.x),
-    y: basePos.y - (breakthroughPath.y + protectionModifier.y) * YPX // Use direct pixel offset upfield
+    x: blockerPos.x + xAcross(lateralBattle),
+    y: blockerPos.y + extendedFight * YPX
   };
 };
 
