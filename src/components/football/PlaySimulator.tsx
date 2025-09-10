@@ -2298,15 +2298,9 @@ setManExtraRoles({ blitzers, spy });
     }
     if (MATCH_COVERAGES.has(cover)) return anchor;
     
-    // Handle DL pass rush movement (applies to all coverages)
+    // Handle DL pass rush movement (applies to all coverages) - use enhanced getDLPosition
     if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") {
-      const startPos = start;
-      const qbTarget = { x: QB.x, y: QB.y };
-      const rushProgress = Math.min(1, tt * 0.8); // Rush toward QB over time
-      return {
-        x: startPos.x + (qbTarget.x - startPos.x) * rushProgress,
-        y: startPos.y + (qbTarget.y - startPos.y) * rushProgress
-      };
+      return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, tt, protectionScheme);
     }
     
     return anchor;
@@ -3174,8 +3168,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
 
       // Defensive Line: Enhanced pass rush with breakthrough system
       if (id === 'DE_L' || id === 'DE_R' || id === 'DT_L' || id === 'DT_R') {
-        // TEMPORARY: Use simple D_ALIGN position to debug rendering issue
-        return D_ALIGN[id];
+        return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, tt, protectionScheme);
       }
       // Curl/flat droppers midpoint for a beat before driving
       let p = approach(start, anchor, 0.35, 0.6);
