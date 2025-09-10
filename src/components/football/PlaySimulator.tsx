@@ -35,8 +35,9 @@ const FIELD_LENGTH_YDS = 120;
 const FIELD_WIDTH_YDS = 53.333333;
 const HASH_FROM_SIDELINE_YDS = 70.75 / 3;
 
-const PX_W = 720; // Reduced width to fit three-column layout better
-const PX_H = 480; // Optimized height for complete 120-yard field visibility
+// QB Perspective View - Optimized for immersive gameplay experience
+const PX_W = 880; // Wider field for better QB perspective visibility (responsive)
+const PX_H = 600; // Enhanced height for better QB perspective immersion
 
 const XPX = PX_W / FIELD_WIDTH_YDS;
 const YPX = PX_H / FIELD_LENGTH_YDS;
@@ -48,8 +49,8 @@ function yDepthYds(p: Pt): number {
   return (PX_H - p.y) / YPX;
 }
 
-// QB at field center width, positioned based on LOS (Line of Scrimmage at 30-yard line)
-const LOS_YDS = 30; // Line of scrimmage 30 yards from bottom goal line
+// QB Perspective: Positioned closer to bottom of screen for immersive "looking upfield" experience  
+const LOS_YDS = 25; // Line of scrimmage 25 yards from bottom - QB perspective focused on downfield action
 const QB = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS) };
 
 // Enhanced QB position based on formation and dropback progression
@@ -75,7 +76,7 @@ const getQBPosition = (isShotgun: boolean, isPostSnap: boolean = false, timeElap
     const dropProgress = Math.min(1, timeElapsed / 2.0);
     const currentDrop = dropYards * dropProgress;
     
-    return { x: QB.x, y: baseY + yUp(currentDrop) };
+    return { x: QB.x, y: baseY + (currentDrop * YPX) };
   }
 };
 
@@ -218,13 +219,13 @@ const sidelineX = (s: Pt, off = SIDELINE_MARGIN) =>
   isLeftOfQB(s) ? xAcross(off) : xAcross(FIELD_WIDTH_YDS - off);
 
 const DEPTH = {
-  quick: LOS_YDS - 11,  // ~9 yards behind LOS
-  short: LOS_YDS + 12,  // ~8 yards behind LOS
-  mid: LOS_YDS + 16,    // ~4 yards behind LOS
-  curl: LOS_YDS + 14,   // ~6 yards behind LOS
-  dig: LOS_YDS + 20,        // At LOS
-  deep: LOS_YDS + 26,   // ~6 yards past LOS
-  shot: LOS_YDS + 30,  // ~10 yards past LOS
+  quick: LOS_YDS + 4,   // ~4 yards past LOS (quick routes)
+  short: LOS_YDS + 8,   // ~8 yards past LOS (short routes)
+  mid: LOS_YDS + 12,    // ~12 yards past LOS (intermediate routes)
+  curl: LOS_YDS + 10,   // ~10 yards past LOS (curl routes)
+  dig: LOS_YDS + 14,    // ~14 yards past LOS (dig routes)
+  deep: LOS_YDS + 18,   // ~18 yards past LOS (deep routes)
+  shot: LOS_YDS + 25,   // ~25 yards past LOS (shot/vertical routes)
 };
 
 const H = {
@@ -269,8 +270,9 @@ function routeFromKeyword(name: RouteKeyword, s: Pt, coverage: CoverageID, refLe
       return [s, stem, breakPt];
     }
     case "SLANT": {
-      const breakPt = { x: s.x + inS * xAcross(6), y: yUp(DEPTH.quick) };
-      return [s, breakPt, { x: breakPt.x + inS * xAcross(4), y: yUp(DEPTH.mid) }];
+      const stemPt = { x: s.x, y: yUp(LOS_YDS + 2) }; // Stem forward 2 yards toward LOS
+      const breakPt = { x: s.x + inS * xAcross(6), y: yUp(LOS_YDS + 4) }; // Break across and past LOS
+      return [s, stemPt, breakPt];
     }
     case "SPEED_OUT": {
       const stem = { x: s.x, y: yUp(DEPTH.quick) };
@@ -648,19 +650,19 @@ const D_ALIGN: Record<DefenderID, Pt> = {
   WILL: { x: xAcross(FIELD_WIDTH_YDS - 20), y: yUp(LOS_YDS + 2) },
   FS: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS + 15) },
   SS: { x: xAcross(FIELD_WIDTH_YDS / 2 - 12), y: yUp(LOS_YDS + 12) },
-  DE_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 9), y: yUp(LOS_YDS - 0.5) },
-  DE_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 9), y: yUp(LOS_YDS - 0.5) },
-  DT_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 3), y: yUp(LOS_YDS - 0.5) },
+  DE_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 9), y: yUp(LOS_YDS - 0.5) },   // DL on defensive side of LOS  
+  DE_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 9), y: yUp(LOS_YDS - 0.5) },   // DL on defensive side of LOS
+  DT_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 3), y: yUp(LOS_YDS - 0.5) },   // DL on defensive side of LOS
   DT_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 3), y: yUp(LOS_YDS - 0.5) }
 };
 
 // Base Offensive Line positions (will be adjusted dynamically for pocket)
 const OL_ALIGN: Record<OffensiveLineID, Pt> = {
-  LT: { x: xAcross(FIELD_WIDTH_YDS / 2 - 6), y: yUp(LOS_YDS) },
-  LG: { x: xAcross(FIELD_WIDTH_YDS / 2 - 3), y: yUp(LOS_YDS) },
-  C: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS) },
-  RG: { x: xAcross(FIELD_WIDTH_YDS / 2 + 3), y: yUp(LOS_YDS) },
-  RT: { x: xAcross(FIELD_WIDTH_YDS / 2 + 6), y: yUp(LOS_YDS) }
+  LT: { x: xAcross(FIELD_WIDTH_YDS / 2 - 6), y: yUp(LOS_YDS + 0.5) },  // OL on offensive side of LOS
+  LG: { x: xAcross(FIELD_WIDTH_YDS / 2 - 3), y: yUp(LOS_YDS + 0.5) },  // OL on offensive side of LOS  
+  C: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS + 0.5) },       // OL on offensive side of LOS
+  RG: { x: xAcross(FIELD_WIDTH_YDS / 2 + 3), y: yUp(LOS_YDS + 0.5) },  // OL on offensive side of LOS
+  RT: { x: xAcross(FIELD_WIDTH_YDS / 2 + 6), y: yUp(LOS_YDS + 0.5) }   // OL on offensive side of LOS
 };
 
 // Enhanced OL positions that form realistic NFL pocket
@@ -670,9 +672,10 @@ const getOLPosition = (olId: OffensiveLineID, qbPosition: Pt, isPostSnap: boolea
   
   if (!isPostSnap) return basePos;
   
-  // NFL pocket formation - forms upside-down "U" around QB
-  const pocketDepth = Math.min(isShotgun ? 2 : 4, timeElapsed * 1.8);
-  const pocketY = basePos.y + yUp(pocketDepth);
+  // Post-snap: OL engages with DL then forms pocket through blocking interaction
+  // Instead of just moving back, OL should stay engaged with their DL assignments
+  const engagementDepth = Math.min(1.5, timeElapsed * 0.8); // Limited backward movement during engagement
+  const pocketY = basePos.y + (engagementDepth * YPX); // Move back slightly due to DL pressure
   
   // Enhanced Center blocking logic for double teams and LB pickup
   let xAdjust = 0;
@@ -698,7 +701,7 @@ const getOLPosition = (olId: OffensiveLineID, qbPosition: Pt, isPostSnap: boolea
         DT_R: { x: D_ALIGN.DT_R.x - xAcross(timeElapsed * 0.5), y: D_ALIGN.DT_R.y + yUp(timeElapsed * 1.5) }
       };
       
-      const stress = calculateOLStress(currentOLPositions, currentDLPositions, timeElapsed);
+      const stress = calculateOLStress(currentOLPositions, currentDLPositions);
       
       // Center help rules (priority from Claude_Full_Guide.md):
       // 1. Aid whichever guard is losing vertical push fastest
@@ -750,8 +753,9 @@ const getOLPosition = (olId: OffensiveLineID, qbPosition: Pt, isPostSnap: boolea
   }
   
   // Create pocket "U" shape - wider at the top, narrower near QB
-  const distanceFromCenter = Math.abs(basePos.x - QB.x);
+  const distanceFromCenter = Math.abs(basePos.x - qbPosition.x);
   const pocketArc = distanceFromCenter * 0.15; // More pronounced arc
+  const pocketDepth = Math.abs(qbPosition.y - yUp(LOS_YDS)) / YPX; // How deep QB has dropped in yards
   const pocketWidth = Math.max(0.8, 1 - (pocketDepth * 0.1)); // Pocket narrows as it deepens
   
   return {
@@ -764,11 +768,11 @@ const ZONES = {
   DEEP_LEFT: { x: xAcross(12), y: yUp(LOS_YDS + 10) },
   DEEP_MIDDLE: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS + 12) },
   DEEP_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 12), y: yUp(LOS_YDS + 10) },
-  CURL_LEFT: { x: xAcross(18), y: yUp(LOS_YDS - 4) },
-  HOOK_MID: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS - 6) },
-  CURL_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 18), y: yUp(LOS_YDS - 4) },
-  FLAT_LEFT: { x: xAcross(8), y: yUp(LOS_YDS - 10) },
-  FLAT_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 8), y: yUp(LOS_YDS - 10) },
+  CURL_LEFT: { x: xAcross(18), y: yUp(LOS_YDS + 4) },    // LBs drop back to cover 4 yards past LOS
+  HOOK_MID: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS + 6) }, // Middle LB drops back 6 yards past LOS  
+  CURL_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 18), y: yUp(LOS_YDS + 4) }, // LBs drop back to cover 4 yards past LOS
+  FLAT_LEFT: { x: xAcross(8), y: yUp(LOS_YDS + 2) },     // Flat zones 2 yards past LOS
+  FLAT_RIGHT: { x: xAcross(FIELD_WIDTH_YDS - 8), y: yUp(LOS_YDS + 2) }, // Flat zones 2 yards past LOS
 };
 
 // Defender id list (used by openness, wrPosSafe, etc.) — keep above first usage to avoid TDZ
@@ -867,8 +871,7 @@ const calculatePocketEnvelope = (
 // Calculate OL stress levels for Center help logic
 const calculateOLStress = (
   olPositions: Record<OffensiveLineID, Pt>,
-  dlPositions: Record<string, Pt>, // Simplified to accept DL-only positions
-  timeElapsed: number
+  dlPositions: Record<string, Pt> // Simplified to accept DL-only positions
 ): Record<OffensiveLineID, OLStress> => {
   const stress: Record<OffensiveLineID, OLStress> = {
     LT: { defender: 'DE_L', verticalPushLoss: 0, engagementFactor: 0.8, needsHelp: false },
@@ -1094,12 +1097,9 @@ export default function PlaySimulator({
   const [protectionScheme, setProtectionScheme] = useState<ProtectionScheme>('MAN_PROTECT');
   const [isShotgun] = useState<boolean>(false);
   const [qbSacked, setQbSacked] = useState<boolean>(false);
-  const [sackTime, setSackTime] = useState<number | null>(null);
-  const [sackingDefender, setSackingDefender] = useState<DefenderID | null>(null);
   
   // Pocket envelope system state
   const [pocketEnvelope, setPocketEnvelope] = useState<PocketEnvelope | null>(null);
-  const [olStress, setOlStress] = useState<Record<OffensiveLineID, OLStress> | null>(null);
   const [showPocketEnvelope, setShowPocketEnvelope] = useState<boolean>(false);
   // const [breakthrough, setBreakthrough] = useState<BreakthroughResult | null>(null);
   // const [olDlEngagement, setOlDlEngagement] = useState<Record<string, { ol: OffensiveLineID; dl: DefenderID; intensity: number }>>({});
@@ -1966,8 +1966,7 @@ setManExtraRoles({ blitzers, spy });
     if (phase !== 'post') {
       // Reset sack state on new play
       setQbSacked(false);
-      setSackTime(null);
-      setSackingDefender(null);
+      // Reset sack state
       return;
     }
     
@@ -1986,8 +1985,7 @@ setManExtraRoles({ blitzers, spy });
       if (timeElapsed >= sackTime) {
         // QB gets sacked!
         setQbSacked(true);
-        setSackTime(timeElapsed);
-        setSackingDefender(breakthrough.defender);
+        // Breakthrough achieved
         
         // Add coaching feedback about the sack
         setExplain(`QB SACKED by ${breakthrough.defender}! ${breakthrough.rushMove} rush beat ${protectionScheme}. Hold time: ${timeElapsed.toFixed(1)}s`);
@@ -1997,13 +1995,13 @@ setManExtraRoles({ blitzers, spy });
         stopClock();
       }
     }
-  }, [phase, t, qbSacked, decision, ballFlying, protectionScheme, defSpeed, isShotgun, stopClock]);
+  }, [phase, t, qbSacked, decision, ballFlying, protectionScheme, defSpeed, isShotgun, stopClock, playId]);
 
   // Pocket Envelope Calculation: Update pocket envelope each frame
   useEffect(() => {
     if (phase !== 'post') {
       setPocketEnvelope(null);
-      setOlStress(null);
+      // Reset pocket envelope
       return;
     }
     
@@ -2026,9 +2024,8 @@ setManExtraRoles({ blitzers, spy });
       DT_R: { x: D_ALIGN.DT_R.x - xAcross(timeElapsed * 0.5), y: D_ALIGN.DT_R.y + yUp(timeElapsed * 1.5) }
     };
     
-    // Calculate OL stress
-    const stress = calculateOLStress(currentOLPositions, currentDLPositions, timeElapsed);
-    setOlStress(stress);
+    // Calculate OL stress for pocket dynamics
+    const stress = calculateOLStress(currentOLPositions, currentDLPositions);
     
     // Calculate pressure factor based on DL proximity and breakthrough
     const breakthrough = calculateBreakthrough(timeElapsed, protectionScheme, defSpeed, playId);
@@ -2038,7 +2035,7 @@ setManExtraRoles({ blitzers, spy });
     const envelope = calculatePocketEnvelope(qbPos, currentOLPositions, timeElapsed, pressureFactor);
     setPocketEnvelope(envelope);
     
-  }, [phase, t, qbPos, protectionScheme, isShotgun, defSpeed]);
+  }, [phase, t, qbPos, protectionScheme, isShotgun, defSpeed, playId]);
 
   // (Dlive/lastTRef/overlayTick are defined earlier to avoid TDZ)
 
@@ -2194,6 +2191,18 @@ setManExtraRoles({ blitzers, spy });
       return anchor;
     }
     if (MATCH_COVERAGES.has(cover)) return anchor;
+    
+    // Handle DL pass rush movement (applies to all coverages)
+    if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") {
+      const startPos = start;
+      const qbTarget = { x: QB.x, y: QB.y };
+      const rushProgress = Math.min(1, tt * 0.8); // Rush toward QB over time
+      return {
+        x: startPos.x + (qbTarget.x - startPos.x) * rushProgress,
+        y: startPos.y + (qbTarget.y - startPos.y) * rushProgress
+      };
+    }
+    
     return anchor;
   }
 
@@ -3059,64 +3068,8 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
 
       // Defensive Line: Enhanced pass rush with breakthrough system
       if (id === 'DE_L' || id === 'DE_R' || id === 'DT_L' || id === 'DT_R') {
-        // Get current QB position for dynamic rush tracking
-        const currentQBPos = getQBPosition(isShotgun, true, tt);
-        
-        // Check for breakthrough (deterministic one DL will eventually win)
-        const currentBreakthrough = calculateBreakthrough(tt, protectionScheme, defSpeed, playId);
-        
-        // Pre-snap phase: Stay at line of scrimmage with subtle movement
-        if (tt < 0.15) {
-          const jockeyDistance = Math.sin(tt * 12) * 0.2;
-          return { 
-            x: start.x + xAcross(jockeyDistance), 
-            y: start.y + yUp(jockeyDistance * 0.3) 
-          };
-        }
-        
-        // Post-snap: Realistic OL/DL pocket battle with jockeying
-        const isBreakthroughPlayer = currentBreakthrough?.defender === id;
-        const timeFromSnap = tt - 0.15;
-        
-        // Get corresponding OL position for this DL
-        let olPosition: Pt;
-        const qbPos = getQBPosition(isShotgun, true, tt);
-        
-        if (id === 'DE_L') olPosition = getOLPosition('LT', qbPos, true, tt, protectionScheme, isShotgun);
-        else if (id === 'DE_R') olPosition = getOLPosition('RT', qbPos, true, tt, protectionScheme, isShotgun);
-        else if (id === 'DT_L') olPosition = getOLPosition('LG', qbPos, true, tt, protectionScheme, isShotgun);
-        else olPosition = getOLPosition('RG', qbPos, true, tt, protectionScheme, isShotgun);
-        
-        // Jockeying phase: DL and OL battle at ~1 yard separation
-        const jockeyPhaseEnd = isBreakthroughPlayer ? 2.0 : 4.0; // When breakthrough happens
-        const sackTime = jockeyPhaseEnd + (isBreakthroughPlayer ? 1.0 : 3.0); // 3-7s total from snap
-        
-        if (timeFromSnap < jockeyPhaseEnd) {
-          // Jockeying: DL tries to push past OL but gets held back
-          const jockeyIntensity = Math.sin(timeFromSnap * 8) * 0.3; // Back-and-forth motion
-          const pushDistance = timeFromSnap * 0.8; // Gradual push forward
-          
-          // DL position is ~1 yard in front of OL (toward QB)
-          const jockeyPosition = {
-            x: olPosition.x + xAcross(jockeyIntensity), // Side-to-side jockeying
-            y: olPosition.y + yUp(1.0 + pushDistance) // 1 yard + gradual push toward QB
-          };
-          
-          return jockeyPosition;
-        } else if (timeFromSnap < sackTime) {
-          // Breakthrough phase: DL breaks free and rushes to QB
-          const breakthroughProgress = (timeFromSnap - jockeyPhaseEnd) / (sackTime - jockeyPhaseEnd);
-          const startBreakthroughPos = { x: olPosition.x, y: olPosition.y + yUp(1.8) }; // Just past OL
-          
-          // Rush toward QB for the sack
-          return {
-            x: startBreakthroughPos.x + (currentQBPos.x - startBreakthroughPos.x) * breakthroughProgress,
-            y: startBreakthroughPos.y + (currentQBPos.y - startBreakthroughPos.y) * breakthroughProgress
-          };
-        } else {
-          // Sack: DL has reached QB
-          return currentQBPos;
-        }
+        // TEMPORARY: Use simple D_ALIGN position to debug rendering issue
+        return D_ALIGN[id];
       }
       // Curl/flat droppers midpoint for a beat before driving
       let p = approach(start, anchor, 0.35, 0.6);
@@ -4512,7 +4465,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
           )}
           
           {/* QB */}
-          <circle cx={qbPos.x} cy={qbPos.y} r={7} fill={qbSacked ? "#dc2626" : "#fbbf24"} />
+          <circle cx={qbPos.x} cy={qbPos.y} r={9} fill={qbSacked ? "#dc2626" : "#fbbf24"} />
           {qbSacked && (
             <>
               {/* Sack visual indicators */}
@@ -4531,7 +4484,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             const pos = getOLPosition(olId, qbPos, phase === 'post', t, protectionScheme, isShotgun);
             return (
               <g key={`ol-${olId}`}>
-                <circle cx={pos.x} cy={pos.y} r={6} fill="#10b981" />
+                <circle cx={pos.x} cy={pos.y} r={8} fill="#10b981" />
                 <text x={pos.x - 6} y={pos.y - 12} className="fill-white/85 text-[8px]">
                   {olId}
                 </text>
@@ -4740,7 +4693,7 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
             const isDL = id.startsWith('DE_') || id.startsWith('DT_');
             return (
                 <g key={id}>
-                <rect x={p.x - 6} y={p.y - 6} width={12} height={12} fill={isDL ? "#7c2d12" : "#ef4444"} opacity={0.95}/>
+                <rect x={p.x - 6} y={p.y - 6} width={12} height={12} fill={isDL ? "#7c3aed" : "#ef4444"} opacity={0.95}/>
                 <text x={p.x + dx} y={p.y + dy}
                         className="text-[9px]" fill="rgba(255,255,255,0.95)"
                         stroke="rgba(0,0,0,0.7)" strokeWidth={2} style={{ paintOrder: "stroke" }}>
