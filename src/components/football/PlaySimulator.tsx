@@ -683,17 +683,18 @@ const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, pr
     const firstStepDistance = timeElapsed * 3; // Moderate approach to OL
     
     if (isEdgeRusher) {
-      // Edge rushers immediately angle toward outside tackles (LT/RT) upon snap
+      // Edge rushers immediately rush toward outside tackles (LT/RT) upon snap - MUCH more aggressive
       const targetTackle = isLeftSide ? 'LT' : 'RT';
       const tacklePos = OL_ALIGN[targetTackle];
       
-      // Calculate angle toward assigned tackle
-      const xTarget = (tacklePos.x - basePos.x) * 0.6 * timeElapsed * 2; // Rush toward tackle
-      const yTarget = firstStepDistance;
+      // Calculate direct path toward assigned tackle with aggressive speed
+      const rushProgress = Math.min(1.0, timeElapsed * 2.5); // Much faster rush - reach tackle in 0.4s
+      const xTarget = (tacklePos.x - basePos.x) * rushProgress; // Full lateral movement
+      const yTarget = (tacklePos.y - basePos.y) * rushProgress; // Full forward movement to OL position
       
       return {
         x: basePos.x + xTarget,
-        y: basePos.y + yUp(yTarget)
+        y: basePos.y + yTarget
       };
     } else {
       // Interior rushers go straight forward initially
