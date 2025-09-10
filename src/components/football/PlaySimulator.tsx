@@ -678,13 +678,30 @@ const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, pr
   const isEdgeRusher = dlId === 'DE_L' || dlId === 'DE_R';
   const isLeftSide = dlId === 'DE_L' || dlId === 'DT_L';
   
-  // Phase 1: Get-off and initial rush (0.0-0.5s) - DL moves toward OL
+  // Phase 1: Get-off and initial rush (0.0-0.5s) - DL moves toward their assigned OL
   if (timeElapsed < OL_ENGAGEMENT_TIME) {
     const firstStepDistance = timeElapsed * 3; // Moderate approach to OL
-    return { 
-      x: basePos.x, 
-      y: basePos.y + yUp(firstStepDistance)
-    };
+    
+    if (isEdgeRusher) {
+      // Edge rushers immediately angle toward outside tackles (LT/RT) upon snap
+      const targetTackle = isLeftSide ? 'LT' : 'RT';
+      const tacklePos = OL_ALIGN[targetTackle];
+      
+      // Calculate angle toward assigned tackle
+      const xTarget = (tacklePos.x - basePos.x) * 0.6 * timeElapsed * 2; // Rush toward tackle
+      const yTarget = firstStepDistance;
+      
+      return {
+        x: basePos.x + xTarget,
+        y: basePos.y + yUp(yTarget)
+      };
+    } else {
+      // Interior rushers go straight forward initially
+      return { 
+        x: basePos.x, 
+        y: basePos.y + yUp(firstStepDistance)
+      };
+    }
   }
   
   // Phase 2: OL Engagement/Hold-back Phase (0.5-2.7s) - DL held by OL blocking
