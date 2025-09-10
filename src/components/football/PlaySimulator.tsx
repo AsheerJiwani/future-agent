@@ -710,7 +710,7 @@ const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, pr
   // Calculate direct path toward QB after breaking through
   const qbOffset = (qbPosition.x - basePos.x) / XPX;
   
-  let breakthroughPath = { x: 0, y: 0 };
+  const breakthroughPath = { x: 0, y: 0 };
   
   if (isEdgeRusher) {
     // Edge rushers: speed rush toward QB after breaking contain
@@ -726,7 +726,7 @@ const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, pr
   }
   
   // Protection scheme adjustments - affects hold-back effectiveness
-  let protectionModifier = { x: 0, y: 0 };
+  const protectionModifier = { x: 0, y: 0 };
   switch (protection) {
     case 'SLIDE_LEFT':
       if (dlId === 'DE_R') {
