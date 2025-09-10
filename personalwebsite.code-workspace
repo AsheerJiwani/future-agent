@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"name": "future-agent",
+			"path": "."
+		},
+		{
+			"name": "docs",
+			"path": "../Downloads/claude_instructions_bundle/docs"
+		},
+		{
+			"name": "docs",
+			"path": "claude_instructions_bundle/docs"
+		},
+		{
+			"name": "claude_instructions_bundle",
+			"path": "../Downloads/claude_instructions_bundle"
+		}
+	],
+	"settings": {}
+}

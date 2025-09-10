@@ -35,10 +35,14 @@ const FIELD_LENGTH_YDS = 120;
 const FIELD_WIDTH_YDS = 53.333333;
 const HASH_FROM_SIDELINE_YDS = 70.75 / 3;
 
-// QB Perspective View - Optimized for Playwright display and proper field perspective
-// Based on field_reference.md analysis: 4:3 aspect ratio like reference image (660x495)
-const PX_W = 960; // Increased width for better Playwright display compatibility  
-const PX_H = 720; // Increased height with proper 4:3 ratio for field perspective
+// QB Perspective View - Optimized for various screen sizes and better utilization
+// Responsive field dimensions that adapt to container while maintaining proper perspective
+const BASE_PX_W = 1120; // Optimized width for modern displays (16:9 friendly)
+const BASE_PX_H = 800;   // Increased height for better field detail
+
+// Use CSS viewport units for truly responsive field sizing
+const PX_W = BASE_PX_W;
+const PX_H = BASE_PX_H;
 
 const XPX = PX_W / FIELD_WIDTH_YDS;
 const YPX = PX_H / FIELD_LENGTH_YDS;
@@ -667,19 +671,19 @@ const D_ALIGN: Record<DefenderID, Pt> = {
   FS: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS + 15) },
   SS: { x: xAcross(FIELD_WIDTH_YDS / 2 - 12), y: yUp(LOS_YDS + 12) },
   // Improved DL positioning with proper technique alignment
-  DE_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 8.5), y: yUp(LOS_YDS - 0.5) },   // Outside shoulder of LT
-  DE_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 8.5), y: yUp(LOS_YDS - 0.5) },   // Outside shoulder of RT
-  DT_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 1.5), y: yUp(LOS_YDS - 0.5) },   // 1-technique (inside shoulder of LG)
-  DT_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 1.5), y: yUp(LOS_YDS - 0.5) }    // 1-technique (inside shoulder of RG)
+  DE_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 8.5), y: yUp(LOS_YDS + 0.5) },   // Outside shoulder of LT
+  DE_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 8.5), y: yUp(LOS_YDS + 0.5) },   // Outside shoulder of RT
+  DT_L: { x: xAcross(FIELD_WIDTH_YDS / 2 - 1.5), y: yUp(LOS_YDS + 0.5) },   // 1-technique (inside shoulder of LG)
+  DT_R: { x: xAcross(FIELD_WIDTH_YDS / 2 + 1.5), y: yUp(LOS_YDS + 0.5) }    // 1-technique (inside shoulder of RG)
 };
 
 // Enhanced Offensive Line positions with proper splits and stance
 const OL_ALIGN: Record<OffensiveLineID, Pt> = {
-  LT: { x: xAcross(FIELD_WIDTH_YDS / 2 - 4.5), y: yUp(LOS_YDS + 0.5) }, // Tighter spacing (reduced from 6 to 4.5)
-  LG: { x: xAcross(FIELD_WIDTH_YDS / 2 - 1.5), y: yUp(LOS_YDS + 0.5) }, // Tighter to center (reduced from 2 to 1.5)
-  C: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS + 0.5) },        // Over the ball
-  RG: { x: xAcross(FIELD_WIDTH_YDS / 2 + 1.5), y: yUp(LOS_YDS + 0.5) }, // Tighter to center (reduced from 2 to 1.5)
-  RT: { x: xAcross(FIELD_WIDTH_YDS / 2 + 4.5), y: yUp(LOS_YDS + 0.5) }  // Tighter spacing (reduced from 6 to 4.5)
+  LT: { x: xAcross(FIELD_WIDTH_YDS / 2 - 4.5), y: yUp(LOS_YDS - 0.5) }, // Tighter spacing (reduced from 6 to 4.5)
+  LG: { x: xAcross(FIELD_WIDTH_YDS / 2 - 1.5), y: yUp(LOS_YDS - 0.5) }, // Tighter to center (reduced from 2 to 1.5)
+  C: { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS - 0.5) },        // Over the ball
+  RG: { x: xAcross(FIELD_WIDTH_YDS / 2 + 1.5), y: yUp(LOS_YDS - 0.5) }, // Tighter to center (reduced from 2 to 1.5)
+  RT: { x: xAcross(FIELD_WIDTH_YDS / 2 + 4.5), y: yUp(LOS_YDS - 0.5) }  // Tighter spacing (reduced from 6 to 4.5)
 };
 
 // Enhanced DL rush mechanics with realistic NFL pass rush timing and OL hold-back (2-5s)
@@ -1269,6 +1273,10 @@ export default function PlaySimulator({
   // Speeds
   const [recSpeed, setRecSpeed] = useState(1.0); // 0.7–1.5
   const [defSpeed, setDefSpeed] = useState(0.95); // 0.7–1.5
+  
+  // Field zoom and camera controls
+  const [zoomLevel, setZoomLevel] = useState(1.0); // 0.5–2.0
+  const [cameraAngle, setCameraAngle] = useState<'qb' | 'sideline' | 'all22'>('qb');
   const [ballSpeed, setBallSpeed] = useState(1.0); // 0.5–3.0 (50% to 300%)
 
   // Sounds + notes
@@ -4439,7 +4447,47 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         <div className="text-xs uppercase tracking-wide text-white/60">
           Simulator — {conceptId} vs {coverage}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        
+        {/* Field View Controls */}
+        <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/60">Zoom:</span>
+            <input
+              type="range"
+              min="0.5"
+              max="2.0"
+              step="0.1"
+              value={zoomLevel}
+              onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+              className="w-16 accent-emerald-500"
+              title={`${(zoomLevel * 100).toFixed(0)}%`}
+            />
+            <span className="text-xs text-white/60 w-8">{(zoomLevel * 100).toFixed(0)}%</span>
+          </div>
+          
+          <div className="flex bg-black/50 rounded p-1 border border-white/20">
+            {[
+              { key: 'qb' as const, label: '🏈', title: 'QB Perspective' },
+              { key: 'sideline' as const, label: '👀', title: 'Sideline View' },
+              { key: 'all22' as const, label: '📷', title: 'All-22 Coaches Film' }
+            ].map(({ key, label, title }) => (
+              <button
+                key={key}
+                onClick={() => setCameraAngle(key)}
+                className={`px-2 py-1 text-xs rounded transition-all ${
+                  cameraAngle === key
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+                title={title}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
           {/* Coverage insights pill */}
           <div className="hidden md:flex items-center gap-2 text-[11px] text-white/80">
             {coverage === 'C3' && (
@@ -4533,8 +4581,18 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
         </div>
       </div>
 
-      <div className="relative w-full">
-        <svg viewBox={`0 0 ${PX_W} ${PX_H}`} className="w-full rounded-xl">
+      <div className="relative w-full" data-testid="field-container">
+        <svg 
+          viewBox={`${PX_W * (1 - zoomLevel) / 2} ${PX_H * (1 - zoomLevel) / 2} ${PX_W * zoomLevel} ${PX_H * zoomLevel}`} 
+          className="w-full h-auto max-h-[85vh] rounded-xl border border-emerald-500/20 shadow-2xl transition-all duration-200" 
+          preserveAspectRatio="xMidYMid meet"
+          data-testid="field-root"
+          style={{
+            background: 'linear-gradient(180deg, #1e3a2e 0%, #0f1e17 100%)',
+            minHeight: '400px',
+            cursor: zoomLevel > 1.2 ? 'grab' : 'default'
+          }}
+        >
           {drawField()}
           {/* Drill banner (applied by Adaptive Next Drill) */}
           {drillInfo && (

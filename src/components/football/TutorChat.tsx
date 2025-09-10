@@ -6,7 +6,33 @@ import type { PlaySnapshot, SnapMeta, ThrowSummary } from "@/types/play";
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
-export default function TutorChat({ conceptId, coverage, formation, snapshot, snapMeta, lastThrow, adaptiveOn = false, onSetCoverage, isFullScreen = false, isTopBar = false }: { conceptId?: FootballConceptId; coverage?: CoverageID; formation?: string; snapshot?: PlaySnapshot; snapMeta?: SnapMeta; lastThrow?: ThrowSummary; adaptiveOn?: boolean; onSetCoverage?: (c: CoverageID)=>void; isFullScreen?: boolean; isTopBar?: boolean }) {
+export default function TutorChat({ 
+  conceptId, 
+  coverage, 
+  formation, 
+  snapshot, 
+  snapMeta, 
+  lastThrow, 
+  adaptiveOn = false, 
+  onSetCoverage, 
+  isFullScreen = false, 
+  isTopBar = false,
+  layoutMode = 'study',
+  isDraggable = false 
+}: { 
+  conceptId?: FootballConceptId; 
+  coverage?: CoverageID; 
+  formation?: string; 
+  snapshot?: PlaySnapshot; 
+  snapMeta?: SnapMeta; 
+  lastThrow?: ThrowSummary; 
+  adaptiveOn?: boolean; 
+  onSetCoverage?: (c: CoverageID)=>void; 
+  isFullScreen?: boolean; 
+  isTopBar?: boolean;
+  layoutMode?: 'study' | 'practice' | 'coach';
+  isDraggable?: boolean;
+}) {
   const [history, setHistory] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [audiblesOn, setAudiblesOn] = useState(true);
@@ -112,6 +138,42 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
     // ROBUST: Multiple dependency checks to ensure triggering
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastThrow?.uniqueId, lastThrow?.throwTimestamp, lastThrow?.playId, lastThrow?.grade, lastThrow?.target]);
+
+  // Layout-specific rendering based on mode
+  if (layoutMode === 'practice') {
+    // PRACTICE MODE: Minimal, non-intrusive assistance
+    return (
+      <div className="fixed bottom-6 right-6 z-50">
+        <div className="bg-black/90 backdrop-blur-xl rounded-lg p-3 border border-emerald-500/30 min-w-64 max-w-80 shadow-2xl">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold text-emerald-400">🎯 PRACTICE ASSIST</div>
+            <button className="text-white/60 hover:text-white text-xs">×</button>
+          </div>
+          
+          {/* Quick feedback only */}
+          {gradeCard && (
+            <div className="mb-2 p-2 bg-emerald-500/10 rounded border border-emerald-500/20">
+              <div className="text-xs text-emerald-300 font-medium">{gradeCard.grade}</div>
+              <div className="text-xs text-white/80 mt-1">{gradeCard.nextRead}</div>
+            </div>
+          )}
+          
+          {/* Minimal input */}
+          <form className="flex gap-2" onSubmit={(e)=>{e.preventDefault(); if(!input.trim()) return; const msg=input.trim(); setInput(''); void send(msg);}}>
+            <input 
+              value={input} 
+              onChange={(e)=>setInput(e.target.value)} 
+              placeholder="Quick question..." 
+              className="flex-1 bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-xs placeholder-white/50 outline-none" 
+            />
+            <button disabled={loading} className="px-2 py-1 rounded bg-emerald-600 text-white text-xs">
+              Ask
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (isTopBar) {
     // TOP BAR MODE: Horizontal layout for top bar integration
@@ -334,7 +396,100 @@ export default function TutorChat({ conceptId, coverage, formation, snapshot, sn
     );
   }
 
-  // TRADITIONAL MODE: Original layout
+  // COACH MODE: Enhanced analysis and feedback
+  if (layoutMode === 'coach') {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-lg flex-1 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm uppercase tracking-wide text-white font-semibold">👨‍🏫 AI FOOTBALL COACH</div>
+            <div className="flex items-center gap-3 text-xs text-white/70">
+              <label className="flex items-center gap-1 cursor-pointer hover:text-white transition-colors">
+                <input type="checkbox" checked={tutor} onChange={(e)=>setTutor(e.target.checked)} className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" /> 
+                <span>Auto-Analysis</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer hover:text-white transition-colors">
+                <input type="checkbox" checked={quizAfter} onChange={(e)=>setQuizAfter(e.target.checked)} className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" /> 
+                <span>Advanced Quizzing</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Enhanced Coach Feedback Cards */}
+          <div className="space-y-3 mb-4">
+            {/* Detailed Grade Analysis */}
+            {gradeCard && (
+              <div className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-emerald-300 text-sm font-semibold">📊 PERFORMANCE BREAKDOWN</div>
+                  {gradeCard.letter && <div className="text-lg font-bold text-emerald-400">{gradeCard.letter}</div>}
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <div className="text-white/60 text-xs">Read Quality:</div>
+                    <div className="text-white font-medium">{gradeCard.grade}</div>
+                  </div>
+                  <div>
+                    <div className="text-white/60 text-xs">Next Priority:</div>
+                    <div className="text-cyan-300 font-medium">{gradeCard.nextRead}</div>
+                  </div>
+                </div>
+                <div className="mt-3 p-3 bg-black/30 rounded-lg">
+                  <div className="text-white/60 text-xs mb-1">Coaching Point:</div>
+                  <div className="text-white text-sm">{gradeCard.coachingTip}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Advanced Coverage Analysis */}
+            {suggested && (
+              <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-indigo-300 text-sm font-semibold">🎯 TACTICAL RECOMMENDATION</div>
+                  {onSetCoverage && (
+                    <button 
+                      onClick={()=>onSetCoverage(suggested.cov)} 
+                      className="px-3 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors"
+                    >
+                      Apply {suggested.cov}
+                    </button>
+                  )}
+                </div>
+                <div className="text-white text-lg font-bold mb-2">{suggested.cov}</div>
+                {suggested.why && <div className="text-white/80 text-sm">{suggested.why}</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Expansive Chat History for Coach Mode */}
+          <div ref={viewportRef} className="flex-1 overflow-auto space-y-2 p-3 bg-white/5 rounded-xl mb-4 min-h-0">
+            {history.map((m,i) => (
+              <div key={i} className={m.role==='assistant' ? 'text-white/90' : 'text-indigo-300'}>
+                <span className="text-[10px] px-2 py-0.5 rounded-full mr-2 bg-white/10">{m.role==='assistant'?'Coach':'You'}</span>
+                <span className="align-middle whitespace-pre-wrap">{m.content}</span>
+              </div>
+            ))}
+            {loading && <div className="text-white/50 text-sm italic">Coach is analyzing your play...</div>}
+          </div>
+
+          {/* Enhanced Input for Detailed Questions */}
+          <form className="flex gap-2" onSubmit={(e)=>{e.preventDefault(); if(!input.trim()) return; const msg=input.trim(); setInput(''); void send(msg);}}>
+            <input 
+              value={input} 
+              onChange={(e)=>setInput(e.target.value)} 
+              placeholder="Ask detailed questions about reads, progressions, technique..." 
+              className="flex-1 bg-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 outline-none border border-white/20 focus:border-white/40" 
+            />
+            <button disabled={loading} className="px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium disabled:opacity-50">
+              {loading ? 'Analyzing...' : 'Ask Coach'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // STUDY MODE: Traditional detailed layout  
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-3 md:p-4 backdrop-blur-lg">
       <div className="flex items-center justify-between mb-4">

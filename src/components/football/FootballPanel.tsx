@@ -169,11 +169,183 @@ export default function FootballPanel() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      {/* SIDE-BY-SIDE LAYOUT */}
+      {/* LEFT SIDEBAR + MAIN CONTENT LAYOUT */}
       <div className="flex h-screen">
-        {/* LEFT SIDE - PlaySimulator + Controls (70-75% width) */}
-        <div className="flex-1 flex flex-col">
-          {/* PlaySimulator Area with Performance Overlay */}
+        {/* LEFT SIDEBAR - Control Center (Fixed Width) */}
+        <div className="bg-black/95 backdrop-blur-xl border-r border-white/20 flex flex-col max-h-screen overflow-hidden" style={{ width: '288px', minWidth: '288px', flexShrink: 0 }}>
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10">
+            <div className="text-sm font-bold text-emerald-400">🏈 GAME CONTROLS</div>
+          </div>
+          
+          {/* Scrollable Controls */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Essential Controls */}
+            <div className="space-y-3">
+              <div className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">Essential</div>
+              
+              {/* Play Concept */}
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-white/80">PLAY CONCEPT</div>
+                <select
+                  value={conceptId}
+                  onChange={(e) => {
+                    const value = e.target.value as FootballConceptId;
+                    startTransition(() => setConceptId(value));
+                  }}
+                  className="w-full bg-white/10 text-white text-sm rounded-lg px-3 py-2 border border-white/20 outline-none focus:border-emerald-400"
+                >
+                  {CONCEPTS.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Coverage */}
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-white/80">COVERAGE</div>
+                <select
+                  value={coverage}
+                  onChange={(e) => {
+                    const value = e.target.value as CoverageID;
+                    startTransition(() => setCoverage(value));
+                  }}
+                  className="w-full bg-white/10 text-white text-sm rounded-lg px-3 py-2 border border-white/20 outline-none focus:border-emerald-400"
+                >
+                  {COVERAGES.map(cv => (
+                    <option key={cv} value={cv}>{COVERAGE_LABEL[cv]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Game Controls */}
+            <div className="space-y-3">
+              <div className="text-xs font-semibold text-purple-300 uppercase tracking-wider">Game Controls</div>
+              
+              {/* SNAP and RESET buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    try {
+                      window.dispatchEvent(new CustomEvent('agent-snap-now'));
+                    } catch (e) {
+                      console.warn('Failed to dispatch snap event:', e);
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 text-sm rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold transition-all transform hover:scale-105 shadow-lg"
+                >
+                  🏈 SNAP
+                </button>
+                <button
+                  onClick={() => {
+                    try {
+                      window.dispatchEvent(new CustomEvent('hard-reset'));
+                    } catch (e) {
+                      console.warn('Failed to dispatch reset event:', e);
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 text-sm rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold transition-all transform hover:scale-105 shadow-lg"
+                >
+                  🔄 RESET
+                </button>
+              </div>
+
+              {/* Quick Throw Targets */}
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-white/80">QUICK THROW</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {['X', 'Z', 'SLOT', 'TE', 'RB'].map(rid => (
+                    <button
+                      key={rid}
+                      className="px-2 py-2 text-xs rounded-md bg-purple-500/20 hover:bg-purple-500/40 text-white border border-purple-500/30 transition-all hover:scale-105 font-medium"
+                      onClick={() => {
+                        try {
+                          window.dispatchEvent(new CustomEvent('throw-to-receiver', { 
+                            detail: { rid } 
+                          }));
+                        } catch (e) {
+                          console.warn('Failed to dispatch throw event:', e);
+                        }
+                      }}
+                    >
+                      {rid}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Advanced Controls */}
+            <div className="space-y-3">
+              <div className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">Advanced</div>
+              
+              {/* Pass Protection */}
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-white/80">PASS PROTECTION</div>
+                <div className="space-y-2">
+                  <label className="flex items-center justify-between p-2 bg-black/30 rounded border border-red-500/20 cursor-pointer">
+                    <span className="text-xs text-white">TE Block</span>
+                    <input 
+                      type="checkbox" 
+                      checked={teBlock}
+                      onChange={(e) => {
+                        setTeBlock(e.target.checked);
+                        try {
+                          window.dispatchEvent(new CustomEvent('toggle-te-block', {
+                            detail: { enabled: e.target.checked }
+                          }));
+                        } catch (err) {
+                          console.warn('Failed to dispatch TE block event:', err);
+                        }
+                      }}
+                      className="w-3 h-3 rounded border-red-500/30 bg-black/30 text-red-500" 
+                    />
+                  </label>
+                  
+                  <label className="flex items-center justify-between p-2 bg-black/30 rounded border border-red-500/20 cursor-pointer">
+                    <span className="text-xs text-white">RB Block</span>
+                    <input 
+                      type="checkbox" 
+                      checked={rbBlock}
+                      onChange={(e) => {
+                        setRbBlock(e.target.checked);
+                        try {
+                          window.dispatchEvent(new CustomEvent('toggle-rb-block', {
+                            detail: { enabled: e.target.checked }
+                          }));
+                        } catch (err) {
+                          console.warn('Failed to dispatch RB block event:', err);
+                        }
+                      }}
+                      className="w-3 h-3 rounded border-red-500/30 bg-black/30 text-red-500" 
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* AI Training */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-white/80 text-xs">
+                    <input type="checkbox" checked={adaptiveOn} onChange={(e)=>setAdaptiveOn(e.target.checked)} className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" /> 
+                    <span>AI Training</span>
+                  </label>
+                </div>
+                <button
+                  onClick={()=>void runReps(5)}
+                  className="w-full px-3 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors"
+                >
+                  ⚡ Run 5 Reps
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* MAIN CONTENT AREA */}
+        <div className="flex-1 flex">
+          {/* PlaySimulator Area */}
           <div className="flex-1 relative">
             <PlaySimulator
               conceptId={conceptId}
@@ -186,8 +358,8 @@ export default function FootballPanel() {
               fullScreen={false}
             />
             
-            {/* Performance Widget - Top-left inside PlaySimulator */}
-            <div className="absolute top-4 left-4 z-40 bg-black/80 backdrop-blur-xl border border-white/20 rounded-xl px-4 py-3 text-white min-w-48">
+            {/* Performance Widget - Top-right corner of PlaySimulator border */}
+            <div className="absolute top-19 right-5 z-40 bg-black/90 backdrop-blur-xl border border-white/30 rounded-lg px-3 py-2 text-white min-w-44 shadow-lg">
               <div className="text-xs uppercase tracking-wide text-emerald-400 font-semibold mb-2">Performance</div>
               {lastThrow ? (
                 <div className="space-y-2 text-sm">
@@ -227,279 +399,22 @@ export default function FootballPanel() {
             </div>
           </div>
 
-          {/* ENHANCED BOTTOM CONTROLS - Multiple sections */}
-          <div className="bg-black/90 backdrop-blur-xl border-t border-white/20 px-6 py-4">
-            {/* Top row - Main controls */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-xs uppercase tracking-wide text-emerald-400 font-semibold">NFL Defense Trainer</div>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-white/80 text-sm">
-                  <input type="checkbox" checked={adaptiveOn} onChange={(e)=>setAdaptiveOn(e.target.checked)} className="w-4 h-4 rounded border-white/30 bg-white/10 text-emerald-500 focus:ring-emerald-400" /> 
-                  <span>AI Training</span>
-                </label>
-                <button
-                  onClick={()=>void runReps(5)}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
-                >
-                  Run 5 Reps
-                </button>
-              </div>
+          {/* RIGHT SIDEBAR - AI Tutor */}
+          <div className="w-80 border-l border-white/20 bg-black/40 backdrop-blur-xl">
+            <div className="h-full p-4">
+              <TutorChat 
+                adaptiveOn={adaptiveOn} 
+                conceptId={conceptId} 
+                coverage={coverage} 
+                formation={snapshot?.formation} 
+                snapshot={snapshot} 
+                snapMeta={snapMeta} 
+                lastThrow={lastThrow} 
+                onSetCoverage={(c)=>setCoverage(c)}
+                isFullScreen={false}
+                isTopBar={false}
+              />
             </div>
-
-            {/* Bottom row - All controls organized */}
-            <div className="grid grid-cols-7 gap-4 items-end">
-              {/* Play Selection */}
-              <div className="space-y-2">
-                <div className="text-xs text-white/60 font-medium">PLAY</div>
-                <select
-                  value={conceptId}
-                  onChange={(e) => {
-                    const value = e.target.value as FootballConceptId;
-                    startTransition(() => setConceptId(value));
-                  }}
-                  className="w-full bg-white/10 text-white text-sm rounded-lg px-3 py-2 border border-white/20 outline-none focus:border-white/40"
-                >
-                  {CONCEPTS.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Coverage Selection */}
-              <div className="space-y-2">
-                <div className="text-xs text-white/60 font-medium">COVERAGE</div>
-                <select
-                  value={coverage}
-                  onChange={(e) => {
-                    const value = e.target.value as CoverageID;
-                    startTransition(() => setCoverage(value));
-                  }}
-                  className="w-full bg-white/10 text-white text-sm rounded-lg px-3 py-2 border border-white/20 outline-none focus:border-white/40"
-                >
-                  {COVERAGES.map(cv => (
-                    <option key={cv} value={cv}>{COVERAGE_LABEL[cv]}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Snap Controls */}
-              <div className="space-y-2">
-                <div className="text-xs text-white/60 font-medium">SNAP</div>
-                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => {
-                        try {
-                          window.dispatchEvent(new CustomEvent('agent-snap-now'));
-                        } catch (e) {
-                          console.warn('Failed to dispatch snap event:', e);
-                        }
-                      }}
-                      className="w-full px-2 py-1 text-xs rounded bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors"
-                    >
-                      Snap
-                    </button>
-                    <label className="flex items-center gap-1 text-white/80 text-xs">
-                      <input type="checkbox" className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" />
-                      <span>Snap on Motion</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Throw Controls */}
-              <div className="space-y-2">
-                <div className="text-xs text-white/60 font-medium">THROW</div>
-                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                  <div className="text-xs text-white/80 mb-1">Target Receiver</div>
-                  <div className="flex gap-1 flex-wrap">
-                    {['X', 'Z', 'SLOT', 'TE', 'RB'].map(rid => (
-                      <button
-                        key={rid}
-                        className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20 text-white/80 border border-white/20 transition-colors"
-                        onClick={() => {
-                          try {
-                            window.dispatchEvent(new CustomEvent('throw-to-receiver', { 
-                              detail: { rid } 
-                            }));
-                          } catch (e) {
-                            console.warn('Failed to dispatch throw event:', e);
-                          }
-                        }}
-                      >
-                        {rid}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Motion Controls */}
-              <div className="space-y-2">
-                <div className="text-xs text-white/60 font-medium">MOTION</div>
-                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                  <div className="space-y-1">
-                    <select 
-                      value={motionReceiver} 
-                      onChange={(e) => setMotionReceiver(e.target.value)}
-                      className="w-full bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20"
-                    >
-                      <option value="">Select Receiver</option>
-                      <option value="X">X</option>
-                      <option value="Z">Z</option>
-                      <option value="SLOT">SLOT</option>
-                      <option value="TE">TE</option>
-                    </select>
-                    <div className="flex gap-1">
-                      <select 
-                        value={motionType} 
-                        onChange={(e) => setMotionType(e.target.value)}
-                        className="flex-1 bg-white/10 text-white text-xs rounded px-1 py-1 border border-white/20"
-                      >
-                        <option value="across">Across</option>
-                        <option value="jet">Jet</option>
-                        <option value="short">Short</option>
-                      </select>
-                      <select 
-                        value={motionDirection} 
-                        onChange={(e) => setMotionDirection(e.target.value)}
-                        className="flex-1 bg-white/10 text-white text-xs rounded px-1 py-1 border border-white/20"
-                      >
-                        <option value="left">Left</option>
-                        <option value="right">Right</option>
-                      </select>
-                    </div>
-                    {motionReceiver && (
-                      <button
-                        onClick={() => {
-                          try {
-                            window.dispatchEvent(new CustomEvent('apply-motion', {
-                              detail: { rid: motionReceiver, type: motionType, dir: motionDirection }
-                            }));
-                          } catch (e) {
-                            console.warn('Failed to dispatch motion event:', e);
-                          }
-                        }}
-                        className="w-full px-2 py-1 text-xs rounded bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors"
-                      >
-                        Apply Motion
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Audible Controls */}
-              <div className="space-y-2">
-                <div className="text-xs text-white/60 font-medium">AUDIBLE</div>
-                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                  <div className="space-y-1">
-                    <select 
-                      value={audibleReceiver} 
-                      onChange={(e) => setAudibleReceiver(e.target.value)}
-                      className="w-full bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20"
-                    >
-                      <option value="">Select Receiver</option>
-                      <option value="X">X</option>
-                      <option value="Z">Z</option>
-                      <option value="SLOT">SLOT</option>
-                      <option value="TE">TE</option>
-                    </select>
-                    <select 
-                      value={audibleRoute} 
-                      onChange={(e) => setAudibleRoute(e.target.value)}
-                      className="w-full bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20"
-                    >
-                      <option value="">Route Change</option>
-                      <option value="SLANT">SLANT</option>
-                      <option value="FADE">FADE</option>
-                      <option value="OUT">OUT</option>
-                      <option value="COMEBACK">COMEBACK</option>
-                    </select>
-                    {audibleReceiver && audibleRoute && (
-                      <button
-                        onClick={() => {
-                          try {
-                            const assignments = { [audibleReceiver]: audibleRoute };
-                            window.dispatchEvent(new CustomEvent('apply-audible', {
-                              detail: { assignments }
-                            }));
-                          } catch (e) {
-                            console.warn('Failed to dispatch audible event:', e);
-                          }
-                        }}
-                        className="w-full px-2 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition-colors"
-                      >
-                        Apply Audible
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Pass Protection */}
-              <div className="space-y-2">
-                <div className="text-xs text-white/60 font-medium">PASS PRO</div>
-                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-white/80 text-xs">
-                      <input 
-                        type="checkbox" 
-                        checked={teBlock}
-                        onChange={(e) => {
-                          setTeBlock(e.target.checked);
-                          try {
-                            window.dispatchEvent(new CustomEvent('toggle-te-block', {
-                              detail: { enabled: e.target.checked }
-                            }));
-                          } catch (err) {
-                            console.warn('Failed to dispatch TE block event:', err);
-                          }
-                        }}
-                        className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" 
-                      />
-                      <span>TE Block</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-white/80 text-xs">
-                      <input 
-                        type="checkbox" 
-                        checked={rbBlock}
-                        onChange={(e) => {
-                          setRbBlock(e.target.checked);
-                          try {
-                            window.dispatchEvent(new CustomEvent('toggle-rb-block', {
-                              detail: { enabled: e.target.checked }
-                            }));
-                          } catch (err) {
-                            console.warn('Failed to dispatch RB block event:', err);
-                          }
-                        }}
-                        className="w-3 h-3 rounded border-white/30 bg-white/10 text-emerald-500" 
-                      />
-                      <span>RB Block</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT SIDE - AI Defense Coach (25-30% width) */}
-        <div className="w-80 border-l border-white/20 bg-black/40 backdrop-blur-xl">
-          <div className="h-full p-4">
-            <TutorChat 
-              adaptiveOn={adaptiveOn} 
-              conceptId={conceptId} 
-              coverage={coverage} 
-              formation={snapshot?.formation} 
-              snapshot={snapshot} 
-              snapMeta={snapMeta} 
-              lastThrow={lastThrow} 
-              onSetCoverage={(c)=>setCoverage(c)}
-              isFullScreen={false}
-              isTopBar={false}
-            />
           </div>
         </div>
       </div>
