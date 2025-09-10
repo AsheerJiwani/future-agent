@@ -743,7 +743,7 @@ const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, pr
     
     return {
       x: blockerPos.x + xAcross(lateralJockey),
-      y: blockerPos.y - yUp(jockeyDistance) // Stay behind the OL blocker
+      y: blockerPos.y + jockeyDistance * YPX // Stay behind the OL blocker (positive = downfield)
     };
   }
   
@@ -765,7 +765,7 @@ const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, pr
     
     return {
       x: blockerPos.x + xAcross(lateralStruggle),
-      y: blockerPos.y - yUp(extendedJockey) // Stay engaged with blocker
+      y: blockerPos.y + extendedJockey * YPX // Stay engaged with blocker (positive = downfield)
     };
   }
   
@@ -811,7 +811,7 @@ const getDLPosition = (dlId: DefenderID, qbPosition: Pt, timeElapsed: number, pr
   
   return {
     x: basePos.x + xAcross(breakthroughPath.x + protectionModifier.x),
-    y: basePos.y + yUp(breakthroughPath.y + protectionModifier.y)
+    y: basePos.y - (breakthroughPath.y + protectionModifier.y) * YPX // Use direct pixel offset upfield
   };
 };
 
