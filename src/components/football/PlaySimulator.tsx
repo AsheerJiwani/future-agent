@@ -2332,7 +2332,8 @@ setManExtraRoles({ blitzers, spy });
     
     // Handle DL pass rush movement (applies to all coverages) - use enhanced getDLPosition
     if (id === "DE_L" || id === "DE_R" || id === "DT_L" || id === "DT_R") {
-      return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, tt, protectionScheme, defSpeed, playId);
+      const timeElapsed = tt * (PLAY_MS / 1000); // Convert tt (0-1) to seconds
+      return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, timeElapsed, protectionScheme, defSpeed, playId);
     }
     
     return anchor;
@@ -3200,7 +3201,8 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
 
       // Defensive Line: Enhanced pass rush with breakthrough system
       if (id === 'DE_L' || id === 'DE_R' || id === 'DT_L' || id === 'DT_R') {
-        return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, tt, protectionScheme, defSpeed, playId);
+        const timeElapsed = tt * (PLAY_MS / 1000); // Convert tt (0-1) to seconds
+        return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, timeElapsed, protectionScheme, defSpeed, playId);
       }
       // Curl/flat droppers midpoint for a beat before driving
       let p = approach(start, anchor, 0.35, 0.6);
@@ -4625,7 +4627,8 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
               
               {/* DL positions and rush paths */}
               {['DE_L', 'DE_R', 'DT_L', 'DT_R'].map((dlId) => {
-                const dlPos = getDLPosition(dlId as DefenderID, qbPos, t, protectionScheme, defSpeed, playId);
+                const timeElapsed = t * (PLAY_MS / 1000); // Convert t (0-1) to seconds
+                const dlPos = getDLPosition(dlId as DefenderID, qbPos, timeElapsed, protectionScheme, defSpeed, playId);
                 const basePos = D_ALIGN[dlId as DefenderID];
                 return (
                   <g key={`dl-${dlId}`}>
