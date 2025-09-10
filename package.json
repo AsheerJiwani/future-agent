@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cleanup": "./scripts/cleanup-playwright.sh",
+    "monitor": "./scripts/monitor-processes.sh",
+    "test:clean": "npm run cleanup && python test_ol_dl_mechanics.py",
+    "test:focused": "npm run cleanup && python test_ol_dl_focused.py",
+    "test:pocket": "npm run cleanup && python test_ol_dl_mechanics_with_pocket.py",
+    "test:stable": "npm run cleanup && python scripts/stable-test-runner.py"
   },
   "dependencies": {
     "@playwright/mcp": "^0.0.37",

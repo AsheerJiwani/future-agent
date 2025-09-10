@@ -345,9 +345,9 @@ export default function FootballPanel() {
           </div>
         </div>
 
-        {/* CENTER: PlaySimulator */}
+        {/* CENTER: PlaySimulator - Full viewport height for Playwright compatibility */}
         <div className="flex-1 flex flex-col min-h-screen">
-          <div className="h-[70vh] relative">
+          <div className="h-[85vh] relative flex items-center justify-center">
             <PlaySimulator
               conceptId={conceptId}
               coverage={coverage}
@@ -360,8 +360,8 @@ export default function FootballPanel() {
             />
           </div>
           
-          {/* Controls below PlaySimulator - Fixed position to prevent movement */}
-          <div className="p-4 space-y-4 bg-black/20 backdrop-blur-xl border-t border-white/20 h-[30vh] overflow-y-auto">
+          {/* Controls below PlaySimulator - Compact for better field display */}
+          <div className="p-2 space-y-2 bg-black/20 backdrop-blur-xl border-t border-white/20 h-[15vh] overflow-y-auto">
             
             {/* Speed Controls & Time Slider Row */}
             <div className="flex items-center gap-4 justify-center">

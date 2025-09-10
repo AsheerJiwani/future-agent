@@ -35,9 +35,10 @@ const FIELD_LENGTH_YDS = 120;
 const FIELD_WIDTH_YDS = 53.333333;
 const HASH_FROM_SIDELINE_YDS = 70.75 / 3;
 
-// QB Perspective View - Optimized for immersive gameplay experience
-const PX_W = 880; // Wider field for better QB perspective visibility (responsive)
-const PX_H = 600; // Enhanced height for better QB perspective immersion
+// QB Perspective View - Optimized for Playwright display and proper field perspective
+// Based on field_reference.md analysis: 4:3 aspect ratio like reference image (660x495)
+const PX_W = 960; // Increased width for better Playwright display compatibility  
+const PX_H = 720; // Increased height with proper 4:3 ratio for field perspective
 
 const XPX = PX_W / FIELD_WIDTH_YDS;
 const YPX = PX_H / FIELD_LENGTH_YDS;
@@ -49,8 +50,9 @@ function yDepthYds(p: Pt): number {
   return (PX_H - p.y) / YPX;
 }
 
-// QB Perspective: Positioned closer to bottom of screen for immersive "looking upfield" experience  
-const LOS_YDS = 25; // Line of scrimmage 25 yards from bottom - QB perspective focused on downfield action
+// QB Perspective: Camera positioned for aerial view like reference image - elevated angle behind QB
+// Reference analysis: moderate aerial height (30-50 feet) with 45-degree viewing angle
+const LOS_YDS = 30; // Line of scrimmage 30 yards from bottom - matches reference image perspective
 const QB = { x: xAcross(FIELD_WIDTH_YDS / 2), y: yUp(LOS_YDS) };
 
 // Enhanced QB position based on formation and dropback progression
@@ -180,26 +182,40 @@ function posOnPathLenScaled(path: Pt[], t: number): Pt {
   return path[path.length - 1];
 }
 
-/* --------- Label offset to avoid overlaps --------- */
+/* --------- Label offset to avoid overlaps - Enhanced for Playwright display --------- */
 function labelOffsetFor(id: string, p: Pt): { dx: number; dy: number } {
   const leftOfQB = p.x < QB.x;
-  const baseDx = leftOfQB ? 12 : -12;
+  const baseDx = leftOfQB ? 14 : -14; // Increased spacing for better visibility
+  
+  // Enhanced position-specific offsets for clearer display on larger field
   const dyMap: Record<string, number> = {
-    X: -10,
-    Z: -10,
-    SLOT: 10,
-    TE: 12,
+    // Offensive players - varied Y offsets to prevent overlap
+    X: -12,
+    Z: -12, 
+    SLOT: 12,
+    TE: 14,
     RB: 18,
-    CB_L: -12,
-    CB_R: -12,
-    NICKEL: 10,
-    FS: -14,
-    SS: -6,
-    SAM: 10,
-    MIKE: 14,
-    WILL: 16,
+    
+    // Defensive backs - positioned above players
+    CB_L: -14,
+    CB_R: -14,
+    NICKEL: 12,
+    FS: -16,
+    SS: -8,
+    
+    // Linebackers - middle positions
+    SAM: 12,
+    MIKE: 16,
+    WILL: 18,
+    
+    // Defensive line - positioned below for DL visibility
+    DE_L: 20,
+    DE_R: 20, 
+    DT_L: 22,
+    DT_R: 22,
   };
-  const dy = dyMap[id] ?? 10;
+  
+  const dy = dyMap[id] ?? 12;
   return { dx: baseDx, dy };
 }
 
@@ -3349,6 +3365,12 @@ function cutDirectionFor(rid: ReceiverID, tt: number): 'inside' | 'outside' | 's
       }
 
       return p;
+    }
+
+    // Final fallback: Enhanced DL pass rush mechanics (critical for all coverages)
+    if (id === 'DE_L' || id === 'DE_R' || id === 'DT_L' || id === 'DT_R') {
+      const timeElapsed = tt * (PLAY_MS / 1000); // Convert tt (0-1) to seconds
+      return getDLPosition(id as DefenderID, { x: QB.x, y: QB.y }, timeElapsed, protectionScheme, defSpeed, playId);
     }
 
     return approach(start, anchor, 0.3, 0.5);

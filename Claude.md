@@ -33,7 +33,8 @@ Use `docs/sources/field_reference.md` as the **single source of truth** for the 
    - “Touchdown” text appears centered in **both** end zones, legible at the default zoom.
    - No logos, watermarks, school names, or extra branding.
 4. **Playwright MCP Verification**
-   - Open `http://localhost:3000` → Football Panel → Play Simulator.
+   - **CRITICAL**: Open `http://localhost:3000` → **Football Playbook Coach** tab → **ENTER FULL SCREEN** → **WAIT 5 SECONDS** (F11 or browser full screen mode). The UI will not render properly without full screen mode.
+   - Open Football Panel → Play Simulator.
    - Assert the field container mounts with a fixed **MacBook Air–like** viewport (as configured).
    - Query for field root by test id or role (e.g., `data-testid="field-root"`).
    - Verify end zone text nodes exist (`"Touchdown"` twice).
